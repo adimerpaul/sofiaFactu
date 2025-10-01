@@ -41,37 +41,112 @@ class DatabaseSeeder extends Seeder
 //                'updated_at' => now(),
 //            ],
         ]);
+//
+//        $sqlFile = base_path('database/seeders/productos_202504240447.sql');
+//        $sqlContent = file_get_contents($sqlFile);
+//        DB::unprepared($sqlContent);
+//        error_log("Productos seed executed");
+//
+//        $sqlFile = base_path('database/seeders/categorias_202504230342.sql');
+//        $sqlContent = file_get_contents($sqlFile);
+//        DB::unprepared($sqlContent);
+//        error_log("Categorias seed executed");
+//
+//        $sqlFile = base_path('database/seeders/subcategorias_202504230342.sql');
+//        $sqlContent = file_get_contents($sqlFile);
+//        DB::unprepared($sqlContent);
+//        error_log("Subcategorias seed executed");
+//
+////        $table->string('nombre')->nullable();
+////        $table->string('ci')->nullable();
+////        $table->string('telefono')->nullable();
+////        $table->string('direccion')->nullable();
+////        $table->string('complemento')->nullable();
+////        $table->string('codigoTipoDocumentoIdentidad')->nullable();
+////        $table->string('email')->nullable();
+//        $cliente = Cliente::create([
+//            'nombre' => 'SN',
+//            'ci' => '0',
+//            'telefono' => '0',
+//            'complemento' => '0',
+//            'codigoTipoDocumentoIdentidad' => '1',
+//            'direccion' => 'S/N',
+//            'email' => '',
+//        ]);
 
-        $sqlFile = base_path('database/seeders/productos_202504240447.sql');
+        $gruposPadres = [
+            ['nombre' => 'BANDEJAS', 'codigo' => '1'],
+            ['nombre' => 'SISTEMA', 'codigo' => 'F'],
+            ['nombre' => 'CARNE DE CERDO', 'codigo' => '2'],
+            ['nombre' => 'CARNE DE POLLO', 'codigo' => '3'],
+            ['nombre' => 'CONSERVAS', 'codigo' => '4'],
+            ['nombre' => 'EMBUTIDOS', 'codigo' => '5'],
+            ['nombre' => 'OTROS', 'codigo' => '6'],
+            ['nombre' => 'CONGELADOS', 'codigo' => '7'],
+            ['nombre' => 'FIAMBRES', 'codigo' => '8'],
+            ['nombre' => 'PODIUM', 'codigo' => '9'],
+            ['nombre' => 'CARNE DE RES GANCHO', 'codigo' => '10'],
+            ['nombre' => 'ENLATADOS', 'codigo' => '011'],
+            ['nombre' => 'PAPAS FRITAS', 'codigo' => '012'],
+            ['nombre' => 'APIS', 'codigo' => '13'],
+            ['nombre' => 'ACEITE', 'codigo' => '90'],
+            ['nombre' => 'FRUTAS Y VERDURAS CONGELADAS', 'codigo' => '80'],
+            ['nombre' => 'PESCADO', 'codigo' => '014'],
+        ];
+        foreach($gruposPadres as $grupoPadre){
+            DB::table('producto_grupo_padres')->insert([
+                'nombre' => $grupoPadre['nombre'],
+                'codigo' => $grupoPadre['codigo'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $gruposHijos = [
+            ['codigo' => '11', 'producto_grupo_padre_id' => 1, 'nombre' => 'BANDEJA DE CERDO'],
+            ['codigo' => '12', 'producto_grupo_padre_id' => 1, 'nombre' => 'BANDEJA DE COSTILLA ON'],
+            ['codigo' => '13', 'producto_grupo_padre_id' => 1, 'nombre' => 'BANDEJA DE PAVO'],
+            ['codigo' => '14', 'producto_grupo_padre_id' => 1, 'nombre' => 'BANDEJA DE POLLO'],
+            ['codigo' => '21', 'producto_grupo_padre_id' => 2, 'nombre' => 'CORTES'],
+            ['codigo' => '22', 'producto_grupo_padre_id' => 2, 'nombre' => 'ENTERO'],
+            ['codigo' => '31', 'producto_grupo_padre_id' => 3, 'nombre' => 'FRIAL'],
+            ['codigo' => '32', 'producto_grupo_padre_id' => 3, 'nombre' => 'TROZADOS'],
+            ['codigo' => '41', 'producto_grupo_padre_id' => 4, 'nombre' => 'ATUN'],
+            ['codigo' => '51', 'producto_grupo_padre_id' => 5, 'nombre' => 'CHORIZO'],
+            ['codigo' => '52', 'producto_grupo_padre_id' => 5, 'nombre' => 'JAMON'],
+            ['codigo' => '53', 'producto_grupo_padre_id' => 5, 'nombre' => 'MORTADELA'],
+            ['codigo' => '61', 'producto_grupo_padre_id' => 6, 'nombre' => 'VARIOS'],
+            ['codigo' => '71', 'producto_grupo_padre_id' => 7, 'nombre' => 'PROCESADOS'],
+            ['codigo' => '54', 'producto_grupo_padre_id' => 5, 'nombre' => 'PATE'],
+            ['codigo' => '55', 'producto_grupo_padre_id' => 5, 'nombre' => 'SALCHICHA'],
+            ['codigo' => '81', 'producto_grupo_padre_id' => 8, 'nombre' => 'AHUMADO'],
+            ['codigo' => '82', 'producto_grupo_padre_id' => 8, 'nombre' => 'QUESO ENRROLLADO'],
+            ['codigo' => '83', 'producto_grupo_padre_id' => 8, 'nombre' => 'SECOS'],
+            ['codigo' => '72', 'producto_grupo_padre_id' => 7, 'nombre' => 'HAMBURGUESA'],
+            ['codigo' => '73', 'producto_grupo_padre_id' => 7, 'nombre' => 'NUGGETS'],
+            ['codigo' => '91', 'producto_grupo_padre_id' => 9, 'nombre' => 'PODIUM'],
+            ['codigo' => '101', 'producto_grupo_padre_id' => 10, 'nombre' => 'CARNE DE RES'],
+            ['codigo' => '0111', 'producto_grupo_padre_id' => 11, 'nombre' => 'CONSERVAS'],
+            ['codigo' => '0121', 'producto_grupo_padre_id' => 12, 'nombre' => 'PAPAS FRITAS'],
+            ['codigo' => '7077', 'producto_grupo_padre_id' => 13, 'nombre' => 'API'],
+            ['codigo' => '8010', 'producto_grupo_padre_id' => 14, 'nombre' => 'FRUTAS Y VERDURAS CONGELADAS'],
+            ['codigo' => '901', 'producto_grupo_padre_id' => 15, 'nombre' => 'ACEITE'],
+            ['codigo' => '0141', 'producto_grupo_padre_id' => 16, 'nombre' => 'PESCADO'],
+        ];
+        foreach($gruposHijos as $grupoHijo) {
+            DB::table('producto_grupos')->insert([
+                'codigo' => $grupoHijo['codigo'],
+                'producto_grupo_padre_id' => $grupoHijo['producto_grupo_padre_id'],
+                'nombre' => $grupoHijo['nombre'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+//        productos_202509302046.sql
+        $sqlFile = base_path('database/seeders/productos_202509302046.sql');
         $sqlContent = file_get_contents($sqlFile);
         DB::unprepared($sqlContent);
-        error_log("Productos seed executed");
-
-        $sqlFile = base_path('database/seeders/categorias_202504230342.sql');
-        $sqlContent = file_get_contents($sqlFile);
-        DB::unprepared($sqlContent);
-        error_log("Categorias seed executed");
-
-        $sqlFile = base_path('database/seeders/subcategorias_202504230342.sql');
-        $sqlContent = file_get_contents($sqlFile);
-        DB::unprepared($sqlContent);
-        error_log("Subcategorias seed executed");
-
-//        $table->string('nombre')->nullable();
-//        $table->string('ci')->nullable();
-//        $table->string('telefono')->nullable();
-//        $table->string('direccion')->nullable();
-//        $table->string('complemento')->nullable();
-//        $table->string('codigoTipoDocumentoIdentidad')->nullable();
-//        $table->string('email')->nullable();
-        $cliente = Cliente::create([
-            'nombre' => 'SN',
-            'ci' => '0',
-            'telefono' => '0',
-            'complemento' => '0',
-            'codigoTipoDocumentoIdentidad' => '1',
-            'direccion' => 'S/N',
-            'email' => '',
-        ]);
+        error_log("Productos seed 202509302046 executed");
     }
 }

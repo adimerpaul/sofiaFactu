@@ -13,31 +13,26 @@ return new class extends Migration
     {
         Schema::create('productos', function (Blueprint $table) {
             $table->id();
-            $table->string('nombre')->nullable();
-            $table->string('barra')->nullable();
-            $table->integer('stockAlmacen')->nullable()->default(0)->comment('cantidad en stock almacen');
-            $table->integer('stockChallgua')->nullable()->default(0)->comment('cantidad en stock sucursal challgua');
-            $table->integer('stockSocavon')->nullable()->default(0)->comment('cantidad en stock sucursal socavon');
-            $table->integer('stockCatalina')->nullable()->default(0)->comment('cantidad en stock sucursal catalina');
-//            $table->integer('cantidadSucursal4')->nullable()->default(0)->comment('cantidad en stock sucursal 4');
-            $table->double('costo',10,2)->nullable();
-            $table->double('precioAntes',10,2)->nullable();
-            $table->double('precio',10,2)->nullable();
-            $table->double('porcentaje',10,2)->nullable();
-            //$table->double('utilidad',10,2)->nullable();
-            $table->string('activo')->default('ACTIVO');
-            $table->string('unidad')->default('UNIDAD');
-            $table->string('registroSanitario')->nullable();
-            $table->string('paisOrigen')->nullable();
-            $table->string('nombreComun')->nullable();
-            $table->string('composicion')->nullable();
-            $table->string('marca')->nullable();
-            $table->string('distribuidora')->nullable();
-            $table->string('imagen')->nullable()->default('productDefault.jpg');
-//            $table->string('color')->nullable();
-            $table->text('descripcion')->nullable();
-            $table->string('categoria')->nullable();
-            $table->string('subcategoria')->nullable();
+            $table->string('codigo', 25);
+            $table->unsignedBigInteger('producto_grupo_id')->nullable();
+            $table->foreign('producto_grupo_id')->references('id')->on('producto_grupos');
+            $table->unsignedBigInteger('producto_grupo_padre_id')->nullable();
+            $table->foreign('producto_grupo_padre_id')->references('id')->on('producto_grupo_padres');
+            $table->string('nombre', 105);
+            $table->string('tipo_producto', 3);
+            for($i=1; $i<=13; $i++){
+                $table->decimal('precio'.$i, 10, 3);
+            }
+            $table->string('codigo_unidad', 15)->nullable();
+            $table->decimal('unidades_caja', 10, 2)->nullable();
+            $table->decimal('cantidad_presentacion', 10, 3)->nullable();
+            $table->string('tipo', 255)->default('NORMAL')->nullable();
+            $table->string('oferta', 255)->default(' ')->nullable();
+            $table->string('codigo_producto_sin', 100)->nullable();
+            $table->string('presentacion', 300)->nullable();
+            $table->string('codigo_grupo_sin', 100)->nullable();
+            $table->decimal('credito', 10, 3)->nullable();
+            $table->boolean('active')->default(true)->nullable();
             $table->softDeletes();
             $table->timestamps();
         });

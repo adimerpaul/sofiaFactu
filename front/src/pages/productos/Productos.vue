@@ -50,6 +50,15 @@
                     <q-item-label>Editar</q-item-label>
                   </q-item-section>
                 </q-item>
+                <q-item clickable @click="prodImgEdit(producto)" v-close-popup>
+                  <q-item-section avatar>
+                    <q-icon name="image" />
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label>Editar Img</q-item-label>
+                  </q-item-section>
+                </q-item>
+  
                 <q-item clickable @click="productoDelete(producto.id)" v-close-popup>
                   <q-item-section avatar>
                     <q-icon name="delete" />
@@ -68,7 +77,7 @@
           <td>
 <!--            {{`${$url}../images/${producto.imagen}`}}<br>-->
             <q-img
-              :src="`${$url}../images/${producto.imagen}`"
+              :src="`${$url}/../${producto.imagen}`"
               style="width: 50px; height: 50px"
               class="q-mr-sm" ></q-img>
           </td>
@@ -225,6 +234,28 @@
         </q-card-section>
       </q-card>
     </q-dialog>
+    <q-dialog v-model="dialogImg">
+      <q-card>
+        <q-card-section class="row items-center">
+          <q-avatar icon="image" color="primary" text-color="white" size="lg" />
+          <span class="q-ml-sm">Actualizar imagen.</span>
+        </q-card-section>
+        <q-card-section>
+          <q-uploader
+            label="Actualizar imagen"
+            :factory="uploadFactory"
+            :auto-upload="true"
+            :multiple="false"
+            accept="image/*"
+            hide-upload-btn
+          />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" color="primary" v-close-popup />
+          <q-btn flat label="Turn on Wifi" color="primary" v-close-popup />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 <script>
@@ -238,6 +269,8 @@ export default {
       productos: [],
       producto: {},
       productoDialog: false,
+      dialogImg: false,
+      imagen:null,
       loading: false,
       actionPeriodo: '',
       filter: '',
@@ -276,6 +309,26 @@ export default {
     this.debouncedCambioBarra = debounce(this.cambioBarra, 500)
   },
   methods: {
+    prodImgEdit(producto) {
+      this.producto = producto
+      this.dialogImg = true
+    },
+      async uploadFactory(files) {
+        const formData = new FormData();
+        formData.append('image', files[0]);
+        formData.append('id', this.producto.id); // o cualquier otro dato extra
+      
+       await this.$axios.post('uploadImage', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        }).then(response => {
+          this.productosGet();
+        }).catch(error => {
+          this.$alert.error(error.response.data.message);
+        })
+      
+    },
     cambioStockA(producto) {
       this.loading = true
       this.$axios.put('productos/' + producto.id, { stockAlmacen: producto.stockAlmacen }).then(res => {

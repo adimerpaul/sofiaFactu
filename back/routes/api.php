@@ -29,6 +29,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/productosStock', [App\Http\Controllers\ProductoController::class, 'productosStock']);
     Route::put('/productos/{producto}', [App\Http\Controllers\ProductoController::class, 'update']);
     Route::delete('/productos/{producto}', [App\Http\Controllers\ProductoController::class, 'destroy']);
+    Route::post('/uploadImage', [App\Http\Controllers\ProductoController::class, 'uploadImage']);
 
 
     Route::post('/searchCliente', [App\Http\Controllers\ClienteController::class, 'searchCliente']);

@@ -4,9 +4,77 @@ namespace App\Http\Controllers;
 
 use App\Models\Producto;
 use Illuminate\Http\Request;
-
+use Intervention\Image\Facades\Image;
+use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver; // Usamos GD por estar en XAMPP
+use Illuminate\Support\Facades\Storage;
 class ProductoController extends Controller
 {
+
+    public function uploadImage(Request $request)
+{
+     $request->validate([
+        'image' => 'required|image|max:5120', // máx 5MB
+    ]);
+
+    $producto = Producto::find($request->id);
+
+    if (!$producto) {
+        return response()->json(['message' => 'Producto no encontrado'], 404);
+    }
+
+    // Crear manager
+    $manager = new ImageManager(new Driver());
+
+    // Leer imagen subida
+    $imageFile = $request->file('image');
+    $image = $manager->read($imageFile);
+
+    // Redimensionar si excede el ancho
+    $maxWidth = 800;
+    if ($image->width() > $maxWidth) {
+        $image = $image->scale(width: $maxWidth);
+    }
+
+    // Obtener extensión original (ej: jpg, png, webp)
+    $extension = strtolower($imageFile->getClientOriginalExtension());
+
+    // Codificar según la extensión original
+    switch ($extension) {
+        case 'jpg':
+        case 'jpeg':
+            $encoded = $image->toJpeg(quality: 80);
+            $extension = 'jpg';
+            break;
+        case 'png':
+            $encoded = $image->toPng();
+            $extension = 'png';
+            break;
+        case 'webp':
+            $encoded = $image->toWebp(quality: 80);
+            $extension = 'webp';
+            break;
+        default:
+            // Si extensión no es soportada, forzar a JPG
+            $encoded = $image->toJpeg(quality: 80);
+            $extension = 'jpg';
+            break;
+    }
+
+    // Nombre de archivo con extensión correcta
+    $filename = 'uploads/' . uniqid() . '.' . $extension;
+
+    // Guardar en disco
+
+    // Asegurarse que la carpeta exista
+    if (!file_exists(public_path('uploads'))) {
+        mkdir(public_path('uploads'), 0755, true);
+    }
+     file_put_contents($filename, $encoded);
+    $producto->imagen = $filename;
+    $producto->save();
+    return response()->json($producto, 200);
+}
     // App/Http/Controllers/CompraController.php
     public function historialComprasVentas($productoId)
     {
@@ -85,8 +153,7 @@ class ProductoController extends Controller
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
                     $qq->where('nombre', 'like', "%{$search}%")
-                        ->orWhere('descripcion', 'like', "%{$search}%")
-                        ->orWhere('barra', 'like', "%{$search}%");
+                        ->orWhere('codigo', 'like', "%{$search}%");
                 });
             })
             ->withSum([

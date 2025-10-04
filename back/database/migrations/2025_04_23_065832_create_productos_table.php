@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('productos', function (Blueprint $table) {
             $table->id();
             $table->string('codigo', 25);
-            $table->string('imagen', 255)->default('default.png')->nullable();
+            $table->string('imagen', 255)->default('uploads/default.png')->nullable();
             $table->unsignedBigInteger('producto_grupo_id')->nullable();
             $table->foreign('producto_grupo_id')->references('id')->on('producto_grupos');
             $table->unsignedBigInteger('producto_grupo_padre_id')->nullable();
@@ -33,7 +33,7 @@ return new class extends Migration
             $table->string('presentacion', 300)->nullable();
             $table->string('codigo_grupo_sin', 100)->nullable();
             $table->decimal('credito', 10, 3)->nullable();
-            $table->string('imagen',100)->nullable();
+//            $table->string('imagen',100)->nullable();
             $table->boolean('active')->default(true)->nullable();
             $table->softDeletes();
             $table->timestamps();

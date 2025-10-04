@@ -74,7 +74,15 @@ class UserController extends Controller{
 //        return response()->json($user);
         return [
             'user' => User::find($user->id),
-            'permissions' => $user->permissions
+            'permissions' => $user->permissions,
+            'datos' => [
+                'nit' => env('NIT'),
+                'razon' => env("RAZON"),
+                'direccion' => env("DIRECCION"),
+                'telefono' => env("TELEFONO"),
+                'url' => env("URL_SIAT"),
+                'url2' => env("URL_SIAT2")
+            ]
         ];
     }
     function index(){

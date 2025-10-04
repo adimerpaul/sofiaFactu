@@ -58,17 +58,17 @@
                   <div class="col-6 col-md-2">
                     <q-card flat bordered class="cursor-pointer" @click="addProducto(producto)">
                       <q-img
-                        :src="`${$url}../images/${producto.imagen}`"
+                        :src="`${$url}/../${producto.imagen}`"
                         class="q-mb-xs"
                         style="height: 120px;"
                       >
                         <div class="absolute-bottom text-center" style="padding: 0;margin: 0;">
-                          <div style="max-width: 190px;line-height: 0.9;">
+                          <div style="max-width: 190px;line-height: 0.9;" class="text-caption">
                             {{ $filters.textUpper( producto.nombre ) }}
                           </div>
                           <div style="display: flex;justify-content: space-between;">
-                            <span>{{ producto.stock }}</span>
-                            <span class="text-bold bg-orange text-black border">{{ producto.precio }} Bs</span>
+                            <span class="text-caption">{{ producto.precio1 }}</span>
+                            <span class="text-bold bg-orange text-black border">{{ producto.codigo }}</span>
                           </div>
                         </div>
                       </q-img>
@@ -86,7 +86,7 @@
                   <span class="text-subtitle2">Productos seleccionados</span>
                 </span>
                 <span>
-                  <q-btn size="xs" dense icon="restore" color="blue" class="q-mb-sm" label="Recuperar pedidos" no-caps @click="recuperarPedido" />
+<!--                  <q-btn size="xs" dense icon="restore" color="blue" class="q-mb-sm" label="Recuperar pedidos" no-caps @click="recuperarPedido" />-->
                 </span>
               </div>
               <q-markup-table dense wrap-cells flat bordered>
@@ -194,8 +194,8 @@
                 </tbody>
                 <tfoot>
                 <tr>
-                  <td colspan="3" class="text-right">Total</td>
-                  <td class="text-right">{{ totalCompra }} Bs</td>
+                  <td colspan="8" class="text-right">Total</td>
+                  <td colspan="3" class="text-right text-bold">{{ totalCompra }} Bs</td>
                 </tr>
                 </tfoot>
               </q-markup-table>
@@ -659,7 +659,7 @@ export default {
         console.error("Error registrando compra:", err);
         this.$alert.error("Error al registrar la compra");
       }).finally(() => {
-        // this.loading = false;
+        this.loading = false;
       });
     },
     proveedoresGet() {

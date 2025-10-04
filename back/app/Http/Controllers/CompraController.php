@@ -170,7 +170,7 @@ class CompraController extends Controller{
                         break;
                 }
                 $producto = Producto::find($p['producto_id']);
-                $producto->precio = $p['precio_venta'];
+                $producto->precio1 = $p['precio_venta'];
                 $producto->save();
             }
 

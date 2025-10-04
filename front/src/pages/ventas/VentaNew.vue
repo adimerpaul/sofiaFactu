@@ -50,7 +50,7 @@
                       @click="openLoteDialog(producto)"
                     >
                       <q-img
-                        :src="`${$url}../images/${producto.imagen}`"
+                        :src="`${$url}/../${producto.imagen}`"
                         class="q-mb-xs"
                         style="height: 120px;"
                       >

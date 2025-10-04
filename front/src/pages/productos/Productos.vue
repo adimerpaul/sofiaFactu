@@ -58,7 +58,7 @@
                     <q-item-label>Editar Img</q-item-label>
                   </q-item-section>
                 </q-item>
-  
+
                 <q-item clickable @click="productoDelete(producto.id)" v-close-popup>
                   <q-item-section avatar>
                     <q-icon name="delete" />
@@ -77,7 +77,7 @@
           <td>
 <!--            {{`${$url}../images/${producto.imagen}`}}<br>-->
             <q-img
-              :src="`${$url}/../${producto.imagen}`"
+              :src="`${$url}../${producto.imagen}`"
               style="width: 50px; height: 50px"
               class="q-mr-sm" ></q-img>
           </td>
@@ -317,7 +317,7 @@ export default {
         const formData = new FormData();
         formData.append('image', files[0]);
         formData.append('id', this.producto.id); // o cualquier otro dato extra
-      
+
        await this.$axios.post('uploadImage', formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
@@ -327,7 +327,7 @@ export default {
         }).catch(error => {
           this.$alert.error(error.response.data.message);
         })
-      
+
     },
     cambioStockA(producto) {
       this.loading = true

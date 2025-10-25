@@ -16,20 +16,24 @@ class DatabaseSeeder extends Seeder
      * Seed the application's database.
      */
     public function run(): void{
-        User::insert([
-            [
-                'name' => 'Administrador',
-                'username' => 'admin',
-                'agencia' => 'Sofia',
-                'role' => 'Admin',
-                'email' => 'admin@example.com',
-                'password' => Hash::make('admin123Admin'),
-                'active' => '1',
-//                'avatar' => 'default.png',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        ]);
+//        User::insert([
+//            [
+//                'name' => 'Administrador',
+//                'username' => 'admin',
+//                'agencia' => 'Sofia',
+//                'role' => 'Admin',
+//                'email' => 'admin@example.com',
+//                'password' => Hash::make('admin123Admin'),
+//                'active' => '1',
+////                'avatar' => 'default.png',
+//                'created_at' => now(),
+//                'updated_at' => now(),
+//            ],
+//        ]);
+//        users_202510241958.sql
+        $sqlFile = base_path('database/seeders/users_202510241958.sql');
+        $sqlContent = file_get_contents($sqlFile);
+        DB::unprepared($sqlContent);
         $permisos = [
             'Usuarios',
             'Impuestos',
@@ -50,7 +54,7 @@ class DatabaseSeeder extends Seeder
         }
         $permisosAll = Permission::all();
 
-        $admin = User::where('username', 'admin')->first();
+        $admin = User::where('id', 1)->first();
         $admin->syncPermissions($permisosAll);
 
         $gruposPadres = [

@@ -3,154 +3,160 @@
 namespace App\Http\Controllers;
 
 use App\Models\Producto;
+use App\Models\ProductoGrupo;
+use App\Models\ProductoGrupoPadre;
 use Illuminate\Http\Request;
-use Intervention\Image\Facades\Image;
+use Illuminate\Support\Facades\File;
+use Illuminate\Validation\Rule;
+use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver; // Usamos GD por estar en XAMPP
-use Illuminate\Support\Facades\Storage;
+
 class ProductoController extends Controller
 {
-
     public function uploadImage(Request $request)
-{
-     $request->validate([
-        'image' => 'required|image|max:5120', // máx 5MB
-    ]);
+    {
+        $request->validate([
+            'id' => 'required|integer|exists:productos,id',
+            'image' => 'required|image|max:5120',
+        ]);
 
-    $producto = Producto::find($request->id);
+        $producto = Producto::findOrFail($request->id);
 
-    if (!$producto) {
-        return response()->json(['message' => 'Producto no encontrado'], 404);
+        $manager = new ImageManager(new Driver());
+        $imageFile = $request->file('image');
+        $image = $manager->read($imageFile->getPathname());
+
+        if ($image->width() > 800) {
+            $image = $image->scale(width: 800);
+        }
+
+        $extension = strtolower($imageFile->getClientOriginalExtension());
+        switch ($extension) {
+            case 'jpg':
+            case 'jpeg':
+                $encoded = $image->toJpeg(quality: 80);
+                $extension = 'jpg';
+                break;
+            case 'png':
+                $encoded = $image->toPng();
+                $extension = 'png';
+                break;
+            case 'webp':
+                $encoded = $image->toWebp(quality: 80);
+                $extension = 'webp';
+                break;
+            default:
+                $encoded = $image->toJpeg(quality: 80);
+                $extension = 'jpg';
+                break;
+        }
+
+        $filename = 'uploads/' . uniqid('prod_', true) . '.' . $extension;
+        $destination = public_path($filename);
+
+        File::ensureDirectoryExists(dirname($destination));
+        file_put_contents($destination, (string) $encoded);
+
+        if (!empty($producto->imagen) && str_starts_with($producto->imagen, 'uploads/')) {
+            $old = public_path($producto->imagen);
+            if (File::exists($old) && !str_ends_with($producto->imagen, 'default.png')) {
+                File::delete($old);
+            }
+        }
+
+        $producto->imagen = $filename;
+        $producto->save();
+
+        return response()->json($producto->fresh(), 200);
     }
 
-    // Crear manager
-    $manager = new ImageManager(new Driver());
-
-    // Leer imagen subida
-    $imageFile = $request->file('image');
-    $image = $manager->read($imageFile);
-
-    // Redimensionar si excede el ancho
-    $maxWidth = 800;
-    if ($image->width() > $maxWidth) {
-        $image = $image->scale(width: $maxWidth);
+    public function gruposPadres()
+    {
+        return ProductoGrupoPadre::orderBy('nombre')->get(['id', 'nombre', 'codigo']);
     }
 
-    // Obtener extensión original (ej: jpg, png, webp)
-    $extension = strtolower($imageFile->getClientOriginalExtension());
-
-    // Codificar según la extensión original
-    switch ($extension) {
-        case 'jpg':
-        case 'jpeg':
-            $encoded = $image->toJpeg(quality: 80);
-            $extension = 'jpg';
-            break;
-        case 'png':
-            $encoded = $image->toPng();
-            $extension = 'png';
-            break;
-        case 'webp':
-            $encoded = $image->toWebp(quality: 80);
-            $extension = 'webp';
-            break;
-        default:
-            // Si extensión no es soportada, forzar a JPG
-            $encoded = $image->toJpeg(quality: 80);
-            $extension = 'jpg';
-            break;
+    public function grupos(Request $request)
+    {
+        return ProductoGrupo::query()
+            ->when($request->filled('producto_grupo_padre_id'), function ($q) use ($request) {
+                $q->where('producto_grupo_padre_id', $request->producto_grupo_padre_id);
+            })
+            ->orderBy('nombre')
+            ->get(['id', 'nombre', 'codigo', 'producto_grupo_padre_id']);
     }
 
-    // Nombre de archivo con extensión correcta
-    $filename = 'uploads/' . uniqid() . '.' . $extension;
-
-    // Guardar en disco
-
-    // Asegurarse que la carpeta exista
-    if (!file_exists(public_path('uploads'))) {
-        mkdir(public_path('uploads'), 0755, true);
-    }
-     file_put_contents($filename, $encoded);
-    $producto->imagen = $filename;
-    $producto->save();
-    return response()->json($producto, 200);
-}
-    // App/Http/Controllers/CompraController.php
     public function historialComprasVentas($productoId)
     {
-        $detalles = \App\Models\CompraDetalle::with(['compra' => function($q){
-            $q->select('id','agencia');
+        $detalles = \App\Models\CompraDetalle::with(['compra' => function ($q) {
+            $q->select('id', 'agencia');
         }])
             ->where('producto_id', $productoId)
             ->where('estado', 'Activo')
             ->whereNull('deleted_at')
             ->where('cantidad_venta', '>', 0)
-            ->orderByRaw("CASE WHEN fecha_vencimiento IS NULL THEN 1 ELSE 0 END, fecha_vencimiento ASC") // primero los que vencen antes
-            ->get(['id','compra_id','producto_id','lote','fecha_vencimiento','cantidad','cantidad_venta','precio','factor','precio_venta','nro_factura']);
+            ->orderByRaw("CASE WHEN fecha_vencimiento IS NULL THEN 1 ELSE 0 END, fecha_vencimiento ASC")
+            ->get(['id', 'compra_id', 'producto_id', 'lote', 'fecha_vencimiento', 'cantidad', 'cantidad_venta', 'precio', 'factor', 'precio_venta', 'nro_factura']);
 
-        // Puedes calcular 'disponible' = cantidad_venta si tu flujo lo maneja así
-        $response = $detalles->map(function($d){
+        $response = $detalles->map(function ($d) {
             return [
-                'id'               => $d->id,                 // compra_detalle_id (lote)
-                'compra_id'        => $d->compra_id,
-                'agencia'          => $d->compra?->agencia,
-                'producto_id'      => $d->producto_id,
-                'lote'             => $d->lote,
-                'fecha_vencimiento'=> $d->fecha_vencimiento,
-                'cantidad'         => (float)$d->cantidad,         // cantidad comprada
-                'disponible'       => (float)$d->cantidad_venta,   // REMANENTE para vender
-                'precio'           => (float)$d->precio,           // costo
-                'factor'           => (float)$d->factor,
-                'precio_venta'     => (float)$d->precio_venta,     // sugerido para venta
-                'nro_factura'      => $d->nro_factura,
+                'id' => $d->id,
+                'compra_id' => $d->compra_id,
+                'agencia' => $d->compra?->agencia,
+                'producto_id' => $d->producto_id,
+                'lote' => $d->lote,
+                'fecha_vencimiento' => $d->fecha_vencimiento,
+                'cantidad' => (float) $d->cantidad,
+                'disponible' => (float) $d->cantidad_venta,
+                'precio' => (float) $d->precio,
+                'factor' => (float) $d->factor,
+                'precio_venta' => (float) $d->precio_venta,
+                'nro_factura' => $d->nro_factura,
             ];
         });
 
         return response()->json($response);
     }
-    function productosStock(Request $request)
+
+    public function productosStock(Request $request)
     {
-        $search  = trim($request->input('search', ''));
+        $search = trim($request->input('search', ''));
         $perPage = (int) $request->input('per_page', 10);
 
         $productos = Producto::query()
-            // Calcula el stock en SQL (suma de cantidad_venta con estado Activo)
-            ->withSum(
-                ['comprasDetalles as stock' => function ($q) {
+            ->withSum([
+                'comprasDetalles as stock' => function ($q) {
                     $q->where('estado', 'Activo');
-                }],
-                'cantidad_venta'
-            )
-            // Búsqueda
+                }
+            ], 'cantidad_venta')
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('productos.nombre', 'like', "%{$search}%")
-                        ->orWhere('productos.descripcion', 'like', "%{$search}%")
-                        ->orWhere('productos.barra', 'like', "%{$search}%");
+                        ->orWhere('productos.codigo', 'like', "%{$search}%");
                 });
             })
-            // Filtra solo los que tienen stock > 0 (en SQL, no en PHP)
             ->having('stock', '>', 0)
             ->orderBy('productos.nombre')
             ->paginate($perPage);
 
-        // El paginator ya trae data, current_page, last_page, total, etc.
         return response()->json($productos);
     }
 
-    function productosAll()
+    public function productosAll()
     {
-        return Producto::orderBy('nombre')->get();
+        return Producto::with(['productoGrupo:id,nombre,codigo', 'productoGrupoPadre:id,nombre,codigo'])
+            ->orderBy('nombre')
+            ->get();
     }
 
     public function index(Request $request)
     {
-        $search  = $request->search;
-        $perPage = $request->per_page ?? 10;
-        $agencia = $request->agencia; // opcional: “Almacen”, “Challgua”, etc.
+        $search = trim((string) $request->input('search', ''));
+        $perPage = (int) $request->input('per_page', 10);
+        $agencia = $request->agencia;
 
-        $productos = \App\Models\Producto::query()
-            ->when($search, function ($q) use ($search) {
+        $productos = Producto::query()
+            ->with(['productoGrupo:id,nombre,codigo,producto_grupo_padre_id', 'productoGrupoPadre:id,nombre,codigo'])
+            ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
                     $qq->where('nombre', 'like', "%{$search}%")
                         ->orWhere('codigo', 'like', "%{$search}%");
@@ -159,9 +165,8 @@ class ProductoController extends Controller
             ->withSum([
                 'comprasDetalles as stock_disponible' => function ($q) use ($agencia) {
                     $q->where('estado', 'Activo')
-                        ->whereNull('deleted_at'); // no anulados
+                        ->whereNull('deleted_at');
                     if (!empty($agencia)) {
-                        // filtra por agencia de la compra
                         $q->whereHas('compra', function ($qc) use ($agencia) {
                             $qc->where('agencia', $agencia);
                         });
@@ -174,20 +179,132 @@ class ProductoController extends Controller
         return response()->json($productos);
     }
 
-    function store(Request $request)
+    public function store(Request $request)
     {
-        return Producto::create($request->all());
+        $data = $this->validateProductData($request, null);
+        $payload = $this->preparePayload($data, true);
+
+        $producto = Producto::create($payload);
+
+        return response()->json($producto, 201);
     }
 
-    function update(Request $request, Producto $producto)
+    public function update(Request $request, Producto $producto)
     {
-        $producto->update($request->all());
-        return $producto;
+        $data = $this->validateProductData($request, $producto);
+        $payload = $this->preparePayload($data, false, $producto);
+
+        $producto->update($payload);
+
+        return response()->json($producto->fresh());
     }
 
-    function destroy(Producto $producto)
+    public function destroy(Producto $producto)
     {
         $producto->delete();
+
         return response()->json(['success' => true]);
+    }
+
+    private function validateProductData(Request $request, ?Producto $producto): array
+    {
+        $isUpdate = $producto !== null;
+
+        $rules = [
+            'codigo' => [
+                $isUpdate ? 'sometimes' : 'nullable',
+                'string',
+                'max:25',
+                Rule::unique('productos', 'codigo')->ignore($producto?->id),
+            ],
+            'imagen' => [$isUpdate ? 'sometimes' : 'nullable', 'string', 'max:255'],
+            'producto_grupo_id' => [$isUpdate ? 'sometimes' : 'nullable', 'integer', 'exists:producto_grupos,id'],
+            'producto_grupo_padre_id' => [$isUpdate ? 'sometimes' : 'nullable', 'integer', 'exists:producto_grupo_padres,id'],
+            'nombre' => [$isUpdate ? 'sometimes' : 'required', 'string', 'max:105'],
+            'tipo_producto' => [$isUpdate ? 'sometimes' : 'required', 'string', 'max:3'],
+            'codigo_unidad' => [$isUpdate ? 'sometimes' : 'nullable', 'string', 'max:15'],
+            'unidades_caja' => [$isUpdate ? 'sometimes' : 'nullable', 'numeric', 'min:0'],
+            'cantidad_presentacion' => [$isUpdate ? 'sometimes' : 'nullable', 'numeric', 'min:0'],
+            'tipo' => [$isUpdate ? 'sometimes' : 'nullable', Rule::in(['NORMAL', 'POLLO', 'RES', 'CERDO'])],
+            'oferta' => [$isUpdate ? 'sometimes' : 'nullable', 'string', 'max:255'],
+            'codigo_producto_sin' => [$isUpdate ? 'sometimes' : 'nullable', 'string', 'max:100'],
+            'presentacion' => [$isUpdate ? 'sometimes' : 'nullable', 'string', 'max:300'],
+            'codigo_grupo_sin' => [$isUpdate ? 'sometimes' : 'nullable', 'string', 'max:100'],
+            'credito' => [$isUpdate ? 'sometimes' : 'nullable', 'numeric', 'min:0'],
+            'active' => [$isUpdate ? 'sometimes' : 'nullable', 'boolean'],
+            // Legacy aliases still accepted.
+            'barra' => [$isUpdate ? 'sometimes' : 'nullable', 'string', 'max:25'],
+            'precio' => [$isUpdate ? 'sometimes' : 'nullable', 'numeric', 'min:0'],
+        ];
+
+        for ($i = 1; $i <= 13; $i++) {
+            $rules['precio' . $i] = [$isUpdate ? 'sometimes' : 'nullable', 'numeric', 'min:0'];
+        }
+
+        return $request->validate($rules);
+    }
+
+    private function preparePayload(array $data, bool $isCreate, ?Producto $producto = null): array
+    {
+        if (isset($data['barra']) && !isset($data['codigo'])) {
+            $data['codigo'] = $data['barra'];
+        }
+
+        if (isset($data['precio']) && !isset($data['precio1'])) {
+            $data['precio1'] = $data['precio'];
+        }
+
+        unset($data['barra'], $data['precio']);
+
+        if (($isCreate || array_key_exists('codigo', $data)) && empty($data['codigo'])) {
+            $data['codigo'] = $this->generateCodigo();
+        }
+
+        if ($isCreate && !isset($data['active'])) {
+            $data['active'] = true;
+        }
+
+        if (isset($data['tipo'])) {
+            $data['tipo'] = strtoupper(trim((string) $data['tipo']));
+        } elseif ($isCreate) {
+            $data['tipo'] = 'NORMAL';
+        }
+
+        if ($isCreate && !isset($data['oferta'])) {
+            $data['oferta'] = ' ';
+        }
+
+        if (isset($data['producto_grupo_id']) && !isset($data['producto_grupo_padre_id'])) {
+            $grupo = ProductoGrupo::select('id', 'producto_grupo_padre_id')->find($data['producto_grupo_id']);
+            if ($grupo) {
+                $data['producto_grupo_padre_id'] = $grupo->producto_grupo_padre_id;
+            }
+        }
+
+        // In create, fill missing prices from precio1.
+        if ($isCreate) {
+            $base = isset($data['precio1']) ? (float) $data['precio1'] : 0;
+            for ($i = 1; $i <= 13; $i++) {
+                $k = 'precio' . $i;
+                if (!isset($data[$k])) {
+                    $data[$k] = $base;
+                }
+            }
+        }
+
+        return $data;
+    }
+
+    private function generateCodigo(): string
+    {
+        $next = ((int) Producto::max('id')) + 1;
+        $codigo = 'PROD-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+
+        while (Producto::where('codigo', $codigo)->exists()) {
+            $next++;
+            $codigo = 'PROD-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+        }
+
+        return $codigo;
     }
 }

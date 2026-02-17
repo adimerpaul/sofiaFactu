@@ -7,57 +7,80 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Producto extends Model{
     use SoftDeletes;
+
     protected $fillable = [
-        'nombre',
-        'barra',
-        'stockAlmacen',
-        'stockChallgua',
-        'stockSocavon',
-        'stockCatalina',
-//        'cantidadSucursal4',
-        'costo',
-        'precioAntes',
-        'precio',
-        'porcentaje',
-        //'utilidad',
-        'activo',
-        'unidad',
-        'registroSanitario',
-        'paisOrigen',
-        'nombreComun',
-        'composicion',
-        'marca',
-        'distribuidora',
+        'codigo',
         'imagen',
-        //'color',
-        'descripcion',
-        'categoria',
-        'subcategoria'
+        'producto_grupo_id',
+        'producto_grupo_padre_id',
+        'nombre',
+        'tipo_producto',
+        'precio1',
+        'precio2',
+        'precio3',
+        'precio4',
+        'precio5',
+        'precio6',
+        'precio7',
+        'precio8',
+        'precio9',
+        'precio10',
+        'precio11',
+        'precio12',
+        'precio13',
+        'codigo_unidad',
+        'unidades_caja',
+        'cantidad_presentacion',
+        'tipo',
+        'oferta',
+        'codigo_producto_sin',
+        'presentacion',
+        'codigo_grupo_sin',
+        'credito',
+        'active',
     ];
+
     protected $hidden = [
         'created_at',
         'updated_at',
         'deleted_at'
     ];
-    protected $appends = ['stock'];
-//    protected $appends = [
-//        'stock',
-//    ];
-//    public function getStockAttribute(){
-//        $productoCompra = CompraDetalle::where('producto_id', $this->id)
-//            ->where('estado', 'Activo')
-//            ->sum('cantidad_venta');
-//        return $productoCompra;
-//    }
 
+    // Keep compatibility with existing front code that still reads "precio" and "barra".
+    protected $appends = ['stock', 'precio', 'barra'];
 
-//    boot stock
-//    protected static function booted()
-//    {
-//    }
     function comprasDetalles(){
         return $this->hasMany(CompraDetalle::class);
     }
+
+    function productoGrupo(){
+        return $this->belongsTo(ProductoGrupo::class);
+    }
+
+    function productoGrupoPadre(){
+        return $this->belongsTo(ProductoGrupoPadre::class);
+    }
+
+    public function getPrecioAttribute(): float
+    {
+        return (float) ($this->precio1 ?? 0);
+    }
+
+    public function setPrecioAttribute($value): void
+    {
+        $this->attributes['precio1'] = $value;
+    }
+
+    public function getBarraAttribute(): ?string
+    {
+        return $this->codigo;
+    }
+
+    public function setBarraAttribute($value): void
+    {
+        $this->attributes['codigo'] = $value;
+    }
+
     public function getStockAttribute($value)
     {
         if ($value !== null) {

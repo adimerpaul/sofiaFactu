@@ -32,6 +32,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/productosAll', [App\Http\Controllers\ProductoController::class, 'productosAll']);
     Route::get('/productos', [App\Http\Controllers\ProductoController::class, 'index']);
     Route::get('/productosStock', [App\Http\Controllers\ProductoController::class, 'productosStock']);
+    Route::get('/producto-grupo-padres', [App\Http\Controllers\ProductoController::class, 'gruposPadres']);
+    Route::get('/producto-grupos', [App\Http\Controllers\ProductoController::class, 'grupos']);
     Route::put('/productos/{producto}', [App\Http\Controllers\ProductoController::class, 'update']);
     Route::delete('/productos/{producto}', [App\Http\Controllers\ProductoController::class, 'destroy']);
     Route::post('/uploadImage', [App\Http\Controllers\ProductoController::class, 'uploadImage']);

@@ -343,6 +343,7 @@ class ImpuestoController extends Controller{
         $codigoPuntoVenta = 0;
         $codigoSucursal = 0;
         $token=env('TOKEN');
+//        error_log('generarCUI: '.$token);
         if (Cui::where('codigoPuntoVenta', $codigoPuntoVenta)->where('codigoSucursal', $codigoSucursal)->where('fechaVigencia','>=', now())->count()>=1){
             return response()->json(['message' => 'El CUI ya existe'], 400);
         }else{
@@ -368,6 +369,7 @@ class ImpuestoController extends Controller{
                     "nit"=>env('NIT'),
                 ]
             ]);
+            error_log("result: ".json_encode($result));
             $cui = new Cui();
             $cui->codigo = $result->RespuestaCuis->codigo;
             $cui->fechaVigencia =  date('Y-m-d H:i:s', strtotime($result->RespuestaCuis->fechaVigencia));

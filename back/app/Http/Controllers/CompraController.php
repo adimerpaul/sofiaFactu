@@ -9,6 +9,8 @@ use App\Models\Proveedor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Validation\Rule;
 
 class CompraController extends Controller{
     function historialCompras($id){
@@ -113,63 +115,84 @@ class CompraController extends Controller{
         DB::beginTransaction();
 
         try {
-            $fecha = Carbon::now()->format('Y-m-d');
-            $hora = Carbon::now()->format('H:i:s');
-//            $user = $request->user();
-            // Crear la compra
-            $proveedor = Proveedor::find($request->proveedor_id);
-//            error_log('Proveedor: ' . json_encode($proveedor));
-//            error_log('Ci:' . $proveedor->ci);
+            $data = $request->validate([
+                'tipo_pago' => ['required', Rule::in(['Efectivo', 'QR'])],
+                'proveedor_id' => ['required', 'integer', 'exists:proveedores,id'],
+                'nro_factura' => ['nullable', 'string', 'max:255'],
+                'agencia' => ['nullable', 'string', 'max:255'],
+                'facturado' => ['nullable', 'boolean'],
+                'foto' => ['nullable', 'image', 'max:5120'],
+                'fecha_hora' => ['nullable', 'date'],
+                'productos' => ['required', 'array', 'min:1'],
+                'productos.*.producto_id' => ['required', 'integer', 'exists:productos,id'],
+                'productos.*.cantidad' => ['required', 'numeric', 'min:0.001'],
+                'productos.*.precio' => ['required', 'numeric', 'min:0'],
+                'productos.*.factor' => ['nullable', 'numeric', 'min:0'],
+                'productos.*.precio_venta' => ['required', 'numeric', 'min:0'],
+                'productos.*.lote' => ['required', 'string', 'max:255'],
+                'productos.*.fecha_vencimiento' => ['required', 'date'],
+            ]);
+
+            $fechaHora = isset($data['fecha_hora'])
+                ? Carbon::parse($data['fecha_hora'])
+                : Carbon::now();
+
+            $fecha = $fechaHora->format('Y-m-d');
+            $hora = $fechaHora->format('H:i:s');
+            $proveedor = Proveedor::findOrFail($data['proveedor_id']);
+
+            $fotoPath = null;
+            if ($request->hasFile('foto')) {
+                File::ensureDirectoryExists(public_path('uploads/compras'));
+                $ext = strtolower($request->file('foto')->getClientOriginalExtension() ?: 'jpg');
+                $name = uniqid('compra_', true) . '.' . $ext;
+                $request->file('foto')->move(public_path('uploads/compras'), $name);
+                $fotoPath = 'uploads/compras/' . $name;
+            }
+
             $compra = Compra::create([
                 'user_id' => auth()->id(),
-                'proveedor_id' => $request->proveedor_id ?? null,
+                'proveedor_id' => $data['proveedor_id'],
                 'fecha' => $fecha,
                 'hora' => $hora,
+                'fecha_hora' => $fechaHora,
                 'ci' => $proveedor->ci ?? null,
                 'nombre' => $proveedor->nombre ?? null,
                 'estado' => 'Activo',
-                'tipo_pago' => $request->tipo_pago,
-                'total' => collect($request->productos)->sum(fn($p) => $p['precio'] * $p['cantidad']),
-                'nro_factura' => $request->nro_factura ?? null,
-                'agencia' => $request->agencia,
+                'tipo_pago' => $data['tipo_pago'],
+                'total' => collect($data['productos'])->sum(fn($p) => (float)$p['precio'] * (float)$p['cantidad']),
+                'nro_factura' => $data['nro_factura'] ?? null,
+                'agencia' => $data['agencia'] ?? null,
+                'facturado' => (bool)($data['facturado'] ?? false),
+                'foto' => $fotoPath,
             ]);
 
-            // Crear los detalles
-            foreach ($request->productos as $p) {
+            foreach ($data['productos'] as $p) {
+                $producto = Producto::findOrFail($p['producto_id']);
+                $factor = (float)($p['factor'] ?? 1.25);
+                $precio = (float)$p['precio'];
+                $cantidad = (float)$p['cantidad'];
+
                 CompraDetalle::create([
                     'compra_id' => $compra->id,
                     'user_id' => auth()->id(),
                     'producto_id' => $p['producto_id'],
                     'proveedor_id' => $compra->proveedor_id,
-                    'nombre' => $p['producto']['nombre'],
-                    'precio' => $p['precio'],
-                    'cantidad' => $p['cantidad'],
-                    'cantidad_venta' => $p['cantidad'],
-                    'total' => $p['precio'] * $p['cantidad'],
-                    'factor' => $p['factor'],
-                    'precio13' => $p['precio'] * 1.3,
-                    'total13' => $p['precio'] * $p['cantidad'] * 1.3,
+                    'nombre' => $producto->nombre,
+                    'precio' => $precio,
+                    'cantidad' => $cantidad,
+                    'cantidad_venta' => $cantidad,
+                    'total' => $precio * $cantidad,
+                    'factor' => $factor,
+                    'precio13' => $precio * $factor,
+                    'total13' => $precio * $cantidad * $factor,
                     'precio_venta' => $p['precio_venta'],
                     'estado' => 'Activo',
-                    'lote' => $p['lote'],
+                    'lote' => trim((string)$p['lote']),
                     'fecha_vencimiento' => $p['fecha_vencimiento'],
                     'nro_factura' => $compra->nro_factura,
                 ]);
-                switch ($request->agencia) {
-                    case 'Almacen':
-                        Producto::where('id', $p['producto_id'])->increment('stockAlmacen', $p['cantidad']);
-                        break;
-                    case 'Challgua':
-                        Producto::where('id', $p['producto_id'])->increment('stockChallgua', $p['cantidad']);
-                        break;
-                    case 'Socavon':
-                        Producto::where('id', $p['producto_id'])->increment('stockSocavon', $p['cantidad']);
-                        break;
-                    case 'Catalina':
-                        Producto::where('id', $p['producto_id'])->increment('stockCatalina', $p['cantidad']);
-                        break;
-                }
-                $producto = Producto::find($p['producto_id']);
+
                 $producto->precio1 = $p['precio_venta'];
                 $producto->save();
             }
@@ -181,6 +204,64 @@ class CompraController extends Controller{
             DB::rollBack();
             return response()->json(['message' => 'Error al registrar la compra', 'error' => $e->getMessage()], 500);
         }
+    }
+
+    public function updateDatos(Request $request, Compra $compra)
+    {
+        $data = $request->validate([
+            'nro_factura' => ['nullable', 'string', 'max:255'],
+            'agencia' => ['nullable', 'string', 'max:255'],
+            'facturado' => ['nullable', 'boolean'],
+            'foto' => ['nullable', 'image', 'max:5120'],
+            'remove_foto' => ['nullable', 'boolean'],
+        ]);
+
+        $payload = [];
+
+        if ($request->has('nro_factura')) {
+            $payload['nro_factura'] = $data['nro_factura'] ?? null;
+        }
+
+        if ($request->has('agencia')) {
+            $payload['agencia'] = $data['agencia'] ?? null;
+        }
+
+        if ($request->has('facturado')) {
+            $payload['facturado'] = (bool)($data['facturado'] ?? false);
+        }
+
+        if ($request->hasFile('foto')) {
+            File::ensureDirectoryExists(public_path('uploads/compras'));
+            $ext = strtolower($request->file('foto')->getClientOriginalExtension() ?: 'jpg');
+            $name = uniqid('compra_', true) . '.' . $ext;
+            $request->file('foto')->move(public_path('uploads/compras'), $name);
+            $newPath = 'uploads/compras/' . $name;
+
+            if (!empty($compra->foto) && str_starts_with($compra->foto, 'uploads/compras/')) {
+                $old = public_path($compra->foto);
+                if (File::exists($old)) {
+                    File::delete($old);
+                }
+            }
+
+            $payload['foto'] = $newPath;
+        }
+
+        if (($data['remove_foto'] ?? false) === true) {
+            if (!empty($compra->foto) && str_starts_with($compra->foto, 'uploads/compras/')) {
+                $old = public_path($compra->foto);
+                if (File::exists($old)) {
+                    File::delete($old);
+                }
+            }
+            $payload['foto'] = null;
+        }
+
+        if (!empty($payload)) {
+            $compra->update($payload);
+        }
+
+        return $compra->fresh(['user', 'proveedor', 'compraDetalles.producto']);
     }
 
 }

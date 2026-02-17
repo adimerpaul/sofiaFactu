@@ -153,9 +153,13 @@ class ProductoController extends Controller
         $search = trim((string) $request->input('search', ''));
         $perPage = (int) $request->input('per_page', 10);
         $agencia = $request->agencia;
+        $active = $request->input('active');
 
         $productos = Producto::query()
             ->with(['productoGrupo:id,nombre,codigo,producto_grupo_padre_id', 'productoGrupoPadre:id,nombre,codigo'])
+            ->when($active !== null && $active !== '', function ($q) use ($active) {
+                $q->where('active', (int)$active);
+            })
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
                     $qq->where('nombre', 'like', "%{$search}%")

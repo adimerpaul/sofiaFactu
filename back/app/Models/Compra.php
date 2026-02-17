@@ -18,7 +18,10 @@ class Compra extends Model{
         'tipo_pago',
         'total',
         'nro_factura',
-        'agencia'
+        'agencia',
+        'facturado',
+        'foto',
+        'fecha_hora',
     ];
     protected $hidden = ['created_at', 'updated_at', 'deleted_at'];
     function user(){

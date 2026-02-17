@@ -58,7 +58,7 @@
                   <div class="col-6 col-md-2">
                     <q-card flat bordered class="cursor-pointer" @click="addProducto(producto)">
                       <q-img
-                        :src="`${$url}/../${producto.imagen}`"
+                        :src="imageUrl(producto.imagen)"
                         class="q-mb-xs"
                         style="height: 120px;"
                       >
@@ -69,6 +69,9 @@
                           <div style="display: flex;justify-content: space-between;">
                             <span class="text-caption">{{ producto.precio1 }}</span>
                             <span class="text-bold bg-orange text-black border">{{ producto.codigo }}</span>
+                          </div>
+                          <div class="text-caption text-right text-bold">
+                            {{ Number(producto.stock || 0).toFixed(3) }}
                           </div>
                         </div>
                       </q-img>
@@ -108,7 +111,7 @@
                 <tbody>
                 <tr v-for="(producto, index) in productosCompras" :key="index">
                   <td class="pm-none" style="display: flex;align-items: center;">
-                    <q-img :src="`${$url}../images/${producto.producto?.imagen}`" class="q-mb-xs" style="height: 35px;width: 35px;" />
+                    <q-img :src="imageUrl(producto.producto?.imagen)" class="q-mb-xs" style="height: 35px;width: 35px;" />
                     <div style="max-width: 120px; wrap-option: warp;line-height: 0.9;">
                       <q-icon name="delete" color="red" class="cursor-pointer" @click="productosCompras.splice(index, 1)" />
 <!--                      {{ producto.producto?.nombre }}-->
@@ -228,15 +231,7 @@
                   dense
                   outlined
                   :rules="[val => !!val || 'Campo requerido']"
-                  @update:model-value="val => {
-    if (val) {
-      this.compra.nombre = val.nombre || ''
-      this.compra.ci     = val.ci || ''
-    } else {
-      this.compra.nombre = ''
-      this.compra.ci     = ''
-    }
-  }"
+                  @update:model-value="onProveedorChange"
                 >
                   <template #append>
                     <q-btn
@@ -253,14 +248,28 @@
                 <q-select v-model="compra.tipo_pago" :options="['Efectivo', 'QR']" label="Tipo de pago" dense outlined />
               </div>
               <div class="col-12 col-md-6 q-pa-xs">
+                <q-input v-model="compra.fecha_hora" outlined dense label="Fecha y hora" type="datetime-local" />
+              </div>
+              <div class="col-12 col-md-6 q-pa-xs">
                 <q-input v-model="compra.nro_factura" outlined dense label="Nro. factura" />
               </div>
 <!--              <div class="col-12 col-md-6 q-pa-xs">-->
-<!--&lt;!&ndash;                agencias&ndash;&gt;-->
-<!--                <q-select v-model="compra.agencia" :options="$agencias" label="Agencia" dense outlined :rules="[-->
-<!--                  val => !!val || 'Campo requerido',-->
-<!--                ]" />-->
+<!--                <q-select v-model="compra.agencia" :options="$agencias" label="Agencia" dense outlined />-->
 <!--              </div>-->
+              <div class="col-12 col-md-6 q-pa-xs flex items-center">
+                <q-toggle v-model="compra.facturado" label="Facturado" />
+              </div>
+              <div class="col-12 col-md-6 q-pa-xs">
+                <q-input v-model="compra.ci" outlined dense label="CI proveedor" readonly />
+              </div>
+              <div class="col-12 col-md-6 q-pa-xs">
+                <q-input v-model="compra.nombre" outlined dense label="Nombre proveedor" readonly />
+              </div>
+              <div class="col-12 col-md-6 q-pa-xs">
+                <q-btn flat color="primary" icon="photo_camera" label="Adjuntar foto" no-caps @click="$refs.compraFotoInput.click()" />
+                <input ref="compraFotoInput" type="file" accept="image/*" style="display:none" @change="onCompraFotoChange" />
+                <div v-if="compraFotoName" class="text-caption q-mt-xs">{{ compraFotoName }}</div>
+              </div>
               <div class="col-12">
 <!--                table-->
                 <q-markup-table flat dense wrap-cells bordered>
@@ -280,7 +289,7 @@
                   <tbody>
                   <tr v-for="(producto, index) in productosCompras" :key="index">
                     <td class="pm-none" style="display: flex;align-items: center;">
-                      <q-img :src="`${$url}../images/${producto.producto?.imagen}`" class="q-mb-xs" style="height: 35px;width: 35px;" />
+                      <q-img :src="imageUrl(producto.producto?.imagen)" class="q-mb-xs" style="height: 35px;width: 35px;" />
                       <div style="max-width: 120px; wrap-option: warp;line-height: 0.9;">
                         {{ $filters.textUpper( producto.producto?.nombre ) }}
                       </div>
@@ -403,8 +412,14 @@ export default {
       compra: {
         nit: "",
         nombre: "",
-        tipo_pago: "Efectivo"
+        tipo_pago: "Efectivo",
+        nro_factura: "",
+        facturado: false,
+        fecha_hora: "",
+        ci: "",
       },
+      compraFoto: null,
+      compraFotoName: "",
       pagination: {
         page: 1,
         rowsPerPage: 24,
@@ -426,9 +441,32 @@ export default {
     },
   },
   methods: {
+    imageUrl(path) {
+      const safe = path || 'uploads/default.png'
+      return `${this.$url}../${safe}`
+    },
     openProveedorDialog() {
       this.resetProveedorForm()
       this.proveedorDialog = true
+    },
+    onProveedorChange(val) {
+      if (val) {
+        this.compra.nombre = val.nombre || ''
+        this.compra.ci = val.ci || ''
+      } else {
+        this.compra.nombre = ''
+        this.compra.ci = ''
+      }
+    },
+    onCompraFotoChange(e) {
+      const file = e.target.files?.[0]
+      this.compraFoto = file || null
+      this.compraFotoName = file ? file.name : ''
+    },
+    nowDateTimeLocal() {
+      const d = new Date()
+      const pad = n => String(n).padStart(2, '0')
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
     },
 
     closeProveedorDialog() {
@@ -548,16 +586,20 @@ export default {
             const producto = prod.producto;
             const existente = this.productosCompras.find(p => p.producto_id === producto.id);
             if (existente) {
-              existente.cantidad += 1;
+              existente.cantidad += parseFloat(prod.cantidad) || 1;
+              this.onCantidadChange(existente);
             } else {
+              const precio = Number(producto.precio1 || 0)
               this.productosCompras.push({
                 producto_id: producto.id,
                 cantidad: parseInt(prod.cantidad),
-                precio: '',
+                precio,
+                total: this.round2((parseInt(prod.cantidad) || 0) * precio),
                 lote: '',
                 fecha_vencimiento: '',
                 producto,
                 factor: 1.25,
+                precio_venta: this.round2(precio * 1.25),
               });
             }
           });
@@ -568,17 +610,14 @@ export default {
         });
       });
     },
-    updatePrecioVenta(productoVenta) {
-      const precio_venta = Math.ceil(productoVenta.precio * productoVenta.factor);
-      productoVenta.precio_venta = precio_venta;
-    },
     productosGet() {
       this.loading = true;
       this.$axios.get("productos", {
         params: {
           search: this.productosSearch,
           page: this.pagination.page,
-          per_page: this.pagination.rowsPerPage
+          per_page: this.pagination.rowsPerPage,
+          active: 1
         },
       }).then((res) => {
         this.productos = res.data.data;
@@ -590,20 +629,25 @@ export default {
       });
     },
     addProducto(producto) {
-      // const existente = this.productosCompras.find(p => p.producto_id === producto.id);
-      // if (existente) {
-      //   existente.cantidad += 1;
-      // } else {
+      const existente = this.productosCompras.find(p => p.producto_id === producto.id);
+      if (existente) {
+        existente.cantidad += 1;
+        this.onCantidadChange(existente);
+      } else {
+        // const precio = Number(producto.precio1 || 0) dibidirlo entre 1.25
+        const precio = this.round2(Number(producto.precio1 || 0) / 1.25)
         this.productosCompras.push({
           producto_id: producto.id,
           cantidad: 1,
-          precio: '',
+          precio,
+          total: precio,
           lote: '',
           fecha_vencimiento: '',
           producto,
           factor: 1.25,
+          precio_venta: this.round2(precio * 1.25),
         });
-      // }
+      }
     },
     clickDialogCompra() {
       if (this.productosCompras.length === 0) {
@@ -611,10 +655,19 @@ export default {
         return;
       }
 
-      const sinPrecio = this.productosCompras.filter(p => !p.precio);
-      if (sinPrecio.length > 0) {
-        this.$alert.error("Todos los productos deben tener precio unitario");
+      const invalidos = this.productosCompras.filter(p =>
+        !p.precio || Number(p.precio) <= 0 ||
+        !p.cantidad || Number(p.cantidad) <= 0 ||
+        !p.precio_venta || Number(p.precio_venta) < 0 ||
+        !p.lote || !String(p.lote).trim() ||
+        !p.fecha_vencimiento
+      );
+      if (invalidos.length > 0) {
+        this.$alert.error("Completa cantidad, precio, precio venta, lote y fecha de vencimiento en todos los productos");
         return;
+      }
+      if (!this.compra.fecha_hora) {
+        this.compra.fecha_hora = this.nowDateTimeLocal()
       }
       this.compraDialog = true;
     },
@@ -632,18 +685,34 @@ export default {
       });
     },
     submitCompra() {
-      this.loading = true;
-      const data = {
-        // ci: this.compra.nit,
-        // nombre: this.compra.nombre,
-        tipo_pago: this.compra.tipo_pago,
-        proveedor_id: this.proveedor.id,
-        nro_factura: this.compra.nro_factura,
-        productos: this.productosCompras,
-        agencia: this.compra.agencia,
-      };
+      const proveedorId = typeof this.proveedor === 'object' ? this.proveedor?.id : this.proveedor
+      if (!proveedorId) {
+        this.$alert.error("Debe seleccionar proveedor");
+        return;
+      }
 
-      this.$axios.post("compras", data).then((res) => {
+      this.loading = true;
+      const fd = new FormData()
+      fd.append('tipo_pago', this.compra.tipo_pago || 'Efectivo')
+      fd.append('proveedor_id', proveedorId)
+      fd.append('nro_factura', this.compra.nro_factura || '')
+      fd.append('facturado', this.compra.facturado ? '1' : '0')
+      fd.append('fecha_hora', this.compra.fecha_hora || this.nowDateTimeLocal())
+      if (this.compraFoto) fd.append('foto', this.compraFoto)
+
+      this.productosCompras.forEach((p, i) => {
+        fd.append(`productos[${i}][producto_id]`, p.producto_id)
+        fd.append(`productos[${i}][cantidad]`, Number(p.cantidad))
+        fd.append(`productos[${i}][precio]`, Number(p.precio))
+        fd.append(`productos[${i}][factor]`, Number(p.factor || 1.25))
+        fd.append(`productos[${i}][precio_venta]`, Number(p.precio_venta))
+        fd.append(`productos[${i}][lote]`, String(p.lote || '').trim())
+        fd.append(`productos[${i}][fecha_vencimiento]`, p.fecha_vencimiento)
+      })
+
+      this.$axios.post("compras", fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      }).then((res) => {
         this.$alert.success("Compra registrada correctamente");
         this.compraDialog = false;
         this.productosCompras = [];
@@ -652,8 +721,14 @@ export default {
         this.compra = {
           nit: "",
           nombre: "",
-          tipo_pago: "Efectivo"
+          tipo_pago: "Efectivo",
+          nro_factura: "",
+          facturado: false,
+          fecha_hora: "",
+          ci: "",
         };
+        this.compraFoto = null;
+        this.compraFotoName = "";
         this.proveedor = null;
       }).catch((err) => {
         console.error("Error registrando compra:", err);
@@ -676,6 +751,7 @@ export default {
   mounted() {
     this.productosGet();
     this.proveedoresGet();
+    this.compra.fecha_hora = this.nowDateTimeLocal();
   }
 };
 </script>

@@ -413,9 +413,10 @@ export default {
       try {
         const res = await this.$axios.get(`productos/${producto.id}/historial-compras-ventas`);
         this.lotes = res.data || [];
-        // Si hay 1 solo lote, lo pre-seleccionamos:
+        // Si hay 1 solo lote, agregar directo.
         if (this.lotes.length === 1) {
           this.onPickLote(this.lotes[0]);
+          this.confirmarLote();
         }
       } catch (e) {
         console.error(e);
@@ -467,16 +468,25 @@ export default {
 
     // ==== CLIENTE & FLUJO VENTA ====
     searchCliente() {
+      const nit = (this.venta.nit || '').toString().trim()
+      if (!nit) {
+        this.venta.nombre = "SN";
+        this.venta.email = "";
+        this.venta.codigoTipoDocumentoIdentidad = 1;
+        this.venta.complemento = "";
+        return;
+      }
       this.loading = true;
-      this.$axios.post("searchCliente", { nit: this.venta.nit })
+      this.$axios.post("searchCliente", { nit })
         .then((res) => {
           this.venta.nombre = "SN";
           this.venta.email = "";
           this.venta.codigoTipoDocumentoIdentidad = 1;
-          if (res.data.nombre) this.venta.nombre = res.data.nombre;
-          if (res.data.email) this.venta.email = res.data.email;
-          if (res.data.codigoTipoDocumentoIdentidad) this.venta.codigoTipoDocumentoIdentidad =  parseInt(res.data.codigoTipoDocumentoIdentidad);
-          if (res.data.complemento) this.venta.complemento = res.data.complemento;
+          this.venta.complemento = "";
+          if (res.data?.nombre) this.venta.nombre = res.data.nombre;
+          if (res.data?.email) this.venta.email = res.data.email;
+          if (res.data?.codigoTipoDocumentoIdentidad) this.venta.codigoTipoDocumentoIdentidad = parseInt(res.data.codigoTipoDocumentoIdentidad);
+          if (res.data?.complemento) this.venta.complemento = res.data.complemento;
         })
         .catch((error) => console.error(error))
         .finally(() => (this.loading = false));
@@ -522,6 +532,7 @@ export default {
       this.loading = true;
       this.$axios.post("ventas", {
         ci: this.venta.nit,
+        nit: this.venta.nit,
         nombre: this.venta.nombre,
         email: this.venta.email,
         codigoTipoDocumentoIdentidad: this.venta.codigoTipoDocumentoIdentidad,

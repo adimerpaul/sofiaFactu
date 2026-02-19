@@ -22,6 +22,7 @@
               <th>Opciones</th>
               <th>ID</th>
               <th>Nombre</th>
+              <th>NIT</th>
               <th>CI</th>
               <th>Telefono</th>
               <th>Zona</th>
@@ -45,6 +46,7 @@
               </td>
               <td>{{ c.id }}</td>
               <td>{{ c.nombre }}</td>
+              <td>{{ c.nit || '-' }}</td>
               <td>{{ c.ci }}</td>
               <td>{{ c.telefono }}</td>
               <td>{{ c.zona || '-' }}</td>
@@ -80,6 +82,7 @@
                 <div class="row q-col-gutter-sm">
                   <div class="col-12 col-md-4"><q-input v-model="cliente.nombre" label="Nombre" dense outlined :rules="[v => !!v || 'Requerido']" /></div>
                   <div class="col-12 col-md-2"><q-input v-model="cliente.ci" label="CI" dense outlined /></div>
+                  <div class="col-12 col-md-2"><q-input v-model="cliente.nit" label="NIT" dense outlined /></div>
                   <div class="col-12 col-md-2"><q-input v-model="cliente.complemento" label="Complemento" dense outlined /></div>
                   <div class="col-12 col-md-2"><q-input v-model="cliente.codigoTipoDocumentoIdentidad" label="Tipo doc" dense outlined /></div>
                   <div class="col-12 col-md-2"><q-input v-model="cliente.id_externo" label="ID externo" dense outlined /></div>
@@ -199,7 +202,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 const emptyCliente = () => ({
-  nombre: '', ci: '', telefono: '', direccion: '', complemento: '', codigoTipoDocumentoIdentidad: '', email: '',
+  nombre: '', nit: '', ci: '', telefono: '', direccion: '', complemento: '', codigoTipoDocumentoIdentidad: '', email: '',
   id_externo: '', cod_ciudad: '', cod_nacio: '', cod_car: null, est_civ: '', edad: '', empresa: '', categoria: null,
   imp_pieza: null, ci_vend: '', list_blanck: false, motivo_list_black: '', list_black: false, tipo_paciente: '', supra_canal: '',
   canal: '', subcanal: '', zona: '', latitud: null, longitud: null, transporte: '', territorio: '', codcli: null, clinew: '',
@@ -372,7 +375,7 @@ export default {
         const c = this.cliente
 
         const fields = [
-          'nombre', 'ci', 'telefono', 'direccion', 'complemento', 'codigoTipoDocumentoIdentidad', 'email',
+          'nombre', 'nit', 'ci', 'telefono', 'direccion', 'complemento', 'codigoTipoDocumentoIdentidad', 'email',
           'id_externo', 'cod_ciudad', 'cod_nacio', 'cod_car', 'est_civ', 'edad', 'empresa', 'categoria',
           'imp_pieza', 'ci_vend', 'list_blanck', 'motivo_list_black', 'list_black', 'tipo_paciente',
           'supra_canal', 'canal', 'subcanal', 'zona', 'latitud', 'longitud', 'transporte', 'territorio',

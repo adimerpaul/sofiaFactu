@@ -50,7 +50,7 @@
                       @click="openLoteDialog(producto)"
                     >
                       <q-img
-                        :src="`${$url}/../${producto.imagen}`"
+                        :src="imageUrl(producto.imagen)"
                         class="q-mb-xs"
                         style="height: 120px;"
                       >
@@ -99,7 +99,7 @@
                 <tr v-for="(item, index) in productosVentas" :key="index">
                   <td style="padding:0;margin:0;display:flex;align-items:center;">
                     <q-img
-                      :src="`${$url}../images/${item.producto?.imagen}`"
+                      :src="imageUrl(item.producto?.imagen)"
                       class="q-mb-xs"
                       style="height: 35px;width: 35px;"
                     />
@@ -404,6 +404,10 @@ export default {
   },
 
   methods: {
+    imageUrl(path) {
+      const safe = path || 'uploads/default.png'
+      return `${this.$url}../${safe}`
+    },
     // ==== LOTES ====
     async openLoteDialog(producto) {
       this.loteProducto = producto;

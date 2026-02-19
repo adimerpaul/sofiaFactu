@@ -73,7 +73,7 @@
                    active-class="menu"
                    dense
                    v-close-popup
-                   v-if="link && $store.user && (link.can.includes($store.user.role) || link.can.includes('Todos'))"
+                   v-if="canSee(link)"
           >
             <q-item-section avatar>
               <q-icon :name="$route.path === link.link ? 'o_' + link.icon : link.icon"
@@ -122,6 +122,7 @@ onMounted(() => {
     { title: 'Usuarios', icon: 'people', link: '/usuarios', can: 'Admin' },
     { title: 'Impuestos', icon: 'percent', link: '/impuestos', can: 'Admin' },
     { title: 'Productos', icon: 'shopping_cart', link: '/productos', can: 'Todos' },
+    { title: 'Clientes', icon: 'groups', link: '/clientes', can: ['Todos'], perm: 'Clientes' },
     { title: 'Ventas', icon: 'shopping_bag', link: '/venta', can: 'Todos' },
     { title: 'Nueva Venta', icon: 'add_shopping_cart', link: '/ventaNuevo', can: 'Todos' },
     { title: 'Proveedores', icon: 'manage_accounts', link: '/proveedores', can: ['Todos']},
@@ -177,6 +178,14 @@ function logout() {
           proxy.$router.push('/login')
         })
     })
+}
+function canSee(link) {
+  if (!link || !proxy.$store?.user) return false
+  const canByRole = (Array.isArray(link.can) ? link.can : [link.can]).some(v => v === 'Todos' || v === proxy.$store.user.role)
+  if (!canByRole) return false
+  if (!link.perm) return true
+  const perms = (proxy.$store.permissions || []).map(p => typeof p === 'string' ? p : p?.name).filter(Boolean)
+  return perms.includes(link.perm)
 }
 </script>
 <style>

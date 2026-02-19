@@ -25,9 +25,20 @@ export default defineRouter(function (/* { store, ssrContext } */) {
     // quasar.conf.js -> build -> publicPath
     history: createHistory(process.env.VUE_ROUTER_BASE)
   })
+  const hasPermission = (permissions, required) => {
+    if (!required) return true
+    const names = (permissions || []).map(p => typeof p === 'string' ? p : p?.name).filter(Boolean)
+    return names.includes(required)
+  }
+
   Router.beforeEach((to, from, next) => {
     if (to.matched.some(record => record.meta.requiresAuth)) {
       if (useCounterStore().isLogged) {
+        const requiredPermission = to.meta?.permission
+        if (requiredPermission && !hasPermission(useCounterStore().permissions, requiredPermission)) {
+          next('/')
+          return
+        }
         next()
         return
       }

@@ -58,7 +58,7 @@ export default boot(({ app, router }) => {
       useCounterStore().isLogged = true
       useCounterStore().user = response.data.user
       useCounterStore().env = response.data.datos
-      useCounterStore().permissions = response.data.permissions
+      useCounterStore().permissions = (response.data.permissions || []).map(p => typeof p === 'string' ? p : p.name)
       localStorage.setItem('user', JSON.stringify(response.data))
     }).catch(error => {
       console.log(error)

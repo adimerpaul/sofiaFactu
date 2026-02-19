@@ -17,6 +17,7 @@ class ClienteController extends Controller
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
                     $qq->where('nombre', 'like', "%{$search}%")
+                        ->orWhere('nit', 'like', "%{$search}%")
                         ->orWhere('ci', 'like', "%{$search}%")
                         ->orWhere('telefono', 'like', "%{$search}%")
                         ->orWhere('codcli', 'like', "%{$search}%");
@@ -60,8 +61,16 @@ class ClienteController extends Controller
 
     public function searchCliente(Request $request)
     {
-        $ci = $request->nit;
-        return Cliente::where('ci', $ci)->first();
+        $nit = trim((string) $request->input('nit', ''));
+        if ($nit === '') {
+            return null;
+        }
+
+        return Cliente::query()
+            ->where('nit', $nit)
+            ->orWhere('ci', $nit)
+            ->orWhere('id_externo', $nit)
+            ->first();
     }
 
     private function validateData(Request $request, bool $isUpdate = false): array
@@ -70,6 +79,7 @@ class ClienteController extends Controller
 
         $rules = [
             'nombre' => [$isUpdate ? 'sometimes' : 'required', 'string', 'max:150'],
+            'nit' => [$sometimes, 'string', 'max:50'],
             'ci' => [$sometimes, 'string', 'max:50'],
             'telefono' => [$sometimes, 'string', 'max:100'],
             'direccion' => [$sometimes, 'string', 'max:255'],
@@ -171,6 +181,14 @@ class ClienteController extends Controller
         $payload = $data;
         unset($payload['fotos'], $payload['remove_fotos']);
         $payload['fotos'] = array_values($existing);
+
+        // Keep CI/NIT synchronized when only one of them is sent.
+        if (empty($payload['nit']) && !empty($payload['ci'])) {
+            $payload['nit'] = $payload['ci'];
+        }
+        if (empty($payload['ci']) && !empty($payload['nit'])) {
+            $payload['ci'] = $payload['nit'];
+        }
 
         if (!isset($payload['venta_estado']) || empty($payload['venta_estado'])) {
             $payload['venta_estado'] = 'ACTIVO';

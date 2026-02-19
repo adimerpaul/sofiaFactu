@@ -367,7 +367,7 @@ class VentaController extends Controller{
         </cabecera>";
             $text .= $detalleFactura;
             $text .= "</facturaComputarizadaCompraVenta>";
-            error_log('Generando XML: ' . $text);
+//            error_log('Generando XML: ' . $text);
 
             $xml = new SimpleXMLElement($text);
             $dom = new DOMDocument('1.0');

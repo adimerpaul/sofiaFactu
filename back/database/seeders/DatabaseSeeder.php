@@ -131,5 +131,11 @@ class DatabaseSeeder extends Seeder
         $sqlContent = file_get_contents($sqlFile);
         DB::unprepared($sqlContent);
         error_log("Productos seed 202509302046 executed");
+
+//        clientes_202602190422.sql
+        $sqlFile = base_path('database/seeders/clientes_202602190422.sql');
+        $sqlContent = file_get_contents($sqlFile);
+        DB::unprepared($sqlContent);
+        error_log("Clientes seed 202602190422 executed");
     }
 }

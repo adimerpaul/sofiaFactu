@@ -15,6 +15,9 @@ class ClienteController extends Controller
         $perPage = (int)$request->input('per_page', 10);
         $soloMios = (bool)$request->input('solo_mios', false);
         $soloDia = (bool)$request->input('solo_dia', false);
+        $ciVend = trim((string)$request->input('ci_vend', ''));
+        $zona = trim((string)$request->input('zona', ''));
+        $ventaEstado = trim((string)$request->input('venta_estado', ''));
         $dayName = strtolower((string)$request->input('dia', Carbon::now()->locale('es')->isoFormat('ddd')));
         $dayMap = [
             'lu' => 'lu', 'lun' => 'lu', 'lunes' => 'lu',
@@ -36,6 +39,15 @@ class ClienteController extends Controller
             ->when($soloDia && $dayField, function ($q) use ($dayField) {
                 $q->where($dayField, true);
             })
+            ->when($ciVend !== '', function ($q) use ($ciVend) {
+                $q->where('ci_vend', $ciVend);
+            })
+            ->when($zona !== '', function ($q) use ($zona) {
+                $q->where('zona', $zona);
+            })
+            ->when($ventaEstado !== '', function ($q) use ($ventaEstado) {
+                $q->where('venta_estado', $ventaEstado);
+            })
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
                     $qq->where('nombre', 'like', "%{$search}%")
@@ -47,6 +59,17 @@ class ClienteController extends Controller
             })
             ->orderByDesc('id')
             ->paginate($perPage);
+    }
+
+    public function zonas()
+    {
+        return Cliente::query()
+            ->selectRaw('zona, COUNT(*) as total')
+            ->whereNotNull('zona')
+            ->where('zona', '!=', '')
+            ->groupBy('zona')
+            ->orderBy('zona')
+            ->get();
     }
 
     public function store(Request $request)

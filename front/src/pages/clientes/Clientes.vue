@@ -3,15 +3,82 @@
     <q-card flat bordered>
       <q-card-section class="row q-col-gutter-sm items-end">
         <div class="col-12 col-md-4">
-          <q-input v-model="filter" dense outlined label="Buscar cliente" debounce="300" @update:model-value="clientesGet">
+          <q-input v-model="filter" dense outlined label="Buscar cliente" debounce="300" @update:model-value="onFilterChange">
             <template #append><q-icon name="search" /></template>
           </q-input>
+        </div>
+        <div class="col-12 col-md-3">
+          <q-select
+            v-model="filterVendedor"
+            :options="vendedores"
+            option-label="label"
+            option-value="username"
+            emit-value
+            map-options
+            clearable
+            dense
+            outlined
+            label="Filtrar vendedor"
+            @update:model-value="onFilterChange"
+          />
+        </div>
+        <div class="col-12 col-md-2">
+          <q-select
+            v-model="filterZona"
+            :options="zonasOptions"
+            emit-value
+            map-options
+            clearable
+            dense
+            outlined
+            label="Filtrar zona"
+            @update:model-value="onFilterChange"
+          />
+        </div>
+        <div class="col-12 col-md-2">
+          <q-select
+            v-model="filterEstado"
+            :options="estadoOptions"
+            emit-value
+            map-options
+            clearable
+            dense
+            outlined
+            label="Estado"
+            @update:model-value="onFilterChange"
+          />
         </div>
         <div class="col-12 col-md-auto">
           <q-btn color="primary" icon="refresh" no-caps label="Actualizar" :loading="loading" @click="clientesGet" />
         </div>
         <div class="col-12 col-md-auto">
           <q-btn color="green" icon="add" no-caps label="Nuevo cliente" :loading="loading" @click="nuevoCliente" />
+        </div>
+      </q-card-section>
+
+      <q-card-section class="row items-center q-col-gutter-sm q-py-sm">
+        <div class="col-auto text-caption text-grey-7">
+          Total: {{ pagination.rowsNumber }}
+        </div>
+        <div class="col-auto">
+          <q-select
+            v-model="pagination.rowsPerPage"
+            :options="[10, 25, 50, 100]"
+            dense
+            outlined
+            label="Por pagina"
+            @update:model-value="onRowsPerPageChange"
+          />
+        </div>
+        <div class="col">
+          <q-pagination
+            v-model="pagination.page"
+            :max="maxPages"
+            max-pages="8"
+            boundary-numbers
+            direction-links
+            @update:model-value="clientesGet"
+          />
         </div>
       </q-card-section>
 
@@ -28,6 +95,7 @@
               <th>Vendedor</th>
               <th>Zona</th>
               <th>Territorio</th>
+              <th>Dias visita</th>
               <th>Venta</th>
             </tr>
           </thead>
@@ -53,10 +121,41 @@
               <td>{{ c.vendedor_user?.name || c.ci_vend || '-' }}</td>
               <td>{{ c.zona || '-' }}</td>
               <td>{{ c.territorio || '-' }}</td>
-              <td>{{ c.venta_estado || 'ACTIVO' }}</td>
+              <td>
+                <div class="row q-gutter-xs no-wrap">
+                  <q-chip size="sm" dense :color="c.lu ? 'primary' : 'grey-5'" text-color="white">Lu</q-chip>
+                  <q-chip size="sm" dense :color="c.ma ? 'primary' : 'grey-5'" text-color="white">Ma</q-chip>
+                  <q-chip size="sm" dense :color="c.mi ? 'primary' : 'grey-5'" text-color="white">Mi</q-chip>
+                  <q-chip size="sm" dense :color="c.ju ? 'primary' : 'grey-5'" text-color="white">Ju</q-chip>
+                  <q-chip size="sm" dense :color="c.vi ? 'primary' : 'grey-5'" text-color="white">Vi</q-chip>
+                  <q-chip size="sm" dense :color="c.sa ? 'primary' : 'grey-5'" text-color="white">Sa</q-chip>
+                  <q-chip size="sm" dense :color="c.do ? 'primary' : 'grey-5'" text-color="white">Do</q-chip>
+                </div>
+              </td>
+              <td>
+                <q-chip dense :color="((c.venta_estado || 'ACTIVO') === 'ACTIVO') ? 'green' : 'orange'" text-color="white">
+                  {{ c.venta_estado || 'ACTIVO' }}
+                </q-chip>
+              </td>
             </tr>
           </tbody>
         </q-markup-table>
+      </q-card-section>
+
+      <q-card-section class="row items-center q-col-gutter-sm q-pt-none">
+        <div class="col-auto text-caption text-grey-7">
+          Pagina {{ pagination.page }} de {{ maxPages }}
+        </div>
+        <div class="col">
+          <q-pagination
+            v-model="pagination.page"
+            :max="maxPages"
+            max-pages="8"
+            boundary-numbers
+            direction-links
+            @update:model-value="clientesGet"
+          />
+        </div>
       </q-card-section>
     </q-card>
 
@@ -304,6 +403,14 @@ export default {
     return {
       loading: false,
       filter: '',
+      filterVendedor: null,
+      filterZona: '',
+      filterEstado: null,
+      zonasOptions: [],
+      estadoOptions: [
+        { label: 'ACTIVO', value: 'ACTIVO' },
+        { label: 'INACTIVO', value: 'INACTIVO' }
+      ],
       clientes: [],
       vendedores: [],
       dialog: false,
@@ -317,12 +424,21 @@ export default {
       pagination: {
         page: 1,
         rowsPerPage: 50,
+        rowsNumber: 0,
       }
+    }
+  },
+  computed: {
+    maxPages () {
+      const total = Number(this.pagination.rowsNumber || 0)
+      const per = Number(this.pagination.rowsPerPage || 1)
+      return Math.max(1, Math.ceil(total / per))
     }
   },
   mounted () {
     this.clientesGet()
     this.vendedoresGet()
+    this.zonasGet()
   },
   watch: {
     dialog (val) {
@@ -367,15 +483,39 @@ export default {
         const res = await this.$axios.get('clientes', {
           params: {
             search: this.filter,
+            ci_vend: this.filterVendedor || '',
+            zona: this.filterZona || '',
+            venta_estado: this.filterEstado || '',
             page: this.pagination.page,
             per_page: this.pagination.rowsPerPage,
           }
         })
         this.clientes = res.data.data || []
+        this.pagination.rowsNumber = Number(res.data.total || 0)
       } catch (e) {
         this.$alert.error(e.response?.data?.message || 'No se pudo cargar clientes')
       } finally {
         this.loading = false
+      }
+    },
+    onFilterChange () {
+      this.pagination.page = 1
+      this.clientesGet()
+    },
+    onRowsPerPageChange () {
+      this.pagination.page = 1
+      this.clientesGet()
+    },
+    async zonasGet () {
+      try {
+        const res = await this.$axios.get('clientes-zonas')
+        const zonas = Array.isArray(res.data) ? res.data : []
+        this.zonasOptions = zonas.map(z => ({
+          label: `${z.zona} (${z.total})`,
+          value: z.zona
+        }))
+      } catch (e) {
+        this.zonasOptions = []
       }
     },
     async vendedoresGet () {

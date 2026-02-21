@@ -46,6 +46,9 @@ class PedidoController extends Controller {
             ->when(($request->solo_mios ?? false) && $user, function ($q) use ($user) {
                 $q->where('user_id', $user->id);
             })
+            ->when($request->filled('user'), function ($q) use ($request) {
+                $q->where('user_id', $request->user);
+            })
             ->orderBy('fecha', 'desc')
             ->orderBy('hora', 'desc')
             ->get();

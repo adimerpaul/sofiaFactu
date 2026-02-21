@@ -550,12 +550,12 @@ class VentaController extends Controller{
         $user = $request->user();
 
         if ($user->role == 'Admin') {
-            $ventas = Venta::with('user', 'cliente')
+            $ventas = Venta::with('user', 'cliente', 'ventaDetalles.producto')
                 ->whereBetween('fecha', [$fechaInicio, $fechaFin])
                 ->orderBy('created_at', 'desc')
                 ->get();
         }else{
-            $ventas = Venta::with('user', 'cliente')
+            $ventas = Venta::with('user', 'cliente', 'ventaDetalles.producto')
                 ->where('user_id', $user->id)
                 ->whereBetween('fecha', [$fechaInicio, $fechaFin])
                 ->where('agencia', $user->agencia)

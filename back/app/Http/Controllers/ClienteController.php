@@ -75,67 +75,103 @@ class ClienteController extends Controller
 
     private function validateData(Request $request, bool $isUpdate = false): array
     {
-        $sometimes = $isUpdate ? 'sometimes' : 'nullable';
+        // Todos estos campos son opcionales y de texto.
+        // Si llegan como numero se convierten a string; si llegan vacios se guardan como null.
+        $optionalTextFields = [
+            'nit', 'ci', 'telefono', 'direccion', 'complemento', 'codigoTipoDocumentoIdentidad',
+            'id_externo', 'cod_ciudad', 'cod_nacio', 'est_civ', 'edad', 'empresa', 'ci_vend',
+            'motivo_list_black', 'tipo_paciente', 'supra_canal', 'canal', 'subcanal', 'zona',
+            'transporte', 'territorio', 'clinew', 'venta_estado', 'complto', 'correcli',
+            'profecion', 'sexo', 'tarjeta',
+        ];
+
+        $normalized = [];
+        foreach ($optionalTextFields as $field) {
+            if (!$request->has($field)) {
+                continue;
+            }
+            $value = $request->input($field);
+            if ($value === null) {
+                $normalized[$field] = null;
+                continue;
+            }
+            if (is_string($value)) {
+                $trimmed = trim($value);
+                $normalized[$field] = $trimmed === '' ? null : $trimmed;
+                continue;
+            }
+            $normalized[$field] = (string) $value;
+        }
+
+        if (!empty($normalized)) {
+            $request->merge($normalized);
+        }
+
+        $presence = $isUpdate ? 'sometimes' : 'nullable';
+        $optionalString = fn (int $max) => [$presence, 'nullable', 'string', "max:$max"];
+        $optionalInt = [$presence, 'nullable', 'integer'];
+        $optionalBool = [$presence, 'nullable', 'boolean'];
+        $optionalNumber = [$presence, 'nullable', 'numeric'];
 
         $rules = [
             'nombre' => [$isUpdate ? 'sometimes' : 'required', 'string', 'max:150'],
-            'nit' => [$sometimes, 'string', 'max:50'],
-            'ci' => [$sometimes, 'string', 'max:50'],
-            'telefono' => [$sometimes, 'string', 'max:100'],
-            'direccion' => [$sometimes, 'string', 'max:255'],
-            'complemento' => [$sometimes, 'string', 'max:20'],
-            'codigoTipoDocumentoIdentidad' => [$sometimes, 'string', 'max:20'],
-            'email' => [$sometimes, 'email', 'max:255'],
+            'nit' => $optionalString(50),
+            'ci' => $optionalString(50),
+            'telefono' => $optionalString(100),
+            'direccion' => $optionalString(255),
+            'complemento' => $optionalString(20),
+            'codigoTipoDocumentoIdentidad' => $optionalString(20),
+            'email' => [$presence, 'nullable', 'email', 'max:255'],
 
-            'id_externo' => [$sometimes, 'string', 'max:15'],
-            'cod_ciudad' => [$sometimes, 'string', 'max:4'],
-            'cod_nacio' => [$sometimes, 'string', 'max:4'],
-            'cod_car' => [$sometimes, 'integer'],
-            'est_civ' => [$sometimes, 'string', 'max:50'],
-            'edad' => [$sometimes, 'string', 'max:3'],
-            'empresa' => [$sometimes, 'string', 'max:150'],
-            'categoria' => [$sometimes, 'integer'],
-            'imp_pieza' => [$sometimes, 'numeric', 'min:0'],
-            'ci_vend' => [$sometimes, 'string', 'max:15'],
-            'list_blanck' => [$sometimes, 'boolean'],
-            'motivo_list_black' => [$sometimes, 'string', 'max:90'],
-            'list_black' => [$sometimes, 'boolean'],
-            'tipo_paciente' => [$sometimes, 'string', 'max:90'],
-            'supra_canal' => [$sometimes, 'string', 'max:5'],
-            'canal' => [$sometimes, 'string', 'max:80'],
-            'subcanal' => [$sometimes, 'string', 'max:20'],
-            'zona' => [$sometimes, 'string', 'max:20'],
-            'latitud' => [$sometimes, 'numeric', 'between:-90,90'],
-            'longitud' => [$sometimes, 'numeric', 'between:-180,180'],
-            'transporte' => [$sometimes, 'string', 'max:60'],
-            'territorio' => [$sometimes, 'string', 'max:10'],
-            'codcli' => [$sometimes, 'integer'],
-            'clinew' => [$sometimes, 'string', 'max:3'],
-            'venta_estado' => [$sometimes, 'string', 'max:100'],
-            'complto' => [$sometimes, 'string', 'max:5'],
-            'tipodocu' => [$sometimes, 'integer'],
-            'lu' => [$sometimes, 'boolean'],
-            'ma' => [$sometimes, 'boolean'],
-            'mi' => [$sometimes, 'boolean'],
-            'ju' => [$sometimes, 'boolean'],
-            'vi' => [$sometimes, 'boolean'],
-            'sa' => [$sometimes, 'boolean'],
-            'do' => [$sometimes, 'boolean'],
-            'correcli' => [$sometimes, 'string', 'max:50'],
-            'canmayni' => [$sometimes, 'boolean'],
-            'baja' => [$sometimes, 'boolean'],
-            'profecion' => [$sometimes, 'string', 'max:60'],
-            'waths' => [$sometimes, 'boolean'],
-            'ctas_activo' => [$sometimes, 'boolean'],
-            'ctas_mont' => [$sometimes, 'numeric', 'min:0'],
-            'ctas_dias' => [$sometimes, 'integer'],
-            'sexo' => [$sometimes, 'string', 'max:20'],
-            'noesempre' => [$sometimes, 'boolean'],
-            'tarjeta' => [$sometimes, 'string', 'max:20'],
+            'id_externo' => $optionalString(15),
+            'cod_ciudad' => $optionalString(4),
+            'cod_nacio' => $optionalString(4),
+            'cod_car' => $optionalInt,
+            'est_civ' => $optionalString(50),
+            'edad' => $optionalString(3),
+            'empresa' => $optionalString(150),
+            'categoria' => $optionalInt,
+            'imp_pieza' => [...$optionalNumber, 'min:0'],
+            'ci_vend' => $optionalString(15),
+            'list_blanck' => $optionalBool,
+            'motivo_list_black' => $optionalString(90),
+            'list_black' => $optionalBool,
+            'tipo_paciente' => $optionalString(90),
+            'supra_canal' => $optionalString(5),
+            'canal' => $optionalString(80),
+            'subcanal' => $optionalString(20),
+            'zona' => $optionalString(20),
+            'latitud' => [...$optionalNumber, 'between:-90,90'],
+            'longitud' => [...$optionalNumber, 'between:-180,180'],
+            'transporte' => $optionalString(60),
+            'territorio' => $optionalString(10),
+            'codcli' => $optionalInt,
+            'clinew' => $optionalString(3),
+            'venta_estado' => $optionalString(100),
+            'complto' => $optionalString(5),
+            'tipodocu' => $optionalInt,
+            'lu' => $optionalBool,
+            'ma' => $optionalBool,
+            'mi' => $optionalBool,
+            'ju' => $optionalBool,
+            'vi' => $optionalBool,
+            'sa' => $optionalBool,
+            'do' => $optionalBool,
+            'correcli' => $optionalString(50),
+            'canmayni' => $optionalBool,
+            'baja' => $optionalBool,
+            'profecion' => $optionalString(60),
+            'waths' => $optionalBool,
+            'ctas_activo' => $optionalBool,
+            'ctas_mont' => [...$optionalNumber, 'min:0'],
+            'ctas_dias' => $optionalInt,
+            'sexo' => $optionalString(20),
+            'noesempre' => $optionalBool,
+            'tarjeta' => $optionalString(20),
 
-            'fotos' => [$sometimes, 'array', 'max:3'],
+            'fotos' => [$presence, 'array', 'max:3'],
             'fotos.*' => ['image', 'max:5120'],
-            'remove_fotos' => [$sometimes, 'array'],
+            'remove_fotos' => [$presence, 'array'],
             'remove_fotos.*' => ['string'],
         ];
 

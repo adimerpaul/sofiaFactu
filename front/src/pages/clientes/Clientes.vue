@@ -25,6 +25,7 @@
               <th>NIT</th>
               <th>CI</th>
               <th>Telefono</th>
+              <th>Vendedor</th>
               <th>Zona</th>
               <th>Territorio</th>
               <th>Venta</th>
@@ -49,6 +50,7 @@
               <td>{{ c.nit || '-' }}</td>
               <td>{{ c.ci }}</td>
               <td>{{ c.telefono }}</td>
+              <td>{{ c.vendedor_user?.name || c.ci_vend || '-' }}</td>
               <td>{{ c.zona || '-' }}</td>
               <td>{{ c.territorio || '-' }}</td>
               <td>{{ c.venta_estado || 'ACTIVO' }}</td>
@@ -106,7 +108,59 @@
                   <div class="col-12 col-md-2"><q-input v-model.number="cliente.categoria" label="Categoria" dense outlined type="number" /></div>
                   <div class="col-12 col-md-2"><q-input v-model.number="cliente.codcli" label="Cod cliente" dense outlined type="number" /></div>
                   <div class="col-12 col-md-2"><q-input v-model="cliente.clinew" label="Cli new" dense outlined /></div>
-                  <div class="col-12 col-md-2"><q-input v-model="cliente.ci_vend" label="CI vendedor" dense outlined /></div>
+                  <div class="col-12 col-md-6">
+                    <q-select
+                      v-model="cliente.ci_vend"
+                      :options="vendedores"
+                      option-label="label"
+                      option-value="username"
+                      emit-value
+                      map-options
+                      clearable
+                      dense
+                      outlined
+                      label="CVENT vendedor (Usuario)"
+                    >
+                      <template #option="scope">
+                        <q-item v-bind="scope.itemProps">
+                          <q-item-section avatar>
+                            <q-avatar size="28px">
+                              <q-img :src="vendedorAvatarUrl(scope.opt)" />
+                            </q-avatar>
+                          </q-item-section>
+                          <q-item-section>
+                            <q-item-label>{{ scope.opt?.name || 'Sin nombre' }}</q-item-label>
+                            <q-item-label caption>@{{ scope.opt?.username || '' }}</q-item-label>
+                          </q-item-section>
+                        </q-item>
+                      </template>
+                      <template #selected-item="scope">
+                        <div class="row items-center no-wrap q-gutter-sm">
+                          <q-avatar size="24px">
+                            <q-img :src="vendedorAvatarUrl(scope.opt)" />
+                          </q-avatar>
+                          <div class="ellipsis">
+                            {{ scope.opt?.name || cliente.ci_vend }} <span class="text-grey-7">@{{ scope.opt?.username || cliente.ci_vend }}</span>
+                          </div>
+                        </div>
+                      </template>
+                    </q-select>
+                  </div>
+                  <div class="col-12 col-md-6" v-if="cliente.ci_vend">
+                    <q-card flat bordered class="seller-card">
+                      <q-card-section class="row items-center q-pa-sm">
+                        <q-avatar size="42px">
+                          <q-img :src="vendedorAvatarUrl(vendedores.find(v => v.username === cliente.ci_vend))" />
+                        </q-avatar>
+                        <div class="q-ml-sm">
+                          <div class="text-weight-medium">
+                            {{ vendedores.find(v => v.username === cliente.ci_vend)?.name || cliente.ci_vend }}
+                          </div>
+                          <div class="text-caption text-grey-7">@{{ cliente.ci_vend }}</div>
+                        </div>
+                      </q-card-section>
+                    </q-card>
+                  </div>
                   <div class="col-12 col-md-2"><q-input v-model.number="cliente.imp_pieza" label="Imp pieza" dense outlined type="number" step="0.01" /></div>
                   <div class="col-12 col-md-3"><q-input v-model="cliente.supra_canal" label="Supra canal" dense outlined /></div>
                   <div class="col-12 col-md-3"><q-input v-model="cliente.canal" label="Canal" dense outlined /></div>
@@ -168,7 +222,7 @@
               <q-tab-panel name="fotos">
                 <div class="row q-col-gutter-sm">
                   <div class="col-12">
-                    <q-btn color="primary" no-caps icon="photo_camera" label="Agregar fotos (m�x. 3)" @click="$refs.fotosInput.click()" />
+                    <q-btn color="primary" no-caps icon="photo_camera" label="Agregar fotos (max. 3)" @click="$refs.fotosInput.click()" />
                     <input ref="fotosInput" type="file" accept="image/*" multiple style="display:none" @change="onFotosChange" />
                   </div>
                   <div class="col-12 text-caption">Puedes cargar hasta 3 fotos del lugar.</div>
@@ -218,6 +272,7 @@ export default {
       loading: false,
       filter: '',
       clientes: [],
+      vendedores: [],
       dialog: false,
       tab: 'basico',
       cliente: emptyCliente(),
@@ -233,8 +288,13 @@ export default {
   },
   mounted () {
     this.clientesGet()
+    this.vendedoresGet()
   },
   methods: {
+    vendedorAvatarUrl (vendedor) {
+      const avatar = vendedor?.avatar || 'default.png'
+      return `${this.$url}../images/${avatar}`
+    },
     fotoUrl (pathOrBlob) {
       if (!pathOrBlob) return ''
       if (pathOrBlob.startsWith('blob:')) return pathOrBlob
@@ -255,6 +315,23 @@ export default {
         this.$alert.error(e.response?.data?.message || 'No se pudo cargar clientes')
       } finally {
         this.loading = false
+      }
+    },
+    async vendedoresGet () {
+      try {
+        const res = await this.$axios.get('users')
+        const users = Array.isArray(res.data) ? res.data : []
+        this.vendedores = users
+          .filter(u => !!u?.username)
+          .map(u => ({
+            id: u.id,
+            name: u.name || u.username,
+            username: u.username,
+            avatar: u.avatar || 'default.png',
+            label: `${u.name || u.username} (@${u.username})`
+          }))
+      } catch (e) {
+        this.vendedores = []
       }
     },
     nuevoCliente () {
@@ -414,3 +491,9 @@ export default {
   }
 }
 </script>
+<style scoped>
+.seller-card {
+  background: linear-gradient(135deg, #eef6ff 0%, #ffffff 100%);
+  border-color: #c9ddff;
+}
+</style>

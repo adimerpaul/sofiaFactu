@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -86,5 +87,10 @@ class Cliente extends Model{
             'ctas_activo' => 'boolean',
             'noesempre' => 'boolean',
         ];
+    }
+
+    public function vendedorUser()
+    {
+        return $this->belongsTo(User::class, 'ci_vend', 'username');
     }
 }

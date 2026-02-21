@@ -14,6 +14,7 @@ class ClienteController extends Controller
         $perPage = (int)$request->input('per_page', 10);
 
         return Cliente::query()
+            ->with(['vendedorUser:id,name,username,avatar'])
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
                     $qq->where('nombre', 'like', "%{$search}%")
@@ -34,12 +35,12 @@ class ClienteController extends Controller
 
         $cliente = Cliente::create($payload);
 
-        return response()->json($cliente, 201);
+        return response()->json($cliente->fresh('vendedorUser:id,name,username,avatar'), 201);
     }
 
     public function show(Cliente $cliente)
     {
-        return $cliente;
+        return $cliente->load('vendedorUser:id,name,username,avatar');
     }
 
     public function update(Request $request, Cliente $cliente)
@@ -49,7 +50,7 @@ class ClienteController extends Controller
 
         $cliente->update($payload);
 
-        return $cliente->fresh();
+        return $cliente->fresh('vendedorUser:id,name,username,avatar');
     }
 
     public function destroy(Cliente $cliente)

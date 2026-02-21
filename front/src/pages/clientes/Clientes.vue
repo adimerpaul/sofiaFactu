@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <q-page class="q-pa-sm">
     <q-card flat bordered>
       <q-card-section class="row q-col-gutter-sm items-end">
@@ -210,11 +210,26 @@
                 <div class="row q-col-gutter-sm">
                   <div class="col-12 col-md-3"><q-input v-model.number="cliente.latitud" label="Latitud" dense outlined type="number" step="0.0000001" /></div>
                   <div class="col-12 col-md-3"><q-input v-model.number="cliente.longitud" label="Longitud" dense outlined type="number" step="0.0000001" /></div>
-                  <div class="col-12 col-md-3"><q-btn color="primary" no-caps label="Centrar mapa" @click="centerMap" /></div>
-                  <div class="col-12 col-md-3"><q-btn color="secondary" no-caps label="Posici�n actual" @click="useCurrentLocation" /></div>
+                  <div class="col-12 col-md-2"><q-btn color="primary" no-caps label="Centrar" class="full-width" @click="centerMap" /></div>
+                  <div class="col-12 col-md-2"><q-btn color="secondary" no-caps label="Mi ubicacion" class="full-width" @click="useCurrentLocation" /></div>
+                  <div class="col-12 col-md-2"><q-btn color="teal" no-caps label="Oruro centro" class="full-width" @click="goToOruro" /></div>
+                  <div class="col-12 col-md-6">
+                    <q-btn
+                      color="info"
+                      no-caps
+                      icon="open_in_new"
+                      label="Abrir en Google Maps"
+                      class="full-width"
+                      :disable="!hasValidCoordinates()"
+                      @click="openGoogleMaps"
+                    />
+                  </div>
                   <div class="col-12">
-                    <div ref="mapRef" style="height: 380px; border-radius: 8px; border: 1px solid #ddd;" />
-                    <div class="text-caption q-mt-xs">Haz click en el mapa para definir latitud y longitud.</div>
+                    <q-chip outline color="primary" icon="place">{{ coordsLabel() }}</q-chip>
+                  </div>
+                  <div class="col-12">
+                    <div ref="mapRef" class="map-canvas" />
+                    <div class="text-caption q-mt-xs">Click en el mapa o arrastra el marcador para actualizar coordenadas.</div>
                   </div>
                 </div>
               </q-tab-panel>
@@ -254,12 +269,30 @@
 <script>
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import markerIcon2xUrl from 'leaflet/dist/images/marker-icon-2x.png'
+import markerIconUrl from 'leaflet/dist/images/marker-icon.png'
+import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png'
+
+const ORURO_CENTER = [-17.967, -67.106]
+
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2xUrl,
+  iconUrl: markerIconUrl,
+  shadowUrl: markerShadowUrl
+})
+
+const visibleMarkerIcon = L.divIcon({
+  className: 'cliente-marker-wrap',
+  html: '<div class="cliente-marker-pin"></div>',
+  iconSize: [28, 28],
+  iconAnchor: [14, 14]
+})
 
 const emptyCliente = () => ({
   nombre: '', nit: '', ci: '', telefono: '', direccion: '', complemento: '', codigoTipoDocumentoIdentidad: '', email: '',
   id_externo: '', cod_ciudad: '', cod_nacio: '', cod_car: null, est_civ: '', edad: '', empresa: '', categoria: null,
   imp_pieza: null, ci_vend: '', list_blanck: false, motivo_list_black: '', list_black: false, tipo_paciente: '', supra_canal: '',
-  canal: '', subcanal: '', zona: '', latitud: null, longitud: null, transporte: '', territorio: '', codcli: null, clinew: '',
+  canal: '', subcanal: '', zona: '', latitud: ORURO_CENTER[0], longitud: ORURO_CENTER[1], transporte: '', territorio: '', codcli: null, clinew: '',
   venta_estado: 'ACTIVO', complto: '', tipodocu: null, lu: false, ma: false, mi: false, ju: false, vi: false, sa: false, do: false,
   correcli: '', canmayni: false, baja: false, profecion: '', waths: false, ctas_activo: false, ctas_mont: null, ctas_dias: null,
   sexo: '', noesempre: false, tarjeta: '', fotos: []
@@ -279,6 +312,7 @@ export default {
       previewFotos: [],
       map: null,
       marker: null,
+      layersControl: null,
       mapReady: false,
       pagination: {
         page: 1,
@@ -289,6 +323,33 @@ export default {
   mounted () {
     this.clientesGet()
     this.vendedoresGet()
+  },
+  watch: {
+    dialog (val) {
+      if (val) {
+        if (this.tab === 'ubicacion') {
+          this.$nextTick(() => this.initMap())
+        }
+        return
+      }
+      if (this.map) {
+        this.map.remove()
+        this.map = null
+        this.marker = null
+        this.layersControl = null
+      }
+    },
+    tab (val) {
+      if (val === 'ubicacion' && this.dialog) {
+        this.$nextTick(() => this.initMap())
+      }
+    },
+    'cliente.latitud' () {
+      this.syncMarkerFromModel()
+    },
+    'cliente.longitud' () {
+      this.syncMarkerFromModel()
+    }
   },
   methods: {
     vendedorAvatarUrl (vendedor) {
@@ -364,57 +425,112 @@ export default {
     },
     initMap () {
       if (!this.$refs.mapRef) return
-      const lat = Number(this.cliente.latitud || -17.967)
-      const lng = Number(this.cliente.longitud || -67.106)
+      const hasCoords = this.hasValidCoordinates()
+      const lat = hasCoords ? Number(this.cliente.latitud) : ORURO_CENTER[0]
+      const lng = hasCoords ? Number(this.cliente.longitud) : ORURO_CENTER[1]
 
       if (!this.map) {
-        this.map = L.map(this.$refs.mapRef).setView([lat, lng], 13)
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap contributors'
+        this.map = L.map(this.$refs.mapRef, {
+          center: [lat, lng],
+          zoom: hasCoords ? 15 : 13
+        })
+
+        const googleRoad = L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
+          attribution: 'Map data © Google',
+          maxZoom: 21
+        })
+        const googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+          attribution: 'Map data © Google',
+          maxZoom: 21
+        })
+        const googleHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+          attribution: 'Map data © Google',
+          maxZoom: 21
+        })
+        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors',
+          maxZoom: 19
+        })
+
+        googleRoad.addTo(this.map)
+        this.layersControl = L.control.layers({
+          'Google Calle': googleRoad,
+          'Google Satelite': googleSat,
+          'Google Hibrido': googleHybrid,
+          OpenStreetMap: osm
         }).addTo(this.map)
 
         this.map.on('click', (e) => {
-          this.cliente.latitud = Number(e.latlng.lat.toFixed(7))
-          this.cliente.longitud = Number(e.latlng.lng.toFixed(7))
-          this.drawMarker()
+          this.setLatLng(e.latlng.lat, e.latlng.lng, false)
         })
       }
 
       this.map.invalidateSize()
-      this.map.setView([lat, lng], 13)
-      this.drawMarker()
+      this.map.setView([lat, lng], hasCoords ? 15 : 13)
+      this.syncMarkerFromModel()
       this.mapReady = true
     },
-    drawMarker () {
-      if (!this.map || !this.cliente.latitud || !this.cliente.longitud) return
-      const latlng = [Number(this.cliente.latitud), Number(this.cliente.longitud)]
+    hasValidCoordinates () {
+      const lat = Number(this.cliente.latitud)
+      const lng = Number(this.cliente.longitud)
+      return Number.isFinite(lat) && Number.isFinite(lng)
+    },
+    coordsLabel () {
+      if (!this.hasValidCoordinates()) return 'Sin coordenadas'
+      return `Lat: ${Number(this.cliente.latitud).toFixed(6)} | Lng: ${Number(this.cliente.longitud).toFixed(6)}`
+    },
+    setLatLng (lat, lng, fly = true) {
+      this.cliente.latitud = Number(lat.toFixed(7))
+      this.cliente.longitud = Number(lng.toFixed(7))
+      this.syncMarkerFromModel(fly)
+    },
+    syncMarkerFromModel (fly = false) {
+      if (!this.map) return
 
-      if (this.marker) {
-        this.marker.setLatLng(latlng)
+      if (!this.hasValidCoordinates()) {
+        if (this.marker) {
+          this.map.removeLayer(this.marker)
+          this.marker = null
+        }
+        return
+      }
+
+      const latlng = [Number(this.cliente.latitud), Number(this.cliente.longitud)]
+      if (!this.marker) {
+        this.marker = L.marker(latlng, { draggable: true, icon: visibleMarkerIcon }).addTo(this.map)
+        this.marker.on('dragend', (e) => {
+          const point = e.target.getLatLng()
+          this.setLatLng(point.lat, point.lng, false)
+        })
       } else {
-        this.marker = L.circleMarker(latlng, {
-          radius: 8,
-          color: '#1976d2',
-          fillColor: '#1976d2',
-          fillOpacity: 0.8
-        }).addTo(this.map)
+        this.marker.setLatLng(latlng)
+      }
+
+      if (fly) {
+        this.map.flyTo(latlng, Math.max(this.map.getZoom(), 15))
       }
     },
     centerMap () {
-      if (!this.map || !this.cliente.latitud || !this.cliente.longitud) return
-      this.map.setView([Number(this.cliente.latitud), Number(this.cliente.longitud)], 15)
-      this.drawMarker()
+      if (!this.map || !this.hasValidCoordinates()) return
+      this.syncMarkerFromModel(true)
+    },
+    goToOruro () {
+      this.setLatLng(ORURO_CENTER[0], ORURO_CENTER[1], true)
+    },
+    openGoogleMaps () {
+      if (!this.hasValidCoordinates()) return
+      const lat = Number(this.cliente.latitud)
+      const lng = Number(this.cliente.longitud)
+      window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank')
     },
     useCurrentLocation () {
       if (!navigator.geolocation) {
-        this.$alert.error('Geolocalizaci�n no disponible')
+        this.$alert.error('Geolocalizacion no disponible')
         return
       }
       navigator.geolocation.getCurrentPosition((pos) => {
-        this.cliente.latitud = Number(pos.coords.latitude.toFixed(7))
-        this.cliente.longitud = Number(pos.coords.longitude.toFixed(7))
-        this.centerMap()
-      }, () => this.$alert.error('No se pudo obtener ubicaci�n'))
+        this.setLatLng(pos.coords.latitude, pos.coords.longitude, true)
+      }, () => this.$alert.error('No se pudo obtener ubicacion'))
     },
     onFotosChange (e) {
       const files = Array.from(e.target.files || [])
@@ -496,4 +612,24 @@ export default {
   background: linear-gradient(135deg, #eef6ff 0%, #ffffff 100%);
   border-color: #c9ddff;
 }
+.map-canvas {
+  height: 400px;
+  border-radius: 12px;
+  border: 1px solid #d7e3f8;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+:deep(.cliente-marker-wrap) {
+  background: transparent;
+  border: 0;
+}
+:deep(.cliente-marker-pin) {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #e53935;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 2px rgba(229, 57, 53, 0.35), 0 4px 12px rgba(0, 0, 0, 0.35);
+}
 </style>
+
+

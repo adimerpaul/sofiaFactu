@@ -18,6 +18,7 @@ const routes = [
       { path: 'productos-vencidos', name: 'productos-vencidos', component: () => import('pages/productos/ProductosVencidos.vue'), meta: { requiresAuth: true } },
       { path: 'pedidos', name: 'pedidos', component: () => import('pages/pedidos/Pedidos.vue'), meta: { requiresAuth: true } },
       { path: 'pedidosCompra', name: 'pedidosCompra', component: () => import('pages/pedidos/PedidosCompra.vue'), meta: { requiresAuth: true } },
+      { path: 'visitas', name: 'visitas', component: () => import('pages/visitas/Visitas.vue'), meta: { requiresAuth: true } },
     ]
   },
   {

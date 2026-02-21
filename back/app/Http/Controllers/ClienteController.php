@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Cliente;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 
@@ -12,9 +13,29 @@ class ClienteController extends Controller
     {
         $search = trim((string)$request->input('search', ''));
         $perPage = (int)$request->input('per_page', 10);
+        $soloMios = (bool)$request->input('solo_mios', false);
+        $soloDia = (bool)$request->input('solo_dia', false);
+        $dayName = strtolower((string)$request->input('dia', Carbon::now()->locale('es')->isoFormat('ddd')));
+        $dayMap = [
+            'lu' => 'lu', 'lun' => 'lu', 'lunes' => 'lu',
+            'ma' => 'ma', 'mar' => 'ma', 'martes' => 'ma',
+            'mi' => 'mi', 'mie' => 'mi', 'miercoles' => 'mi', 'miércoles' => 'mi',
+            'ju' => 'ju', 'jue' => 'ju', 'jueves' => 'ju',
+            'vi' => 'vi', 'vie' => 'vi', 'viernes' => 'vi',
+            'sa' => 'sa', 'sab' => 'sa', 'sabado' => 'sa', 'sábado' => 'sa',
+            'do' => 'do', 'dom' => 'do', 'domingo' => 'do',
+        ];
+        $dayField = $dayMap[$dayName] ?? null;
+        $user = $request->user();
 
         return Cliente::query()
             ->with(['vendedorUser:id,name,username,avatar'])
+            ->when($soloMios && $user, function ($q) use ($user) {
+                $q->where('ci_vend', $user->username);
+            })
+            ->when($soloDia && $dayField, function ($q) use ($dayField) {
+                $q->where($dayField, true);
+            })
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
                     $qq->where('nombre', 'like', "%{$search}%")

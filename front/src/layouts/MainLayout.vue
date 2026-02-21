@@ -131,6 +131,7 @@ onMounted(() => {
     { title: 'Productos por vencer', icon: 'warning', link: '/productos-vencer', can: ['Todos']},
     { title: 'Productos vencidos', icon: 'do_not_touch', link: '/productos-vencidos', can: ['Todos']},
     { title: 'Pedidos', icon: 'real_estate_agent', link: '/pedidos', can: ['Todos']},
+    { title: 'Visitas', icon: 'map', link: '/visitas', can: ['Todos']},
     { title: 'Realizar pedido', icon: 'shopping_cart_checkout', link: '/pedidosCompra', can: ['Todos']},
   ]
   linksList.value = baseLinks

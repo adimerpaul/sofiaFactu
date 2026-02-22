@@ -6,6 +6,7 @@ use App\Models\Pedido;
 use App\Models\PedidoDetalle;
 use App\Models\Cliente;
 use App\Models\Producto;
+use App\Models\Visita;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -78,6 +79,21 @@ class PedidoController extends Controller {
                 return response()->json(['message' => 'Debe agregar al menos un producto para realizar pedido'], 422);
             }
 
+            if (!$isPedido) {
+                $visita = $this->registrarVisita(
+                    userId: (int) $user->id,
+                    clienteId: isset($data['cliente_id']) ? (int) $data['cliente_id'] : null,
+                    tipoVisita: $tipoPedido,
+                    comentario: $data['comentario_visita'] ?? ($data['observaciones'] ?? null)
+                );
+
+                DB::commit();
+                return response()->json([
+                    'message' => 'Accion registrada',
+                    'visita' => $visita->load('cliente:id,nombre,codcli'),
+                ], 201);
+            }
+
             $pedido = Pedido::create([
                 'user_id' => $user->id,
                 'cliente_id' => $data['cliente_id'] ?? null,
@@ -108,6 +124,12 @@ class PedidoController extends Controller {
             }
 
             $pedido->update(['total' => $total]);
+            $this->registrarVisita(
+                userId: (int) $user->id,
+                clienteId: isset($data['cliente_id']) ? (int) $data['cliente_id'] : null,
+                tipoVisita: $tipoPedido,
+                comentario: $data['comentario_visita'] ?? ($data['observaciones'] ?? null)
+            );
 
             DB::commit();
             return response()->json($pedido->load(['detalles.producto', 'cliente', 'user']), 201);
@@ -115,5 +137,17 @@ class PedidoController extends Controller {
             DB::rollBack();
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    private function registrarVisita(int $userId, ?int $clienteId, string $tipoVisita, ?string $comentario): Visita
+    {
+        return Visita::create([
+            'user_id' => $userId,
+            'cliente_id' => $clienteId,
+            'fecha' => now()->toDateString(),
+            'hora' => now()->format('H:i:s'),
+            'tipo_visita' => $tipoVisita,
+            'comentario' => $comentario ? mb_substr(trim($comentario), 0, 600) : null,
+        ]);
     }
 }

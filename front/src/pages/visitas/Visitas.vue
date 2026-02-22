@@ -46,27 +46,27 @@
       <q-markup-table dense flat wrap-cells>
         <thead>
         <tr>
-          <th>ID</th>
+          <th>Accion</th>
           <th>Cliente</th>
           <th>Direccion</th>
           <th>Telefono</th>
           <th>Estado</th>
-          <th>Accion</th>
         </tr>
         </thead>
         <tbody>
-        <tr v-for="c in clientes" :key="c.id" :class="selectedCliente?.id === c.id ? 'row-selected' : ''">
-          <td>{{ c.codcli || c.id }}</td>
-          <td>{{ c.nombre }}</td>
+        <tr v-for="c in clientesOrdenados" :key="c.id" :class="[selectedCliente?.id === c.id ? 'row-selected' : '', rowClassByCliente(c)]" @click="openAcciones(c)">
+          <td>
+            <q-btn color="purple" icon="visibility" dense round @click="openAcciones(c)" />
+          </td>
+          <td>
+            {{ c.nombre }}
+          </td>
           <td>{{ c.direccion || '-' }}</td>
           <td>{{ c.telefono || '-' }}</td>
           <td>
-            <q-chip dense :color="(c.venta_estado || 'ACTIVO') === 'ACTIVO' ? 'green' : 'orange'" text-color="white">
-              {{ c.venta_estado || 'ACTIVO' }}
+            <q-chip dense :color="statusColor(clienteStatus(c.id))" text-color="white">
+              {{ clienteStatus(c.id) }}
             </q-chip>
-          </td>
-          <td>
-            <q-btn color="purple" icon="visibility" dense round @click="openAcciones(c)" />
           </td>
         </tr>
         </tbody>
@@ -87,8 +87,8 @@
               <div><b>Direccion:</b> {{ selectedCliente?.direccion || '-' }}</div>
               <div class="q-mt-sm">
                 Estado para pedidos:
-                <q-chip dense :color="(selectedCliente?.venta_estado || 'ACTIVO') === 'ACTIVO' ? 'green' : 'orange'" text-color="white">
-                  {{ selectedCliente?.venta_estado || 'ACTIVO' }}
+                <q-chip dense :color="statusColor(clienteStatus(selectedCliente?.id))" text-color="white">
+                  {{ clienteStatus(selectedCliente?.id) }}
                 </q-chip>
               </div>
             </div>
@@ -99,16 +99,16 @@
         </q-card-section>
         <q-card-actions align="stretch" class="row q-col-gutter-sm q-px-md q-pb-md">
           <div class="col-12 col-md-6">
-            <q-btn color="green" icon="shopping_cart" no-caps class="full-width" label="Realizar pedido" @click="accionSeleccionada('REALIZAR_PEDIDO')" />
+            <q-btn color="green" icon="shopping_cart" no-caps class="full-width" label="Realizar pedido" @click="accionSeleccionada('REALIZAR_PEDIDO')" :loading="loadingAccion === 'REALIZAR_PEDIDO'" :disable="Boolean(loadingAccion)" />
           </div>
           <div class="col-12 col-md-6">
-            <q-btn color="warning" icon="history" no-caps class="full-width" label="Retornar" @click="accionSeleccionada('RETORNAR')" />
+            <q-btn color="warning" icon="history" no-caps class="full-width" label="Retornar" @click="accionSeleccionada('RETORNAR')" :loading="loadingAccion === 'RETORNAR'" :disable="Boolean(loadingAccion)" />
           </div>
           <div class="col-12 col-md-6">
-            <q-btn color="negative" icon="close" no-caps class="full-width" label="No pedido" @click="accionSeleccionada('NO_PEDIDO')" />
+            <q-btn color="negative" icon="close" no-caps class="full-width" label="No pedido" @click="accionSeleccionada('NO_PEDIDO')" :loading="loadingAccion === 'NO_PEDIDO'" :disable="Boolean(loadingAccion)" />
           </div>
           <div class="col-12 col-md-6">
-            <q-btn color="purple" icon="map" no-caps class="full-width" label="Generar ruta" @click="accionSeleccionada('GENERAR_RUTA')" />
+            <q-btn color="purple" icon="map" no-caps class="full-width" label="Generar ruta" @click="accionSeleccionada('GENERAR_RUTA')" :loading="loadingAccion === 'GENERAR_RUTA'" :disable="Boolean(loadingAccion)" />
           </div>
         </q-card-actions>
       </q-card>
@@ -190,7 +190,7 @@
 
         <q-card-actions align="between" class="q-pa-md">
           <q-btn flat color="negative" label="Cerrar" @click="dialogPedido = false" />
-          <q-btn color="green" no-caps icon="send" label="Realizar pedido" :loading="loading" @click="guardarPedido" />
+          <q-btn color="green" no-caps icon="send" label="Realizar pedido" :loading="loadingPedido" :disable="loadingPedido || Boolean(loadingAccion)" @click="guardarPedido" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -212,24 +212,21 @@ L.Icon.Default.mergeOptions({
 
 const ORURO_CENTER = [-17.967, -67.106]
 const DAY_MAP = ['do', 'lu', 'ma', 'mi', 'ju', 'vi', 'sa']
-const clienteMarkerIcon = L.divIcon({
-  className: 'cliente-pin-wrap',
-  html: '<span class="cliente-pin-dot"></span>',
-  iconSize: [20, 20],
-  iconAnchor: [10, 10]
-})
 
 export default {
   name: 'VisitasPage',
   data () {
     return {
       loading: false,
+      loadingPedido: false,
+      loadingAccion: '',
       map: null,
       markersLayer: null,
       meMarker: null,
       search: '',
       showAllDays: false,
       clientes: [],
+      visitasByCliente: {},
       selectedCliente: null,
       comentario: '',
       dialogAcciones: false,
@@ -258,6 +255,27 @@ export default {
     },
     totalPedido () {
       return this.pedidoItems.reduce((acc, p) => acc + (Number(p.cantidad) * Number(p.precio)), 0)
+    },
+    clientesOrdenados () {
+      const prioridad = {
+        ACTIVO: 1,
+        RETORNAR: 2,
+        NO_PEDIDO: 3,
+        REALIZAR_PEDIDO: 4,
+      }
+
+      return [...this.clientes].sort((a, b) => {
+        const sa = this.clienteStatus(a?.id)
+        const sb = this.clienteStatus(b?.id)
+        const pa = prioridad[sa] || 99
+        const pb = prioridad[sb] || 99
+
+        if (pa !== pb) return pa - pb
+
+        const na = String(a?.nombre || '').toLowerCase()
+        const nb = String(b?.nombre || '').toLowerCase()
+        return na.localeCompare(nb, 'es')
+      })
     }
   },
   mounted () {
@@ -278,6 +296,31 @@ export default {
     this.meMarker = null
   },
   methods: {
+    markerColor (status) {
+      const s = String(status || 'ACTIVO').toUpperCase()
+      if (s === 'RETORNAR') return '#f4b400'
+      if (s === 'NO_PEDIDO') return '#e53935'
+      return '#1e88e5'
+    },
+    statusColor (status) {
+      const s = String(status || 'ACTIVO').toUpperCase()
+      if (s === 'RETORNAR') return 'warning'
+      if (s === 'NO_PEDIDO') return 'negative'
+      if (s === 'REALIZAR_PEDIDO') return 'positive'
+      if (s === 'GENERAR_RUTA') return 'purple'
+      return 'primary'
+    },
+    rowClassByCliente (cliente) {
+      const status = this.clienteStatus(cliente?.id)
+      if (status === 'RETORNAR') return 'cliente-retornar'
+      if (status === 'NO_PEDIDO') return 'cliente-no-pedido'
+      if (status === 'REALIZAR_PEDIDO') return 'cliente-pedido'
+      return ''
+    },
+    clienteStatus (clienteId) {
+      if (!clienteId) return 'ACTIVO'
+      return this.visitasByCliente[clienteId]?.tipo_visita || 'ACTIVO'
+    },
     mapReady () {
       return !!(this.map && this.map._loaded && this.map.getPane && this.map.getPane('mapPane'))
     },
@@ -314,6 +357,7 @@ export default {
         })
         if (!this.isAlive) return
         this.clientes = res.data?.data || []
+        await this.cargarVisitas()
         this.renderMarkers()
       } catch (e) {
         this.$alert.error(e.response?.data?.message || 'No se pudo cargar clientes de visitas')
@@ -331,8 +375,15 @@ export default {
         const lat = Number(c.latitud)
         const lng = Number(c.longitud)
         const idLabel = c.codcli || c.id
-
-        const marker = L.marker([lat, lng], { icon: clienteMarkerIcon, zIndexOffset: 400 }).addTo(this.markersLayer)
+        const status = this.clienteStatus(c.id)
+        const color = this.markerColor(status)
+        const marker = L.circleMarker([lat, lng], {
+          radius: 9,
+          fillColor: color,
+          color: '#fff',
+          weight: 3,
+          fillOpacity: 0.95
+        }).addTo(this.markersLayer)
         marker.bindTooltip(String(idLabel), { permanent: true, direction: 'top', className: 'cliente-id-tooltip' })
         marker.on('click', () => this.openAcciones(c))
         bounds.push([lat, lng])
@@ -347,6 +398,27 @@ export default {
     setDayFilter (allDays) {
       this.showAllDays = allDays
       this.cargarClientes()
+    },
+    async cargarVisitas () {
+      try {
+        const res = await this.$axios.get('visitas', {
+          params: {
+            solo_mios: 1,
+            all_days: 1,
+            latest_per_cliente: 1,
+            fecha: new Date().toISOString().slice(0, 10),
+          }
+        })
+        const data = Array.isArray(res.data) ? res.data : (res.data?.data || [])
+        const byCliente = {}
+        data.forEach(v => {
+          if (!v?.cliente_id) return
+          byCliente[v.cliente_id] = v
+        })
+        this.visitasByCliente = byCliente
+      } catch (_) {
+        this.visitasByCliente = {}
+      }
     },
     locateMe () {
       if (!this.mapReady()) return
@@ -375,12 +447,14 @@ export default {
     },
     openAcciones (cliente) {
       this.selectedCliente = cliente
+      this.loadingAccion = ''
       this.dialogAcciones = true
     },
     accionSeleccionada (accion) {
       if (!this.selectedCliente) return
       if (accion === 'REALIZAR_PEDIDO') {
         this.dialogAcciones = false
+        this.loadingPedido = false
         this.dialogPedido = true
         return
       }
@@ -391,6 +465,7 @@ export default {
     },
     async guardarAccion (accion) {
       if (!this.selectedCliente) return
+      this.loadingAccion = accion
       this.loading = true
       try {
         await this.$axios.post('pedidos', {
@@ -403,9 +478,12 @@ export default {
         this.$alert.success('Accion registrada')
         this.dialogAcciones = false
         this.comentario = ''
+        await this.cargarVisitas()
+        this.renderMarkers()
       } catch (e) {
         this.$alert.error(e.response?.data?.message || 'No se pudo registrar la accion')
       } finally {
+        this.loadingAccion = ''
         this.loading = false
       }
     },
@@ -502,6 +580,7 @@ export default {
         return
       }
 
+      this.loadingPedido = true
       this.loading = true
       try {
         await this.$axios.post('pedidos', {
@@ -516,9 +595,12 @@ export default {
         this.dialogPedido = false
         this.comentario = ''
         this.pedidoItems = []
+        await this.cargarVisitas()
+        this.renderMarkers()
       } catch (e) {
         this.$alert.error(e.response?.data?.message || 'No se pudo registrar pedido')
       } finally {
+        this.loadingPedido = false
         this.loading = false
       }
     }
@@ -547,6 +629,20 @@ export default {
 .row-selected {
   background: #f0f8ff;
 }
+.cliente-link {
+  justify-content: flex-start;
+  width: 100%;
+  text-align: left;
+}
+.cliente-pedido {
+  background: #dcfce7;
+}
+.cliente-retornar {
+  background: #fff2b3;
+}
+.cliente-no-pedido {
+  background: #ffd6d6;
+}
 :deep(.cliente-id-tooltip) {
   background: #22b8cf;
   color: #fff;
@@ -558,18 +654,5 @@ export default {
 }
 :deep(.cliente-id-tooltip:before) {
   border-top-color: #22b8cf;
-}
-:deep(.cliente-pin-wrap) {
-  background: transparent;
-  border: 0;
-}
-:deep(.cliente-pin-dot) {
-  display: block;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #e53935;
-  border: 3px solid #fff;
-  box-shadow: 0 0 0 2px rgba(229, 57, 53, 0.35), 0 3px 9px rgba(0, 0, 0, 0.35);
 }
 </style>

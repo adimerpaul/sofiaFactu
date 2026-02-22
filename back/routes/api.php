@@ -70,6 +70,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/pedidos', [App\Http\Controllers\PedidoController::class, 'index']);
     Route::put('/pedidos/{pedido}', [App\Http\Controllers\PedidoController::class, 'update']);
     Route::post('/pedidos', [App\Http\Controllers\PedidoController::class, 'store']);
+    Route::get('/visitas', [App\Http\Controllers\VisitaController::class, 'index']);
 
     Route::get('/recuperarPedido', [App\Http\Controllers\PedidoController::class, 'recuperarPedido']);
 

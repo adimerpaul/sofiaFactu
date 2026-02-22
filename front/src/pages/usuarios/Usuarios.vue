@@ -47,6 +47,18 @@
         </q-td>
       </template>
 
+      <template #body-cell-es_camion="props">
+        <q-td :props="props">
+          <q-chip
+            :label="props.row.es_camion ? 'Sí' : 'No'"
+            :color="props.row.es_camion ? 'teal' : 'grey'"
+            text-color="white"
+            dense
+            size="12px"
+          />
+        </q-td>
+      </template>
+
       <template #body-cell-avatar="props">
         <q-td :props="props">
           <q-avatar rounded>
@@ -100,6 +112,7 @@
             <q-select v-model="user.role" label="Rol" dense outlined :options="roles" :rules="[v => !!v || 'Campo requerido']"/>
             <q-input v-model="user.email" label="Email" dense outlined hint=""/>
             <q-input v-model="user.celular" label="Celular" dense outlined hint=""/>
+            <q-toggle v-model="user.es_camion" label="Es camión" color="primary" class="q-mb-sm"/>
 <!--            <q-select v-model="user.area" label="Área" dense outlined :options="$areas" :rules="[v => !!v || 'Campo requerido']"/>-->
 <!--            <q-select v-model="user.zona" label="Zona" dense outlined :options="$zonas" :rules="[v => !!v || 'Campo requerido']"/>-->
             <div class="text-right">
@@ -194,6 +207,7 @@ export default {
         { name: 'username', label: 'Usuario', align: 'left', field: 'username' },
         { name: 'avatar', label: 'Avatar', align: 'left', field: (row) => row.avatar },
         { name: 'role', label: 'Rol', align: 'left', field: 'role' },
+        { name: 'es_camion', label: 'Camion', align: 'left', field: row => row.es_camion ? 'Si' : 'No' },
         // { name: 'area', label: 'Área', align: 'left', field: 'area' },
         // { name: 'zona', label: 'Zona', align: 'left', field: 'zona' },
         { name: 'email', label: 'Email', align: 'left', field: 'email' },
@@ -222,12 +236,12 @@ export default {
       } finally { this.loading = false }
     },
     userNew() {
-      this.user = { name: '', username: '', password: '', role: 'Asistente', avatar: 'default.png', area: 'DNA', zona: 'CENTRAL', email: '', celular: '' }
+      this.user = { name: '', username: '', password: '', role: 'Usuario', avatar: 'default.png', area: 'DNA', zona: 'CENTRAL', email: '', celular: '', es_camion: false }
       this.actionUser = 'Nuevo'
       this.userDialog = true
     },
     userEdit(user) {
-      this.user = { ...user }
+      this.user = { ...user, es_camion: !!user.es_camion }
       this.actionUser = 'Editar'
       this.userDialog = true
     },

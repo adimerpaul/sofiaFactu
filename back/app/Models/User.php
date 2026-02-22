@@ -17,12 +17,29 @@ class User extends Authenticatable{
         'name',
         'email',
         'password',
+        'clave',
         'username',
         'active',
         'agencia',
         'role',
         'avatar',
         'celular',
+        'es_camion',
+        'cod_aut',
+        'fecha_nacimiento',
+        'ci',
+        'cod_prof',
+        'app1',
+        'app2',
+        'nombre1',
+        'nombre2',
+        'salario',
+        'direccion',
+        'cod_car',
+        'nro',
+        'nro_alm',
+        'acceso_emp',
+        'placa',
     ];
     protected $appends = ['color'];
     public function getColorAttribute(){
@@ -34,6 +51,7 @@ class User extends Authenticatable{
     }
     protected $hidden = [
         'password',
+        'clave',
         'remember_token',
         'created_at',
         'updated_at',
@@ -45,6 +63,10 @@ class User extends Authenticatable{
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'clave' => 'encrypted',
+            'es_camion' => 'boolean',
+            'fecha_nacimiento' => 'date',
+            'acceso_emp' => 'boolean',
         ];
     }
 }

@@ -92,26 +92,96 @@ class UserController extends Controller{
             ->get();
     }
     function update(Request $request, $id){
-        $user = User::find($id);
-        $user->update($request->except('password'));
+        $user = User::findOrFail($id);
+        $data = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'username' => 'sometimes|required|string|max:255|unique:users,username,' . $user->id,
+            'role' => 'sometimes|nullable|string|max:255',
+            'email' => 'sometimes|nullable|email|max:255|unique:users,email,' . $user->id,
+            'celular' => 'sometimes|nullable|string|max:100',
+            'es_camion' => 'sometimes|boolean',
+            'cod_aut' => 'sometimes|nullable|integer',
+            'fecha_nacimiento' => 'sometimes|nullable|date',
+            'ci' => 'sometimes|nullable|string|max:15',
+            'cod_prof' => 'sometimes|nullable|integer',
+            'app1' => 'sometimes|nullable|string|max:20',
+            'app2' => 'sometimes|nullable|string|max:20',
+            'nombre1' => 'sometimes|nullable|string|max:15',
+            'nombre2' => 'sometimes|nullable|string|max:15',
+            'salario' => 'sometimes|nullable|numeric',
+            'direccion' => 'sometimes|nullable|string|max:250',
+            'cod_car' => 'sometimes|nullable|integer',
+            'nro' => 'sometimes|nullable|integer',
+            'nro_alm' => 'sometimes|nullable|integer',
+            'acceso_emp' => 'sometimes|nullable|boolean',
+            'placa' => 'sometimes|nullable|string|max:100',
+        ]);
+        $user->update($data);
         error_log('User' . json_encode($user));
         return $user;
     }
     function updatePassword(Request $request, $id){
-        $user = User::find($id);
+        $user = User::findOrFail($id);
+        $request->validate([
+            'password' => 'required|string|min:1',
+        ]);
         $user->update([
-            'password' => bcrypt($request->password),
+            'password' => $request->password,
+            'clave' => $request->password,
         ]);
         return $user;
     }
     function store(Request $request){
-        $validatedData = $request->validate([
+        $request->validate([
             'username' => 'required|unique:users',
             'password' => 'required',
             'name' => 'required',
+            'role' => 'nullable|string|max:255',
+            'email' => 'nullable|email|max:255|unique:users,email',
+            'celular' => 'nullable|string|max:100',
+            'es_camion' => 'nullable|boolean',
+            'cod_aut' => 'nullable|integer',
+            'fecha_nacimiento' => 'nullable|date',
+            'ci' => 'nullable|string|max:15',
+            'cod_prof' => 'nullable|integer',
+            'app1' => 'nullable|string|max:20',
+            'app2' => 'nullable|string|max:20',
+            'nombre1' => 'nullable|string|max:15',
+            'nombre2' => 'nullable|string|max:15',
+            'salario' => 'nullable|numeric',
+            'direccion' => 'nullable|string|max:250',
+            'cod_car' => 'nullable|integer',
+            'nro' => 'nullable|integer',
+            'nro_alm' => 'nullable|integer',
+            'acceso_emp' => 'nullable|boolean',
+            'placa' => 'nullable|string|max:100',
 //            'email' => 'required|email|unique:users',
         ]);
-        $user = User::create($request->all());
+        $user = User::create([
+            'username' => $request->username,
+            'password' => $request->password,
+            'clave' => $request->password,
+            'name' => $request->name,
+            'role' => $request->role ?? 'Usuario',
+            'email' => $request->email,
+            'celular' => $request->celular,
+            'es_camion' => (bool) ($request->es_camion ?? false),
+            'cod_aut' => $request->cod_aut,
+            'fecha_nacimiento' => $request->fecha_nacimiento,
+            'ci' => $request->ci,
+            'cod_prof' => $request->cod_prof,
+            'app1' => $request->app1,
+            'app2' => $request->app2,
+            'nombre1' => $request->nombre1,
+            'nombre2' => $request->nombre2,
+            'salario' => $request->salario,
+            'direccion' => $request->direccion,
+            'cod_car' => $request->cod_car,
+            'nro' => $request->nro,
+            'nro_alm' => $request->nro_alm,
+            'acceso_emp' => $request->acceso_emp,
+            'placa' => $request->placa,
+        ]);
         return $user;
     }
     function destroy($id){

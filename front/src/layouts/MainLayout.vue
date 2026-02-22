@@ -54,6 +54,9 @@
                 <div style="width: 100px; white-space: normal; overflow-wrap: break-word;">
                   {{ $store.user.name }} <br>
                   <q-chip color="red" dense size="xs" class="text-white">{{$store.user.role}}</q-chip>
+                  <q-chip :color="$store.user.es_camion ? 'teal' : 'grey'" dense size="xs" class="text-white q-ml-xs">
+                    Camión: {{ $store.user.es_camion ? 'Sí' : 'No' }}
+                  </q-chip>
                 </div>
                 <!--                <pre>{{$store.user}}</pre>-->
               </div>
@@ -149,21 +152,21 @@ onMounted(() => {
   const user = JSON.parse(localStorage.getItem('user')) || {}
 
   const baseLinks = [
-    { title: 'Principal', icon: 'home', link: '/', can: 'Todos' },
-    { title: 'Usuarios', icon: 'people', link: '/usuarios', can: 'Admin' },
-    { title: 'Impuestos', icon: 'percent', link: '/impuestos', can: 'Admin' },
-    { title: 'Productos', icon: 'shopping_cart', link: '/productos', can: 'Todos' },
-    { title: 'Clientes', icon: 'groups', link: '/clientes', can: ['Todos'], perm: 'Clientes' },
-    { title: 'Ventas', icon: 'shopping_bag', link: '/venta', can: 'Todos' },
-    { title: 'Nueva Venta', icon: 'add_shopping_cart', link: '/ventaNuevo', can: 'Todos' },
-    { title: 'Proveedores', icon: 'manage_accounts', link: '/proveedores', can: ['Todos']},
-    { title: 'Compras', icon: 'storefront', link: '/compras', can: ['Todos']},
-    { title: 'Compras Nueva', icon: 'shopping_basket', link: '/compras-create', can: ['Todos']},
-    { title: 'Productos por vencer', icon: 'warning', link: '/productos-vencer', can: ['Todos']},
-    { title: 'Productos vencidos', icon: 'do_not_touch', link: '/productos-vencidos', can: ['Todos']},
-    { title: 'Pedidos', icon: 'real_estate_agent', link: '/pedidos', can: ['Todos']},
-    { title: 'Visitas', icon: 'map', link: '/visitas', can: ['Todos']},
-    { title: 'Realizar pedido', icon: 'shopping_cart_checkout', link: '/pedidosCompra', can: ['Todos']},
+    { title: 'Principal', icon: 'home', link: '/', always: true },
+    { title: 'Usuarios', icon: 'people', link: '/usuarios', perm: 'Usuarios' },
+    { title: 'Impuestos', icon: 'percent', link: '/impuestos', perm: 'Impuestos' },
+    { title: 'Productos', icon: 'shopping_cart', link: '/productos', perm: 'Productos' },
+    { title: 'Clientes', icon: 'groups', link: '/clientes', perm: 'Clientes' },
+    { title: 'Ventas', icon: 'shopping_bag', link: '/venta', perm: 'Ventas' },
+    { title: 'Nueva Venta', icon: 'add_shopping_cart', link: '/ventaNuevo', perm: 'Nueva Venta' },
+    { title: 'Proveedores', icon: 'manage_accounts', link: '/proveedores', perm: 'Proveedores'},
+    { title: 'Compras', icon: 'storefront', link: '/compras', perm: 'Compras'},
+    { title: 'Compras Nueva', icon: 'shopping_basket', link: '/compras-create', perm: 'Nueva Compra'},
+    { title: 'Productos por vencer', icon: 'warning', link: '/productos-vencer', perm: 'Productos por vencer'},
+    { title: 'Productos vencidos', icon: 'do_not_touch', link: '/productos-vencidos', perm: 'Productos vencidos'},
+    { title: 'Pedidos', icon: 'real_estate_agent', link: '/pedidos', perm: 'Pedidos'},
+    { title: 'Visitas', icon: 'map', link: '/visitas', perm: 'Pedidos'},
+    { title: 'Realizar pedido', icon: 'shopping_cart_checkout', link: '/pedidosCompra', perm: 'Nuevo Pedido'},
   ]
   linksList.value = baseLinks
   loadFallas()
@@ -219,11 +222,10 @@ function logout() {
 }
 function canSee(link) {
   if (!link || !proxy.$store?.user) return false
-  const canByRole = (Array.isArray(link.can) ? link.can : [link.can]).some(v => v === 'Todos' || v === proxy.$store.user.role)
-  if (!canByRole) return false
-  if (!link.perm) return true
+  if (link.always) return true
   const perms = (proxy.$store.permissions || []).map(p => typeof p === 'string' ? p : p?.name).filter(Boolean)
-  return perms.includes(link.perm)
+  const requiredPerm = link.perm || link.title
+  return perms.includes(requiredPerm)
 }
 function loadFallas(showError = false) {
   proxy.$axios.get('/impuestos/fallas')

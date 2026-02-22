@@ -31,7 +31,7 @@ class DatabaseSeeder extends Seeder
 //            ],
 //        ]);
 //        users_202510241958.sql
-        $sqlFile = base_path('database/seeders/users_202510241958.sql');
+        $sqlFile = base_path('database/seeders/users_202602220930.sql');
         $sqlContent = file_get_contents($sqlFile);
         DB::unprepared($sqlContent);
         $permisos = [
@@ -126,8 +126,7 @@ class DatabaseSeeder extends Seeder
             ]);
         }
 
-//        productos_202509302046.sql
-        $sqlFile = base_path('database/seeders/productos_202509302046.sql');
+        $sqlFile = base_path('database/seeders/productos_202602220930.sql');
         $sqlContent = file_get_contents($sqlFile);
         DB::unprepared($sqlContent);
         error_log("Productos seed 202509302046 executed");

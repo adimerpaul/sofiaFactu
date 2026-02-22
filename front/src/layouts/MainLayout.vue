@@ -16,6 +16,34 @@
         <span class="q-pa-xs text-bold">{{version}}</span>
         <q-toolbar-title>
         </q-toolbar-title>
+        <div class="q-mr-sm">
+          <q-btn flat round dense icon="notifications" @click="loadFallas">
+            <q-badge v-if="fallasPendientes > 0" color="negative" floating>{{ fallasPendientes }}</q-badge>
+            <q-tooltip>Fallas CUFD</q-tooltip>
+            <q-menu>
+              <q-list style="min-width: 360px; max-width: 420px;">
+                <q-item-label header>
+                  Alertas de impuestos
+                </q-item-label>
+                <q-item v-if="fallas.length === 0">
+                  <q-item-section>Sin fallas pendientes</q-item-section>
+                </q-item>
+                <q-item v-for="falla in fallas.slice(0, 5)" :key="falla.id">
+                  <q-item-section>
+                    <q-item-label class="text-negative text-weight-bold">Fallo generación CUFD</q-item-label>
+                    <q-item-label caption>{{ falla.mensaje }}</q-item-label>
+                    <q-item-label caption>{{ falla.detalle?.error || '' }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+                <q-separator />
+                <q-item clickable v-close-popup @click="$router.push('/impuestos')">
+                  <q-item-section avatar><q-icon name="settings" /></q-item-section>
+                  <q-item-section>Ir a Impuestos / Ajustes</q-item-section>
+                </q-item>
+              </q-list>
+            </q-menu>
+          </q-btn>
+        </div>
         <div>
           <q-btn-dropdown flat unelevated  no-caps dropdownIcon="expand_more">
             <template v-slot:label>
@@ -104,13 +132,16 @@
 </template>
 
 <script setup>
-import {getCurrentInstance, onMounted, ref} from 'vue'
+import {getCurrentInstance, onBeforeUnmount, onMounted, ref} from 'vue'
 // import EssentialLink from 'components/EssentialLink.vue'
 const {proxy} = getCurrentInstance()
 const linksList = ref([])
 
 
 const leftDrawerOpen = ref(false)
+const fallasPendientes = ref(0)
+const fallas = ref([])
+let pollTimer = null
 
 const version =import.meta.env.VITE_API_VERSION
 
@@ -135,6 +166,8 @@ onMounted(() => {
     { title: 'Realizar pedido', icon: 'shopping_cart_checkout', link: '/pedidosCompra', can: ['Todos']},
   ]
   linksList.value = baseLinks
+  loadFallas()
+  pollTimer = setInterval(() => loadFallas(false), 60000)
 
   // const sucursalLinks = {
   //   'Ayacucho': { title: 'Ayacucho', icon: 'event', link: '/reservas', can: 'Todos', color: 'text-green' },
@@ -149,6 +182,10 @@ onMounted(() => {
   //   ...baseLinks.slice(2),
   //   sucursalLinks[altSucursal]
   // ]
+})
+
+onBeforeUnmount(() => {
+  if (pollTimer) clearInterval(pollTimer)
 })
 
 function toggleLeftDrawer () {
@@ -187,6 +224,18 @@ function canSee(link) {
   if (!link.perm) return true
   const perms = (proxy.$store.permissions || []).map(p => typeof p === 'string' ? p : p?.name).filter(Boolean)
   return perms.includes(link.perm)
+}
+function loadFallas(showError = false) {
+  proxy.$axios.get('/impuestos/fallas')
+    .then((res) => {
+      fallasPendientes.value = res.data?.pending || 0
+      fallas.value = (res.data?.data || []).filter((x) => x.estado === 'pendiente')
+    })
+    .catch((err) => {
+      if (showError) {
+        proxy.$alert.error(err?.response?.data?.message || 'No se pudieron cargar fallas de impuestos')
+      }
+    })
 }
 </script>
 <style>

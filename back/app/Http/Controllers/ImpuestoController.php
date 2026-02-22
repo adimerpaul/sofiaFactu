@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Cufd;
 use App\Models\Cui;
 use App\Models\EventoSignificativo;
+use App\Models\ImpuestoFalla;
 use App\Models\Venta;
+use App\Services\Impuestos\CufdService;
 use Illuminate\Http\Request;
 use Phar;
 use PharData;
@@ -385,50 +387,119 @@ class ImpuestoController extends Controller{
         return response()->json($cufd, 200);
     }
     function generarCUFD(){
-        $codigoPuntoVenta = 0;
-        $codigoSucursal = 0;
-        if (Cufd::where('codigoPuntoVenta', $codigoPuntoVenta)->where('codigoSucursal', $codigoSucursal)->where('fechaVigencia','>=', now())->count()>=1){
-            return response()->json(['message' => 'El CUFD ya existe'], 400);
-        }else{
-            $cui=Cui::where('codigoPuntoVenta', $codigoPuntoVenta)->where('codigoSucursal', $codigoSucursal)->where('fechaVigencia','>=', now());
-            if ($cui->count()==0){
-                return response()->json(['message' => 'El CUI no existe'], 400);
+        try {
+            $result = app(CufdService::class)->generateCufdDaily();
+            if (($result['status'] ?? null) === 'skipped') {
+                ImpuestoFalla::query()->create([
+                    'tipo' => 'CUFD',
+                    'mensaje' => $result['message'] ?? 'El CUFD vigente ya existe para hoy',
+                    'detalle' => ['reason' => 'already_exists_today'],
+                    'estado' => 'pendiente',
+                    'fecha_evento' => now(),
+                ]);
+                return response()->json(['message' => $result['message']], 200);
             }
-            $client = new \SoapClient(env("URL_SIAT")."FacturacionCodigos?WSDL",  [
-                'stream_context' => stream_context_create([
-                    'http' => [
-                        'header' => "apikey: TokenApi ".env('TOKEN'),
-                    ]
-                ]),
-                'cache_wsdl' => WSDL_CACHE_NONE,
-                'compression' => SOAP_COMPRESSION_ACCEPT | SOAP_COMPRESSION_GZIP | SOAP_COMPRESSION_DEFLATE,
-                'trace' => 1,
-                'use' => SOAP_LITERAL,
-                'style' => SOAP_DOCUMENT,
+            return response()->json(['success' => $result['message']], 200);
+        } catch (\Throwable $e) {
+            ImpuestoFalla::query()->create([
+                'tipo' => 'CUFD',
+                'mensaje' => 'Fallo la generacion manual de CUFD',
+                'detalle' => ['error' => $e->getMessage()],
+                'estado' => 'pendiente',
+                'fecha_evento' => now(),
             ]);
-            $result= $client->cufd([
-                "SolicitudCufd"=>[
-                    "codigoAmbiente"=>env('AMBIENTE'),
-                    "codigoModalidad"=>env('MODALIDAD'),
-                    "codigoPuntoVenta"=>$codigoPuntoVenta,
-                    "codigoSistema"=>env('CODIGO_SISTEMA'),
-                    "codigoSucursal"=>$codigoSucursal,
-                    "cuis"=> $cui->first()->codigo,
-                    "nit"=>env('NIT'),
-                ]
-            ]);
-            error_log("result: ".json_encode($result));
-
-            $cufd = new Cufd();
-            $cufd->codigo = $result->RespuestaCufd->codigo;
-            $cufd->codigoControl = $result->RespuestaCufd->codigoControl;
-//            $cufd->fechaVigencia =  date('Y-m-d H:i:s', strtotime($result->RespuestaCufd->fechaVigencia));
-            $cufd->fechaVigencia =  date('Y-m-d H:i:s', strtotime (date('Y-m-d 23:59:59')));
-            $cufd->fechaCreacion =  date('Y-m-d H:i:s');
-            $cufd->codigoPuntoVenta = $codigoPuntoVenta;
-            $cufd->codigoSucursal = $codigoSucursal;
-            $cufd->save();
-            return response()->json(['success' => 'CUFD creado correctamente'], 200);
+            return response()->json(['message' => $e->getMessage()], 500);
         }
+    }
+
+    public function fallas()
+    {
+        $items = ImpuestoFalla::query()
+            ->orderByDesc('fecha_evento')
+            ->limit(100)
+            ->get();
+
+        return response()->json([
+            'pending' => $items->where('estado', 'pendiente')->count(),
+            'data' => $items->values(),
+        ], 200);
+    }
+
+    public function ocultarFalla(ImpuestoFalla $falla)
+    {
+        $falla->update([
+            'estado' => 'oculto',
+            'resolved_at' => now(),
+        ]);
+
+        return response()->json(['message' => 'Falla ocultada'], 200);
+    }
+
+    public function resolverFalla(ImpuestoFalla $falla)
+    {
+        $falla->update([
+            'estado' => 'resuelto',
+            'resolved_at' => now(),
+        ]);
+
+        return response()->json(['message' => 'Falla resuelta'], 200);
+    }
+
+    public function eliminarFalla(ImpuestoFalla $falla)
+    {
+        $falla->delete();
+        return response()->json(['message' => 'Falla eliminada'], 200);
+    }
+
+    public function reintentarCufd()
+    {
+        try {
+            $result = app(CufdService::class)->generateCufdDaily();
+
+            if (($result['status'] ?? '') === 'created') {
+                ImpuestoFalla::query()
+                    ->where('tipo', 'CUFD')
+                    ->where('estado', 'pendiente')
+                    ->update([
+                        'estado' => 'resuelto',
+                        'resolved_at' => now(),
+                    ]);
+            }
+            if (($result['status'] ?? '') === 'skipped') {
+                ImpuestoFalla::query()->create([
+                    'tipo' => 'CUFD',
+                    'mensaje' => $result['message'] ?? 'El CUFD vigente ya existe para hoy',
+                    'detalle' => ['reason' => 'already_exists_today'],
+                    'estado' => 'pendiente',
+                    'fecha_evento' => now(),
+                ]);
+            }
+
+            return response()->json($result, 200);
+        } catch (\Throwable $e) {
+            ImpuestoFalla::query()->create([
+                'tipo' => 'CUFD',
+                'mensaje' => 'Fallo al reintentar generar CUFD',
+                'detalle' => ['error' => $e->getMessage()],
+                'estado' => 'pendiente',
+                'fecha_evento' => now(),
+            ]);
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function estadoAutoCufd()
+    {
+        $actual = Cufd::query()
+            ->where('fechaVigencia', '>=', now())
+            ->latest('id')
+            ->first();
+
+        return response()->json([
+            'hora_programada' => '00:15',
+            'zona_horaria' => config('app.timezone'),
+            'cufd_actual' => $actual,
+            'fallas_pendientes' => ImpuestoFalla::query()->where('tipo', 'CUFD')->where('estado', 'pendiente')->count(),
+        ], 200);
     }
 }

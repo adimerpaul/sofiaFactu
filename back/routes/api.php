@@ -75,7 +75,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/impuestos/generar-cui', [App\Http\Controllers\ImpuestoController::class, 'generarCUI']);
     Route::post('/impuestos/generar-cufd', [App\Http\Controllers\ImpuestoController::class, 'generarCUFD']);
+    Route::post('/impuestos/reintentar-cufd', [App\Http\Controllers\ImpuestoController::class, 'reintentarCufd']);
     Route::get('/impuestos/list-cufd', [App\Http\Controllers\ImpuestoController::class, 'listCUFD']);
+    Route::get('/impuestos/auto-cufd/estado', [App\Http\Controllers\ImpuestoController::class, 'estadoAutoCufd']);
+    Route::get('/impuestos/fallas', [App\Http\Controllers\ImpuestoController::class, 'fallas']);
+    Route::put('/impuestos/fallas/{falla}/resolver', [App\Http\Controllers\ImpuestoController::class, 'resolverFalla']);
+    Route::put('/impuestos/fallas/{falla}/ocultar', [App\Http\Controllers\ImpuestoController::class, 'ocultarFalla']);
+    Route::delete('/impuestos/fallas/{falla}', [App\Http\Controllers\ImpuestoController::class, 'eliminarFalla']);
     Route::post('/verificarImpuestos/{cuf}', [App\Http\Controllers\ImpuestoController::class, 'verificarImpuestos']);
     Route::post('/eventoSignificativo', [App\Http\Controllers\ImpuestoController::class, 'eventoSignificativo']);
     Route::post('/validarPaquete', [App\Http\Controllers\ImpuestoController::class, 'validarPaquete']);

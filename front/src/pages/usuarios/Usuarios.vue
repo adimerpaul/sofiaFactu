@@ -1,7 +1,7 @@
 <template>
   <q-page class="q-pa-md">
     <q-table
-      :rows="users"
+      :rows="rowsFiltered"
       :columns="columns"
       dense
       wrap-cells
@@ -14,6 +14,17 @@
       <template #top-right>
         <q-btn color="positive" label="Nuevo" @click="userNew" no-caps icon="add_circle_outline" :loading="loading" class="q-mr-sm" />
         <q-btn color="primary" label="Actualizar" @click="usersGet" no-caps icon="refresh" :loading="loading" class="q-mr-sm" />
+        <q-select
+          v-model="camionFilter"
+          :options="camionFilterOptions"
+          emit-value
+          map-options
+          dense
+          outlined
+          label="Camión"
+          style="min-width: 140px"
+          class="q-mr-sm"
+        />
         <q-input v-model="filter" label="Buscar" dense outlined>
           <template #append><q-icon name="search" /></template>
         </q-input>
@@ -275,6 +286,12 @@ export default {
       loading: false,
       actionUser: '',
       filter: '',
+      camionFilter: 'all',
+      camionFilterOptions: [
+        { label: 'Todos', value: 'all' },
+        { label: 'Sí', value: 'yes' },
+        { label: 'No', value: 'no' },
+      ],
       roles: ['Admin', 'Usuario'],
       columns: [
         { name: 'actions', label: 'Acciones', align: 'center' },
@@ -487,6 +504,11 @@ export default {
     },
   },
   computed: {
+    rowsFiltered() {
+      if (this.camionFilter === 'all') return this.users
+      const mustBeCamion = this.camionFilter === 'yes'
+      return this.users.filter(u => !!u.es_camion === mustBeCamion)
+    },
     filteredPermissions() {
       if (!this.permFilter) return this.permissions
       const t = this.permFilter.toLowerCase()

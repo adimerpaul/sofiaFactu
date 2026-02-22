@@ -15,6 +15,18 @@
               <template #append><q-icon name="search" /></template>
             </q-input>
           </div>
+          <div class="col-12 col-md-3">
+            <q-select
+              v-model="filterTipo"
+              :options="tiposFiltro"
+              label="Filtrar tipo"
+              dense
+              outlined
+              emit-value
+              map-options
+              @update:model-value="onTipoFilterChange"
+            />
+          </div>
           <div class="col-12 col-md-auto">
             <q-btn color="primary" label="Actualizar" no-caps icon="refresh" :loading="loading" @click="productosGet" />
           </div>
@@ -369,6 +381,7 @@ export default {
       loading: false,
       actionPeriodo: '',
       filter: '',
+      filterTipo: 'TODOS',
       pagination: {
         page: 1,
         rowsPerPage: 15,
@@ -380,6 +393,13 @@ export default {
       grupoPadres: [],
       grupos: [],
       tiposProducto: [
+        { label: 'NORMAL', value: 'NORMAL' },
+        { label: 'POLLO', value: 'POLLO' },
+        { label: 'RES', value: 'RES' },
+        { label: 'CERDO', value: 'CERDO' },
+      ],
+      tiposFiltro: [
+        { label: 'TODOS', value: 'TODOS' },
         { label: 'NORMAL', value: 'NORMAL' },
         { label: 'POLLO', value: 'POLLO' },
         { label: 'RES', value: 'RES' },
@@ -427,6 +447,10 @@ export default {
     onPadreChange (padreId) {
       this.producto.producto_grupo_id = null
       this.loadGrupos(padreId)
+    },
+    onTipoFilterChange () {
+      this.pagination.page = 1
+      this.productosGet()
     },
     copiarPrecio1 () {
       const base = Number(this.producto.precio1 || 0)
@@ -527,6 +551,7 @@ export default {
       this.$axios.get('productos', {
         params: {
           search: this.filter,
+          tipo: this.filterTipo === 'TODOS' ? '' : this.filterTipo,
           page: this.pagination.page,
           per_page: this.pagination.rowsPerPage,
         }

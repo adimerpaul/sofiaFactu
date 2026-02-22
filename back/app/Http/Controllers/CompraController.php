@@ -19,7 +19,17 @@ class CompraController extends Controller{
             ->orderByDesc('fecha_vencimiento')
             ->get();
 
-        return response()->json($historial);
+        $historial = $historial->map(function ($item) {
+            $cantidad = (float) ($item->cantidad ?? 0);
+            $disponible = (float) ($item->cantidad_venta ?? 0);
+            $vendida = max(0, $cantidad - $disponible);
+            $item->cantidad_vendida = $vendida;
+            $item->cantidad_disponible = $disponible;
+            $item->porcentaje_vendido = $cantidad > 0 ? round(($vendida / $cantidad) * 100, 2) : 0;
+            return $item;
+        });
+
+        return response()->json($historial->values());
     }
     public function productosPorVencer(Request $request){
         $dias = (int) ($request->dias ?? 5);

@@ -300,6 +300,9 @@
                 <th>Lote</th>
                 <th>Vencimiento</th>
                 <th>Cantidad</th>
+                <th>Vendida</th>
+                <th>Disponible</th>
+                <th>% Vendido</th>
                 <th>Precio</th>
                 <th>Total</th>
               </tr>
@@ -311,6 +314,9 @@
                 <td>{{ item.lote }}</td>
                 <td>{{ item.fecha_vencimiento }}</td>
                 <td>{{ Number(item.cantidad || 0).toFixed(3) }}</td>
+                <td>{{ Number(item.cantidad_vendida || 0).toFixed(3) }}</td>
+                <td>{{ Number(item.cantidad_disponible || 0).toFixed(3) }}</td>
+                <td>{{ Number(item.porcentaje_vendido || 0).toFixed(2) }}%</td>
                 <td>{{ Number(item.precio || 0).toFixed(3) }}</td>
                 <td>{{ Number(item.total || 0).toFixed(3) }}</td>
               </tr>

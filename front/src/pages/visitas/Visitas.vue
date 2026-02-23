@@ -59,7 +59,7 @@
             <q-btn color="purple" icon="visibility" dense round @click="openAcciones(c)" />
           </td>
           <td>
-            {{ c.nombre }}
+            {{ c.codcli }} -{{ c.nombre }}
           </td>
           <td>{{ c.direccion || '-' }}</td>
           <td>{{ c.telefono || '-' }}</td>
@@ -175,9 +175,20 @@
               <td><q-input v-model.number="p.cantidad" dense outlined type="number" min="1" style="min-width:90px" /></td>
               <td><q-input v-model.number="p.precio" dense outlined type="number" min="0" step="0.01" style="min-width:110px" /></td>
               <td>{{ p.codigo || p.producto_id }}</td>
-              <td>{{ p.nombre }}</td>
+              <td>
+                {{ p.nombre }}
+              </td>
               <td><q-input v-model="p.observacion" dense outlined /></td>
-              <td><q-btn flat dense round icon="delete" color="negative" @click="pedidoItems.splice(index, 1)" /></td>
+              <td>
+                <q-btn
+                  flat
+                  dense
+                  round
+                  icon="delete"
+                  color="negative"
+                  @click="pedidoItems.splice(index, 1)"
+                />
+              </td>
             </tr>
             <tr v-if="pedidoItems.length === 0">
               <td colspan="7" class="text-grey-7">Sin datos disponibles</td>
@@ -212,6 +223,7 @@ L.Icon.Default.mergeOptions({
 
 const ORURO_CENTER = [-17.967, -67.106]
 const DAY_MAP = ['do', 'lu', 'ma', 'mi', 'ju', 'vi', 'sa']
+const TIPOS_OBLIGATORIOS = ['POLLO', 'RES', 'CERDO']
 
 export default {
   name: 'VisitasPage',
@@ -297,18 +309,23 @@ export default {
   },
   methods: {
     markerColor (status) {
-      const s = String(status || 'ACTIVO').toUpperCase()
+      const s = this.normalizeStatus(status)
+      if (s === 'REALIZAR_PEDIDO') return '#16a34a'
       if (s === 'RETORNAR') return '#f4b400'
       if (s === 'NO_PEDIDO') return '#e53935'
+      if (s === 'GENERAR_RUTA') return '#7e22ce'
       return '#1e88e5'
     },
     statusColor (status) {
-      const s = String(status || 'ACTIVO').toUpperCase()
+      const s = this.normalizeStatus(status)
       if (s === 'RETORNAR') return 'warning'
       if (s === 'NO_PEDIDO') return 'negative'
       if (s === 'REALIZAR_PEDIDO') return 'positive'
       if (s === 'GENERAR_RUTA') return 'purple'
       return 'primary'
+    },
+    normalizeStatus (status) {
+      return String(status || 'ACTIVO').trim().toUpperCase()
     },
     rowClassByCliente (cliente) {
       const status = this.clienteStatus(cliente?.id)
@@ -319,7 +336,7 @@ export default {
     },
     clienteStatus (clienteId) {
       if (!clienteId) return 'ACTIVO'
-      return this.visitasByCliente[clienteId]?.tipo_visita || 'ACTIVO'
+      return this.normalizeStatus(this.visitasByCliente[clienteId]?.tipo_visita || 'ACTIVO')
     },
     mapReady () {
       return !!(this.map && this.map._loaded && this.map.getPane && this.map.getPane('mapPane'))
@@ -450,11 +467,12 @@ export default {
       this.loadingAccion = ''
       this.dialogAcciones = true
     },
-    accionSeleccionada (accion) {
+    async accionSeleccionada (accion) {
       if (!this.selectedCliente) return
       if (accion === 'REALIZAR_PEDIDO') {
         this.dialogAcciones = false
         this.loadingPedido = false
+        this.pedidoItems = []
         this.dialogPedido = true
         return
       }
@@ -497,19 +515,45 @@ export default {
       }
       window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank')
     },
+    mapStockOption (p) {
+      return {
+        id: p.id,
+        label: `${p.codigo || p.id}-${p.nombre} ${Number(p.precio1 || 0).toFixed(2)}Bs ${Number(p.stock || 0).toFixed(2)}U`,
+        nombre: p.nombre,
+        codigo: p.codigo,
+        precio: Number(p.precio1 || 0),
+        stock: Number(p.stock || 0),
+        tipo: String(p.tipo || '').toUpperCase(),
+      }
+    },
     async cargarProductos () {
       try {
-        const res = await this.$axios.get('productosStock', { params: { per_page: 500 } })
-        const data = res.data?.data || []
-        this.productosSource = data
-        this.productos = data.map(p => ({
-          id: p.id,
-          label: `${p.codigo || p.id}-${p.nombre} ${Number(p.precio1 || 0).toFixed(2)}Bs ${Number(p.stock || 0).toFixed(2)}U`,
-          nombre: p.nombre,
-          codigo: p.codigo,
-          precio: Number(p.precio1 || 0),
-          stock: Number(p.stock || 0)
-        }))
+        const [resStock, resAll] = await Promise.all([
+          this.$axios.get('productosStock', { params: { per_page: 500 } }),
+          this.$axios.get('productosAll')
+        ])
+
+        const stockData = resStock.data?.data || []
+        const allData = Array.isArray(resAll.data) ? resAll.data : []
+
+        const extraTipos = allData.filter(p => TIPOS_OBLIGATORIOS.includes(String(p?.tipo || '').toUpperCase()))
+        const mergedById = new Map()
+        ;[...stockData, ...extraTipos].forEach(p => {
+          if (!p?.id) return
+          mergedById.set(p.id, p)
+        })
+
+        const prioridadTipo = { POLLO: 1, RES: 2, CERDO: 3 }
+        this.productosSource = Array.from(mergedById.values())
+          .sort((a, b) => {
+            const ta = String(a?.tipo || '').toUpperCase()
+            const tb = String(b?.tipo || '').toUpperCase()
+            const pa = prioridadTipo[ta] || 99
+            const pb = prioridadTipo[tb] || 99
+            if (pa !== pb) return pa - pb
+            return String(a?.nombre || '').localeCompare(String(b?.nombre || ''), 'es')
+          })
+        this.productos = this.productosSource.map(this.mapStockOption)
       } catch (_) {
         this.productos = []
         this.productosSource = []
@@ -519,26 +563,12 @@ export default {
       update(() => {
         const needle = (val || '').toLowerCase()
         if (!needle) {
-          this.productos = this.productosSource.map(p => ({
-            id: p.id,
-            label: `${p.codigo || p.id}-${p.nombre} ${Number(p.precio1 || 0).toFixed(2)}Bs ${Number(p.stock || 0).toFixed(2)}U`,
-            nombre: p.nombre,
-            codigo: p.codigo,
-            precio: Number(p.precio1 || 0),
-            stock: Number(p.stock || 0)
-          }))
+          this.productos = this.productosSource.map(this.mapStockOption)
           return
         }
         this.productos = this.productosSource
           .filter(p => `${p.nombre || ''} ${p.codigo || ''}`.toLowerCase().includes(needle))
-          .map(p => ({
-            id: p.id,
-            label: `${p.codigo || p.id}-${p.nombre} ${Number(p.precio1 || 0).toFixed(2)}Bs ${Number(p.stock || 0).toFixed(2)}U`,
-            nombre: p.nombre,
-            codigo: p.codigo,
-            precio: Number(p.precio1 || 0),
-            stock: Number(p.stock || 0)
-          }))
+          .map(this.mapStockOption)
       })
     },
     agregarProducto () {

@@ -65,6 +65,9 @@ class PedidoController extends Controller {
             $rules = [
                 'tipo_pedido' => 'nullable|string|in:REALIZAR_PEDIDO,RETORNAR,NO_PEDIDO,GENERAR_RUTA',
                 'tipo_pago' => 'nullable|string|in:Contado,QR,Credito,Boleta anterior',
+                'facturado' => 'nullable|boolean',
+                'fecha' => 'nullable|date',
+                'hora' => 'nullable|string|max:50',
                 'cliente_id' => 'nullable|integer|exists:clientes,id',
                 'observaciones' => 'nullable|string|max:600',
                 'comentario_visita' => 'nullable|string|max:600',
@@ -72,6 +75,8 @@ class PedidoController extends Controller {
                 'productos.*.producto_id' => 'required_with:productos|integer|exists:productos,id',
                 'productos.*.cantidad' => 'required_with:productos|numeric|min:0.01',
                 'productos.*.precio' => 'required_with:productos|numeric|min:0',
+                'productos.*.observacion' => 'nullable|string|max:600',
+                'productos.*.detalle_extra' => 'nullable|array',
             ];
             $data = $request->validate($rules);
 
@@ -94,30 +99,56 @@ class PedidoController extends Controller {
                 ], 201);
             }
 
+            $productos = $data['productos'] ?? [];
+            $productoTipos = Producto::query()
+                ->whereIn('id', collect($productos)->pluck('producto_id')->values()->all())
+                ->pluck('tipo', 'id');
+
+            $contiene = [
+                'normal' => false,
+                'res' => false,
+                'cerdo' => false,
+                'pollo' => false,
+            ];
+            foreach ($productos as $item) {
+                $tipo = strtoupper((string) ($productoTipos[$item['producto_id']] ?? 'NORMAL'));
+                if ($tipo === 'RES') $contiene['res'] = true;
+                elseif ($tipo === 'CERDO') $contiene['cerdo'] = true;
+                elseif ($tipo === 'POLLO') $contiene['pollo'] = true;
+                else $contiene['normal'] = true;
+            }
+
             $pedido = Pedido::create([
                 'user_id' => $user->id,
                 'cliente_id' => $data['cliente_id'] ?? null,
-                'fecha' => now()->format('Y-m-d'),
-                'hora' => now()->format('H:i:s'),
+                'fecha' => $data['fecha'] ?? now()->format('Y-m-d'),
+                'hora' => $data['hora'] ?? null,
                 'estado' => 'Pendiente',
                 'tipo_pago' => $data['tipo_pago'] ?? null,
+                'facturado' => (bool) ($data['facturado'] ?? false),
                 'tipo_pedido' => $tipoPedido,
+                'contiene_normal' => $contiene['normal'],
+                'contiene_res' => $contiene['res'],
+                'contiene_cerdo' => $contiene['cerdo'],
+                'contiene_pollo' => $contiene['pollo'],
                 'total' => 0,
                 'observaciones' => $data['observaciones'] ?? null,
                 'comentario_visita' => $data['comentario_visita'] ?? null,
             ]);
 
             $total = 0;
-            foreach (($data['productos'] ?? []) as $item) {
+            foreach ($productos as $item) {
                 $cantidad = (float)$item['cantidad'];
                 $precio = (float)$item['precio'];
                 $subtotal = $precio * $cantidad;
-                if ($subtotal > 0) {
+                if ($cantidad > 0) {
                     $pedido->detalles()->create([
                         'producto_id' => $item['producto_id'],
                         'cantidad' => $cantidad,
                         'precio' => $precio,
-                        'total' => $subtotal
+                        'total' => $subtotal,
+                        'observacion_detalle' => $item['observacion'] ?? null,
+                        'detalle_extra' => $item['detalle_extra'] ?? null,
                     ]);
                     $total += $subtotal;
                 }

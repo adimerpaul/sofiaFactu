@@ -15,10 +15,24 @@ class Pedido extends Model {
         'hora',
         'estado',
         'tipo_pago',
+        'facturado',
         'tipo_pedido',
+        'contiene_normal',
+        'contiene_res',
+        'contiene_cerdo',
+        'contiene_pollo',
         'total',
         'observaciones',
         'comentario_visita'
+    ];
+
+    protected $casts = [
+        'fecha' => 'date:Y-m-d',
+        'facturado' => 'boolean',
+        'contiene_normal' => 'boolean',
+        'contiene_res' => 'boolean',
+        'contiene_cerdo' => 'boolean',
+        'contiene_pollo' => 'boolean',
     ];
 
     public function detalles() {

@@ -12,6 +12,7 @@ class Cliente extends Model{
         'nombre',
         'nit',
         'ci',
+        'username',
         'telefono',
         'direccion',
         'complemento',

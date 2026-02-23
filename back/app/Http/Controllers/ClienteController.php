@@ -74,8 +74,42 @@ class ClienteController extends Controller
 
     public function store(Request $request)
     {
+        // verificar si existe alguno ci y complemento igual para evitar duplicados
+        $ci = trim((string)$request->input('ci', ''));
+        $complemento = trim((string)$request->input('complemento', ''));
+        if ($ci !== '') {
+            $exists = Cliente::query()
+                ->where('ci', $ci)
+                ->where(function ($q) use ($complemento) {
+                    if ($complemento !== '') {
+                        $q->where('complemento', $complemento);
+                    } else {
+                        $q->whereNull('complemento')->orWhere('complemento', '');
+                    }
+                })
+                ->exists();
+            if ($exists) {
+                return response()->json(['error' => 'Ya existe un cliente con el mismo CI y complemento'], 422);
+            }
+        }
+        //si el campo nit no esta vacio verificar si sxiste alguno con el mismo nit para evitar duplicados
+        $nit = trim((string)$request->input('nit', ''));
+        if  ($nit !== '') {
+            $exists = Cliente::query()
+                ->where('nit', $nit)
+                ->exists();
+            if ($exists) {
+                return response()->json(['error' => 'Ya existe un cliente con el mismo NIT'], 422);
+            }
+        }
         $data = $this->validateData($request);
         $payload = $this->preparePayload($request, $data, null);
+
+        // Solo al crear, asignar el CI del usuario que registra
+        $user = $request->user();
+        if ($user && isset($user->ci)) {
+            $payload['username'] = $user->ci;
+        }
 
         $cliente = Cliente::create($payload);
 
@@ -89,8 +123,40 @@ class ClienteController extends Controller
 
     public function update(Request $request, Cliente $cliente)
     {
+        // verificar si existe alguno ci y complemento igual para evitar duplicados sin considerar el cliente actual
+        $ci = trim((string)$request->input('ci', ''));
+        $complemento = trim((string)$request->input('complemento', ''));
+        if ($ci !== '') {
+            $exists = Cliente::query()
+                ->where('id', '!=', $cliente->id)
+                ->where('ci', $ci)
+                ->where(function ($q) use ($complemento) {
+                    if ($complemento !== '') {
+                        $q->where('complemento', $complemento);
+                    } else {
+                        $q->whereNull('complemento')->orWhere('complemento', '');
+                    }
+                })
+                ->exists();
+            if ($exists) {
+                return response()->json(['error' => 'Ya existe otro cliente con el mismo CI y complemento'], 422);
+            }
+        }
+        //si el campo nit no esta vacio verificar si sxiste alguno con el mismo nit para evitar duplicados sin considerar el cliente actual
+        $nit = trim((string)$request->input('nit', ''));
+        if  ($nit !== '') {
+            $exists = Cliente::query()
+                ->where('id', '!=', $cliente->id)
+                ->where('nit', $nit)
+                ->exists();
+            if ($exists) {
+                return response()->json(['error' => 'Ya existe otro cliente con el mismo NIT'], 422);
+            }
+        }
         $data = $this->validateData($request, true);
         $payload = $this->preparePayload($request, $data, $cliente);
+        // Nunca modificar el campo user en update
+        unset($payload['username']);
 
         $cliente->update($payload);
 
@@ -157,7 +223,7 @@ class ClienteController extends Controller
         $optionalInt = [$presence, 'nullable', 'integer'];
         $optionalBool = [$presence, 'nullable', 'boolean'];
         $optionalNumber = [$presence, 'nullable', 'numeric'];
-
+        // ci no se repita
         $rules = [
             'nombre' => [$isUpdate ? 'sometimes' : 'required', 'string', 'max:150'],
             'nit' => $optionalString(50),

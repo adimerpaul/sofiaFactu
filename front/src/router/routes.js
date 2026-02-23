@@ -6,6 +6,7 @@ const routes = [
       { path: '', component: () => import('pages/IndexPage.vue'), meta: { requiresAuth: true } },
       { path: 'usuarios', component: () => import('pages/usuarios/Usuarios.vue'), meta: { requiresAuth: true } },
       { path: 'clientes', name: 'clientes', component: () => import('pages/clientes/Clientes.vue'), meta: { requiresAuth: true, permission: 'Clientes' } },
+      { path: 'alta-cliente', name: 'alta-cliente', component: () => import('pages/clientes/AltaCliente.vue'), meta: { requiresAuth: true, permission: 'Clientes' } },
       { path: 'productos', name: 'productos', component: () => import('pages/productos/Productos.vue'), meta: { requiresAuth: true } },
       { path: 'venta', name: 'venta', component: () => import('pages/ventas/Ventas.vue'), meta: { requiresAuth: true } },
       { path: 'ventaNuevo', name: 'ventaNuevo', component: () => import('pages/ventas/VentaNew.vue'), meta: { requiresAuth: true } },

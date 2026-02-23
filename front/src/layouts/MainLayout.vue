@@ -157,6 +157,7 @@ onMounted(() => {
     { title: 'Impuestos', icon: 'percent', link: '/impuestos', perm: 'Impuestos' },
     { title: 'Productos', icon: 'shopping_cart', link: '/productos', perm: 'Productos' },
     { title: 'Clientes', icon: 'groups', link: '/clientes', perm: 'Clientes' },
+    { title: 'Nueva Cliente', icon: 'person_add', link: '/alta-cliente', perm: 'Clientes' },
     { title: 'Ventas', icon: 'shopping_bag', link: '/venta', perm: 'Ventas' },
     { title: 'Nueva Venta', icon: 'add_shopping_cart', link: '/ventaNuevo', perm: 'Nueva Venta' },
     { title: 'Proveedores', icon: 'manage_accounts', link: '/proveedores', perm: 'Proveedores'},

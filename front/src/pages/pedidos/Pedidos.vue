@@ -113,7 +113,7 @@
         </td>
         <td>{{ pedido.user?.name }}</td>
         <td>
-          <q-chip :color="pedido.estado === 'Pendiente' ? 'orange' : pedido.estado === 'Aceptado' ? 'green' : 'red'" class="text-white" dense>
+          <q-chip :color="pedido.estado === 'Creado' ? 'blue' : pedido.estado === 'Pendiente' ? 'orange' : pedido.estado === 'Enviado' ? 'teal' : pedido.estado === 'Aceptado' ? 'green' : 'red'" class="text-white" dense>
             {{ pedido.estado }}
           </q-chip>
         </td>
@@ -138,7 +138,9 @@ export default {
       fechaFin: moment().format('YYYY-MM-DD'),
       loading: false,
       estados: [
+        { label: 'Creado', value: 'Creado' },
         { label: 'Pendiente', value: 'Pendiente' },
+        { label: 'Enviado', value: 'Enviado' },
         { label: 'Aceptado', value: 'Aceptado' },
         { label: 'Anulado', value: 'Anulado' }
       ]

@@ -167,6 +167,7 @@ onMounted(() => {
     { title: 'Productos vencidos', icon: 'do_not_touch', link: '/productos-vencidos', perm: 'Productos vencidos'},
     { title: 'Pedidos', icon: 'real_estate_agent', link: '/pedidos', perm: 'Pedidos'},
     { title: 'Visitas', icon: 'map', link: '/visitas', perm: 'Pedidos'},
+    { title: 'Mis pedidos', icon: 'playlist_add_check', link: '/mis-pedidos', perm: 'Pedidos'},
     { title: 'Realizar pedido', icon: 'shopping_cart_checkout', link: '/pedidosCompra', perm: 'Nuevo Pedido'},
   ]
   linksList.value = baseLinks

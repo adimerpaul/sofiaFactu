@@ -124,7 +124,7 @@
 
         <q-card-section class="q-pt-sm">
           <div class="row q-col-gutter-sm">
-            <div class="col-12 col-md-5">
+            <div class="col-12 col-md-4">
               <q-option-group
                 v-model="tipoPago"
                 :options="tiposPago"
@@ -133,7 +133,24 @@
                 inline
               />
             </div>
-            <div class="col-12 col-md-7">
+            <div class="col-12 col-md-2">
+              <q-toggle v-model="facturadoPedido" label="Facturado" />
+            </div>
+            <div class="col-12 col-md-3">
+              <q-input v-model="fechaPedido" type="date" label="Fecha" dense outlined />
+            </div>
+            <div class="col-12 col-md-3">
+              <q-select
+                v-model="horaPedido"
+                :options="horariosPedido"
+                label="Horario"
+                dense
+                outlined
+                emit-value
+                map-options
+              />
+            </div>
+            <div class="col-12 col-md-12">
               <q-input v-model="comentario" label="Comentario" dense outlined />
             </div>
             <div class="col-12 col-md-10">
@@ -150,7 +167,28 @@
                 use-input
                 input-debounce="350"
                 @filter="filtrarProductos"
-              />
+              >
+                <template #selected-item="scope">
+                  <div class="row items-center no-wrap q-gutter-xs">
+                    <q-avatar rounded size="24px">
+                      <q-img :src="productImageUrl(scope?.opt?.imagen)" />
+                    </q-avatar>
+                    <span class="ellipsis">{{ scope?.opt?.label || '' }}</span>
+                  </div>
+                </template>
+                <template #option="scope">
+                  <q-item v-bind="scope.itemProps">
+                    <q-item-section avatar>
+                      <q-avatar rounded size="28px">
+                        <q-img :src="productImageUrl(scope.opt.imagen)" />
+                      </q-avatar>
+                    </q-item-section>
+                    <q-item-section>
+                      <q-item-label>{{ scope.opt.label }}</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
             </div>
             <div class="col-12 col-md-2">
               <q-btn color="negative" icon="add" class="full-width" @click="agregarProducto" />
@@ -160,38 +198,66 @@
           <q-markup-table dense flat bordered class="q-mt-sm">
             <thead>
             <tr>
+              <th>Detalle</th>
               <th>Subtotal</th>
               <th>Cantidad</th>
               <th>Precio</th>
               <th>Cod</th>
               <th>Nombre</th>
               <th>Obs</th>
-              <th></th>
+<!--              <th></th>-->
             </tr>
             </thead>
             <tbody>
             <tr v-for="(p, index) in pedidoItems" :key="`${p.producto_id}-${index}`">
+              <td>
+<!--                <q-btn flat dense round icon="tune" color="purple" @click="openDetalleDialog(p, index)" />-->
+                <q-btn-dropdown dense :label="'Op(' + p.tipo + ')'" :color="normalizeTipoProducto(p.tipo) === 'RES' ? 'red' : (normalizeTipoProducto(p.tipo) === 'CERDO' ? 'brown' : (normalizeTipoProducto(p.tipo) === 'POLLO' ? 'orange' : 'primary'))" no-caps size="10px">
+                  <q-list>
+                    <q-item clickable v-ripple @click="openDetalleDialog(p, index)" v-close-popup>
+                      <q-item-section avatar><q-icon name="tune" color="purple" /></q-item-section>
+                      <q-item-section>Editar detalle</q-item-section>
+                    </q-item>
+                    <q-item clickable v-ripple @click="pedidoItems.splice(index, 1)" v-close-popup>
+                      <q-item-section avatar><q-icon name="delete" color="negative" /></q-item-section>
+                      <q-item-section>Eliminar producto</q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-btn-dropdown>
+<!--                <pre>{{p.tipo}}</pre>-->
+              </td>
               <td>{{ (Number(p.cantidad) * Number(p.precio)).toFixed(2) }}</td>
-              <td><q-input v-model.number="p.cantidad" dense outlined type="number" min="1" style="min-width:90px" /></td>
-              <td><q-input v-model.number="p.precio" dense outlined type="number" min="0" step="0.01" style="min-width:110px" /></td>
+              <td>
+<!--                <q-input v-model.number="p.cantidad" dense outlined type="number" min="1" style="min-width:90px" />-->
+                <input type="text" v-model.number="p.cantidad" style="width: 40px" @input="p.cantidad = p.cantidad < 1 ? 1 : p.cantidad" />
+              </td>
+              <td>
+<!--                <q-input v-model.number="p.precio" dense outlined type="number" min="0" step="0.01" style="min-width:110px" />-->
+                <input type="text" v-model.number="p.precio" style="width: 50px" @input="p.precio = p.precio < 0 ? 0 : p.precio" />
+              </td>
               <td>{{ p.codigo || p.producto_id }}</td>
               <td>
-                {{ p.nombre }}
+                <div class="row items-center no-wrap q-gutter-sm">
+                  <q-avatar rounded size="30px">
+                    <q-img :src="productImageUrl(p.imagen)" />
+                  </q-avatar>
+                  <div>{{ p.nombre }}</div>
+                </div>
               </td>
-              <td><q-input v-model="p.observacion" dense outlined /></td>
-              <td>
-                <q-btn
-                  flat
-                  dense
-                  round
-                  icon="delete"
-                  color="negative"
-                  @click="pedidoItems.splice(index, 1)"
-                />
-              </td>
+              <td>{{ p.observacion || '-' }}</td>
+<!--              <td>-->
+<!--                <q-btn-->
+<!--                  flat-->
+<!--                  dense-->
+<!--                  round-->
+<!--                  icon="delete"-->
+<!--                  color="negative"-->
+<!--                  @click="pedidoItems.splice(index, 1)"-->
+<!--                />-->
+<!--              </td>-->
             </tr>
             <tr v-if="pedidoItems.length === 0">
-              <td colspan="7" class="text-grey-7">Sin datos disponibles</td>
+              <td colspan="8" class="text-grey-7">Sin datos disponibles</td>
             </tr>
             </tbody>
           </q-markup-table>
@@ -202,6 +268,85 @@
         <q-card-actions align="between" class="q-pa-md">
           <q-btn flat color="negative" label="Cerrar" @click="dialogPedido = false" />
           <q-btn color="green" no-caps icon="send" label="Realizar pedido" :loading="loadingPedido" :disable="loadingPedido || Boolean(loadingAccion)" @click="guardarPedido" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="dialogDetalle">
+      <q-card style="width: 450px; max-width: 96vw;">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">Pedido {{ detalleTipoLabel }}</div>
+          <q-space />
+          <q-btn flat round dense icon="close" v-close-popup />
+        </q-card-section>
+        <q-card-section>
+          <div class="row q-col-gutter-sm" v-if="detalleTipo === 'NORMAL'">
+            <div class="col-12">
+              <q-input v-model="detalleEdit.observacion" dense outlined label="Observacion detalle" />
+            </div>
+          </div>
+
+          <div class="row q-col-gutter-sm" v-else-if="detalleTipo === 'RES'">
+            <div class="col-12 col-md-4"><q-input v-model="detalleEdit.precio_res" dense outlined label="Precio RES" /></div>
+            <div class="col-12 col-md-4"><q-input v-model="detalleEdit.res_trozado" dense outlined label="Res trozado" /></div>
+            <div class="col-12 col-md-4"><q-input v-model="detalleEdit.res_entero" dense outlined label="Res entero" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.res_pierna" dense outlined label="Res pierna" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.res_brazo" dense outlined label="Res brazo" /></div>
+            <div class="col-12"><q-input v-model="detalleEdit.observacion" dense outlined label="Observacion detalle" /></div>
+          </div>
+
+          <div class="row q-col-gutter-sm" v-else-if="detalleTipo === 'CERDO'">
+            <div class="col-12 col-md-4"><q-input v-model="detalleEdit.cerdo_precio_total" dense outlined label="Precio total" /></div>
+            <div class="col-12 col-md-4"><q-input v-model="detalleEdit.cerdo_entero" dense outlined label="Cerdo entero" /></div>
+            <div class="col-12 col-md-4"><q-input v-model="detalleEdit.cerdo_kilo" dense outlined label="Cerdo kilo" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.cerdo_desmembrado" dense outlined label="Cerdo desmembrado" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.cerdo_corte" dense outlined label="Cerdo corte" /></div>
+            <div class="col-12"><q-input v-model="detalleEdit.observacion" dense outlined label="Observacion detalle" /></div>
+          </div>
+
+          <div class="row q-col-gutter-sm" v-else>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_cja_b5" dense outlined label="Cja b5" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_uni_b5" dense outlined label="Uni b5" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_cja_b6" dense outlined label="Cja b6" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_uni_b6" dense outlined label="Uni b6" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_cja_104" dense outlined label="Cja-104 (1.5-1.7)" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_uni_104" dense outlined label="Unid-104" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_cja_105" dense outlined label="Cja-105 (1.7-1.9)" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_uni_105" dense outlined label="Unid-105" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_cja_106" dense outlined label="Cja-106 (1.9-2.2)" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_uni_106" dense outlined label="Unid-106" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_cja_107" dense outlined label="Cja-107 (2.2-2.5)" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_uni_107" dense outlined label="Unid-107" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_cja_108" dense outlined label="Cja-108 (2.6-2.7)" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_uni_108" dense outlined label="Unid-108" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_cja_109" dense outlined label="Cja-109 (2.8-2.9)" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_uni_109" dense outlined label="Unid-109" /></div>
+            <div class="col-12"><q-input v-model="detalleEdit.pollo_rango_unidades" dense outlined label="Rango pollo (unidades)" /></div>
+
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_ala" dense outlined label="Ala" /></div>
+            <div class="col-12 col-md-6"><q-select v-model="detalleEdit.pollo_ala_unidad" :options="unidadesPollo" dense outlined label="Unidad ala" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_cadera" dense outlined label="Cadera" /></div>
+            <div class="col-12 col-md-6"><q-select v-model="detalleEdit.pollo_cadera_unidad" :options="unidadesPollo" dense outlined label="Unidad cadera" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_pecho" dense outlined label="Pecho" /></div>
+            <div class="col-12 col-md-6"><q-select v-model="detalleEdit.pollo_pecho_unidad" :options="unidadesPollo" dense outlined label="Unidad pecho" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_pi_mu" dense outlined label="Pi/Mu" /></div>
+            <div class="col-12 col-md-6"><q-select v-model="detalleEdit.pollo_pi_mu_unidad" :options="unidadesPollo" dense outlined label="Unidad pi/mu" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_filete" dense outlined label="Filete" /></div>
+            <div class="col-12 col-md-6"><q-select v-model="detalleEdit.pollo_filete_unidad" :options="unidadesPollo" dense outlined label="Unidad filete" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_cuello" dense outlined label="Cuello" /></div>
+            <div class="col-12 col-md-6"><q-select v-model="detalleEdit.pollo_cuello_unidad" :options="unidadesPollo" dense outlined label="Unidad cuello" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_hueso" dense outlined label="Hueso" /></div>
+            <div class="col-12 col-md-6"><q-select v-model="detalleEdit.pollo_hueso_unidad" :options="unidadesPollo" dense outlined label="Unidad hueso" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_menudencia" dense outlined label="Menudencia" /></div>
+            <div class="col-12 col-md-6"><q-select v-model="detalleEdit.pollo_menudencia_unidad" :options="unidadesPollo" dense outlined label="Unidad menudencia" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_bs" dense outlined label="BS" /></div>
+            <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_bs2" dense outlined label="BS2" /></div>
+            <div class="col-12"><q-input v-model="detalleEdit.observacion" dense outlined label="Observacion detalle" /></div>
+          </div>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat color="negative" label="Cerrar" v-close-popup />
+          <q-btn color="primary" label="Guardar detalle" @click="saveDetalleDialog" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -250,10 +395,26 @@ export default {
         { label: 'Boleta anterior', value: 'Boleta anterior' }
       ],
       tipoPago: 'Contado',
+      facturadoPedido: false,
+      fechaPedido: new Date().toISOString().slice(0, 10),
+      horariosPedido: [
+        { label: '06:00-07:30', value: '06:00-07:30' },
+        { label: '07:30-09:00', value: '07:30-09:00' },
+        { label: '09:00-10:30', value: '09:00-10:30' },
+        { label: '10:30-12:00', value: '10:30-12:00' },
+        { label: 'SEGUNDA VUELTA', value: 'SEGUNDA VUELTA' },
+        { label: 'SE RECOGE', value: 'SE RECOGE' },
+      ],
+      horaPedido: '06:00-07:30',
       productos: [],
       productosSource: [],
       productoSeleccionado: null,
       pedidoItems: [],
+      dialogDetalle: false,
+      detalleEditIndex: -1,
+      detalleEdit: {},
+      detalleTipo: 'NORMAL',
+      unidadesPollo: ['KG', 'CAJA', 'UNIDAD'],
       isAlive: true
     }
   },
@@ -288,6 +449,12 @@ export default {
         const nb = String(b?.nombre || '').toLowerCase()
         return na.localeCompare(nb, 'es')
       })
+    },
+    detalleTipoLabel () {
+      if (this.detalleTipo === 'RES') return 'Res'
+      if (this.detalleTipo === 'CERDO') return 'Cerdo'
+      if (this.detalleTipo === 'POLLO') return 'Pollo'
+      return 'Normal'
     }
   },
   mounted () {
@@ -326,6 +493,90 @@ export default {
     },
     normalizeStatus (status) {
       return String(status || 'ACTIVO').trim().toUpperCase()
+    },
+    normalizeTipoProducto (tipo) {
+      const t = String(tipo || 'NORMAL').trim().toUpperCase()
+      if (t === 'RES' || t === 'CERDO' || t === 'POLLO') return t
+      return 'NORMAL'
+    },
+    detalleDefaultsByTipo (tipo) {
+      if (tipo === 'RES') {
+        return {
+          precio_res: '',
+          res_trozado: '',
+          res_entero: '',
+          res_pierna: '',
+          res_brazo: '',
+          observacion: '',
+        }
+      }
+      if (tipo === 'CERDO') {
+        return {
+          cerdo_precio_total: '',
+          cerdo_entero: '',
+          cerdo_desmembrado: '',
+          cerdo_corte: '',
+          cerdo_kilo: '',
+          observacion: '',
+        }
+      }
+      if (tipo === 'POLLO') {
+        return {
+          pollo_cja_b5: '',
+          pollo_uni_b5: '',
+          pollo_cja_b6: '',
+          pollo_uni_b6: '',
+          pollo_cja_104: '',
+          pollo_uni_104: '',
+          pollo_cja_105: '',
+          pollo_uni_105: '',
+          pollo_cja_106: '',
+          pollo_uni_106: '',
+          pollo_cja_107: '',
+          pollo_uni_107: '',
+          pollo_cja_108: '',
+          pollo_uni_108: '',
+          pollo_cja_109: '',
+          pollo_uni_109: '',
+          pollo_rango_unidades: '',
+          pollo_ala: '',
+          pollo_ala_unidad: 'KG',
+          pollo_cadera: '',
+          pollo_cadera_unidad: 'KG',
+          pollo_pecho: '',
+          pollo_pecho_unidad: 'KG',
+          pollo_pi_mu: '',
+          pollo_pi_mu_unidad: 'KG',
+          pollo_filete: '',
+          pollo_filete_unidad: 'KG',
+          pollo_cuello: '',
+          pollo_cuello_unidad: 'KG',
+          pollo_hueso: '',
+          pollo_hueso_unidad: 'KG',
+          pollo_menudencia: '',
+          pollo_menudencia_unidad: 'KG',
+          pollo_bs: '',
+          pollo_bs2: '',
+          observacion: '',
+        }
+      }
+      return { observacion: '' }
+    },
+    openDetalleDialog (item, index) {
+      this.detalleEditIndex = index
+      this.detalleTipo = this.normalizeTipoProducto(item?.tipo)
+      const defaults = this.detalleDefaultsByTipo(this.detalleTipo)
+      this.detalleEdit = { ...defaults, ...(item?.detalle_extra || {}) }
+      this.dialogDetalle = true
+    },
+    saveDetalleDialog () {
+      if (this.detalleEditIndex < 0 || !this.pedidoItems[this.detalleEditIndex]) return
+      const current = this.pedidoItems[this.detalleEditIndex]
+      current.detalle_extra = { ...this.detalleEdit }
+      current.observacion = this.detalleEdit.observacion || current.observacion || ''
+      this.dialogDetalle = false
+      this.detalleEditIndex = -1
+      this.detalleEdit = {}
     },
     rowClassByCliente (cliente) {
       const status = this.clienteStatus(cliente?.id)
@@ -421,7 +672,7 @@ export default {
         const res = await this.$axios.get('visitas', {
           params: {
             solo_mios: 1,
-            all_days: 1,
+            all_days: 0,
             latest_per_cliente: 1,
             fecha: new Date().toISOString().slice(0, 10),
           }
@@ -473,6 +724,9 @@ export default {
         this.dialogAcciones = false
         this.loadingPedido = false
         this.pedidoItems = []
+        this.facturadoPedido = false
+        this.fechaPedido = new Date().toISOString().slice(0, 10)
+        this.horaPedido = this.horariosPedido[0].value
         this.dialogPedido = true
         return
       }
@@ -521,10 +775,15 @@ export default {
         label: `${p.codigo || p.id}-${p.nombre} ${Number(p.precio1 || 0).toFixed(2)}Bs ${Number(p.stock || 0).toFixed(2)}U`,
         nombre: p.nombre,
         codigo: p.codigo,
+        imagen: p.imagen || 'uploads/default.png',
         precio: Number(p.precio1 || 0),
         stock: Number(p.stock || 0),
-        tipo: String(p.tipo || '').toUpperCase(),
+        tipo: this.normalizeTipoProducto(p.tipo),
       }
+    },
+    productImageUrl (path) {
+      const safe = path || 'uploads/default.png'
+      return `${this.$url}../${safe}`
     },
     async cargarProductos () {
       try {
@@ -584,9 +843,12 @@ export default {
           producto_id: p.id,
           codigo: p.codigo,
           nombre: p.nombre,
+          imagen: p.imagen || 'uploads/default.png',
           cantidad: 1,
           precio: Number(p.precio || 0),
-          observacion: ''
+          observacion: '',
+          tipo: this.normalizeTipoProducto(p.tipo),
+          detalle_extra: this.detalleDefaultsByTipo(this.normalizeTipoProducto(p.tipo)),
         })
       }
       this.productoSeleccionado = null
@@ -602,7 +864,8 @@ export default {
         producto_id: p.producto_id,
         cantidad: Number(p.cantidad || 0),
         precio: Number(p.precio || 0),
-        observacion: p.observacion || ''
+        observacion: p.observacion || '',
+        detalle_extra: p.detalle_extra || null,
       })).filter(p => p.cantidad > 0 && p.precio >= 0)
 
       if (productos.length === 0) {
@@ -616,6 +879,9 @@ export default {
         await this.$axios.post('pedidos', {
           tipo_pedido: 'REALIZAR_PEDIDO',
           tipo_pago: this.tipoPago,
+          facturado: this.facturadoPedido,
+          fecha: this.fechaPedido,
+          hora: this.horaPedido,
           cliente_id: this.selectedCliente.id,
           comentario_visita: this.comentario || '',
           observaciones: this.comentario || '',

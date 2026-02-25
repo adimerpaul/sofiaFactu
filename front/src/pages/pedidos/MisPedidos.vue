@@ -46,6 +46,9 @@
         <div class="col-12 col-md-auto">
           <q-btn color="cyan-7" icon="download" no-caps label="Reporte Cerdo" @click="exportarReporteTipo('CERDO')" />
         </div>
+        <div class="col-12 col-md-auto">
+          <q-btn color="blue-grey-7" icon="download" no-caps label="Reporte Normal" @click="exportarReporteTipo('NORMAL')" />
+        </div>
       </q-card-section>
 
       <q-card-section class="row q-col-gutter-sm items-center">
@@ -302,7 +305,6 @@
 
 <script setup>
 import { computed, getCurrentInstance, onMounted, ref } from 'vue'
-import { Excel } from 'src/addons/Excel'
 
 const { proxy } = getCurrentInstance()
 
@@ -310,7 +312,6 @@ const fecha = ref(new Date().toISOString().slice(0, 10))
 const loading = ref(false)
 const sendingAll = ref(false)
 const saving = ref(false)
-const reporte = ref('POLLO')
 const search = ref('')
 
 const pedidos = ref([])
@@ -345,34 +346,6 @@ const newProductoId = ref(null)
 const enviables = computed(() => pedidos.value.filter(p => isEditable(p)))
 const totalEdit = computed(() => editForm.value.productos.reduce((acc, p) => acc + (Number(p.cantidad || 0) * Number(p.precio || 0)), 0))
 const detalleTipoLabel = computed(() => detalleTipo.value === 'RES' ? 'Res' : detalleTipo.value === 'CERDO' ? 'Cerdo' : detalleTipo.value === 'POLLO' ? 'Pollo' : 'Normal')
-
-const filasReporte = computed(() => {
-  const tipo = reporte.value
-  const out = []
-  pedidos.value.forEach((p) => {
-    ;(p.detalles || []).forEach((d) => {
-      const tipoDetalle = normalizeTipo(d.producto?.tipo)
-      if (tipoDetalle !== tipo) return
-      out.push({
-        key: `${p.id}-${d.id}`,
-        pedido: p,
-        detalle: d,
-      })
-    })
-  })
-  return out
-})
-
-const filasReporteFiltradas = computed(() => {
-  const term = search.value.trim().toLowerCase()
-  if (!term) return filasReporte.value
-  return filasReporte.value.filter(r => {
-    const cliente = (r.pedido.cliente?.nombre || '').toLowerCase()
-    const codcli = String(r.pedido.cliente?.codcli || '')
-    const comanda = String(r.pedido.id)
-    return cliente.includes(term) || codcli.includes(term) || comanda.includes(term)
-  })
-})
 
 const pedidosFiltrados = computed(() => {
   const term = search.value.trim().toLowerCase()
@@ -583,145 +556,32 @@ async function enviarTodos () {
   }
 }
 
-function exportarReporteTipo (tipo) {
-  reporte.value = tipo
-  exportarReporte()
-}
-
-function exportarReporte () {
-  const vendor = (proxy.$store?.user?.name || 'VENDEDOR').replace(/\s+/g, '_').toUpperCase()
-  const tipo = reporte.value
-  const list = filasReporteFiltradas.value
-
-  if (tipo === 'POLLO') {
-    const content = list.map(({ pedido, detalle }) => {
-      const ex = detalle?.detalle_extra || {}
-      return {
-        cliente: pedido?.cliente?.nombre || '',
-        b5_cja: ex.pollo_cja_b5 || '',
-        b5_uni: ex.pollo_uni_b5 || '',
-        b6_cja: ex.pollo_cja_b6 || '',
-        b6_uni: ex.pollo_uni_b6 || '',
-        c104_cja: ex.pollo_cja_104 || '',
-        c104_uni: ex.pollo_uni_104 || '',
-        c105_cja: ex.pollo_cja_105 || '',
-        c105_uni: ex.pollo_uni_105 || '',
-        c106_cja: ex.pollo_cja_106 || '',
-        c106_uni: ex.pollo_uni_106 || '',
-        c107_cja: ex.pollo_cja_107 || '',
-        c107_uni: ex.pollo_uni_107 || '',
-        c108_cja: ex.pollo_cja_108 || '',
-        c108_uni: ex.pollo_uni_108 || '',
-        c109_cja: ex.pollo_cja_109 || '',
-        c109_uni: ex.pollo_uni_109 || '',
-        rango: ex.pollo_rango_unidades || '',
-        ala: ex.pollo_ala || '',
-        cadera: ex.pollo_cadera || '',
-        pecho: ex.pollo_pecho || '',
-        pimu: ex.pollo_pi_mu || '',
-        filete: ex.pollo_filete || '',
-        cuello: ex.pollo_cuello || '',
-        hueso: ex.pollo_hueso || '',
-        menudencia: ex.pollo_menudencia || '',
-        bs: ex.pollo_bs || '',
-        bs2: ex.pollo_bs2 || '',
-        fact: pedido.facturado ? 'SI' : 'NO',
-        horario: pedido.hora || '',
-        comentario: detalle?.observacion_detalle || pedido?.observaciones || '',
-      }
+async function exportarReporteTipo (tipo) {
+  try {
+    const res = await proxy.$axios.get(`/mis-pedidos/reporte/${tipo}`, {
+      params: { fecha: fecha.value },
+      responseType: 'blob',
     })
-    Excel.export([{
-      columns: [
-        { label: 'CLIENTE', value: 'cliente' },
-        { label: 'B5 cja', value: 'b5_cja' }, { label: 'B5 uni', value: 'b5_uni' },
-        { label: 'B6 cja', value: 'b6_cja' }, { label: 'B6 uni', value: 'b6_uni' },
-        { label: '104 cja', value: 'c104_cja' }, { label: '104 uni', value: 'c104_uni' },
-        { label: '105 cja', value: 'c105_cja' }, { label: '105 uni', value: 'c105_uni' },
-        { label: '106 cja', value: 'c106_cja' }, { label: '106 uni', value: 'c106_uni' },
-        { label: '107 cja', value: 'c107_cja' }, { label: '107 uni', value: 'c107_uni' },
-        { label: '108 cja', value: 'c108_cja' }, { label: '108 uni', value: 'c108_uni' },
-        { label: '109 cja', value: 'c109_cja' }, { label: '109 uni', value: 'c109_uni' },
-        { label: 'Rango', value: 'rango' }, { label: 'Ala', value: 'ala' },
-        { label: 'Cadera', value: 'cadera' }, { label: 'Pecho', value: 'pecho' },
-        { label: 'Pi/Mu', value: 'pimu' }, { label: 'Filete', value: 'filete' },
-        { label: 'Cuello', value: 'cuello' }, { label: 'Hueso', value: 'hueso' },
-        { label: 'Menudencia', value: 'menudencia' }, { label: 'Bs', value: 'bs' },
-        { label: 'Bs.2', value: 'bs2' }, { label: 'Fact', value: 'fact' },
-        { label: 'Horario', value: 'horario' }, { label: 'Comentario', value: 'comentario' },
-      ],
-      content
-    }], `${vendor}_${fecha.value.replaceAll('-', '')}_poll`)
-    return
-  }
 
-  if (tipo === 'RES') {
-    const content = list.map(({ pedido, detalle }) => {
-      const ex = detalle?.detalle_extra || {}
-      return {
-        cliente: pedido?.cliente?.nombre || '',
-        precio: ex.precio_res || detalle?.precio || '',
-        trozado: ex.res_trozado || '',
-        ent_med: ex.res_entero || '',
-        pierna: ex.res_pierna || '',
-        brazo: ex.res_brazo || '',
-        observacion: detalle?.observacion_detalle || '',
-        cantidad: detalle?.cantidad || '',
-        fact: pedido.facturado ? 'SI' : 'NO',
-        horario: pedido.hora || '',
-        comentario: pedido.observaciones || '',
-      }
+    const blob = new Blob([res.data], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     })
-    Excel.export([{
-      columns: [
-        { label: 'CLIENTE', value: 'cliente' },
-        { label: 'Precio', value: 'precio' },
-        { label: 'TROZADO', value: 'trozado' },
-        { label: 'ENT/MED', value: 'ent_med' },
-        { label: 'PIERNA', value: 'pierna' },
-        { label: 'BRAZO', value: 'brazo' },
-        { label: 'OBSERVACION', value: 'observacion' },
-        { label: 'CNTAD', value: 'cantidad' },
-        { label: 'FACT', value: 'fact' },
-        { label: 'HORARIO', value: 'horario' },
-        { label: 'COMENTARIO', value: 'comentario' },
-      ],
-      content
-    }], `${vendor}_res_${fecha.value.replaceAll('-', '')}`)
-    return
-  }
 
-  const content = list.map(({ pedido, detalle }) => {
-    const ex = detalle?.detalle_extra || {}
-    return {
-      cliente: pedido?.cliente?.nombre || '',
-      precio: ex.cerdo_precio_total || detalle?.precio || '',
-      total: ex.cerdo_entero || '',
-      entero: ex.cerdo_entero || '',
-      membra: ex.cerdo_desmembrado || '',
-      corte: ex.cerdo_corte || '',
-      observacion: detalle?.observacion_detalle || '',
-      cantidad: detalle?.cantidad || '',
-      fact: pedido.facturado ? 'SI' : 'NO',
-      horario: pedido.hora || '',
-      comentario: pedido.observaciones || '',
-    }
-  })
-  Excel.export([{
-    columns: [
-      { label: 'CLIENTE', value: 'cliente' },
-      { label: 'Precio', value: 'precio' },
-      { label: 'TOTAL', value: 'total' },
-      { label: 'Entero', value: 'entero' },
-      { label: 'membra', value: 'membra' },
-      { label: 'Corte', value: 'corte' },
-      { label: 'OBSERVACION', value: 'observacion' },
-      { label: 'CNTAD', value: 'cantidad' },
-      { label: 'FACT', value: 'fact' },
-      { label: 'HORARIO', value: 'horario' },
-      { label: 'COMENTARIO', value: 'comentario' },
-    ],
-    content
-  }], `${vendor}_cerd_${fecha.value.replaceAll('-', '')}`)
+    const disposition = res?.headers?.['content-disposition'] || ''
+    const match = disposition.match(/filename="?([^"]+)"?/)
+    const fileName = match?.[1] || `reporte_${String(tipo).toLowerCase()}_${fecha.value}.xlsx`
+
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  } catch (e) {
+    proxy.$alert.error(e?.response?.data?.message || `No se pudo exportar el reporte ${tipo}`)
+  }
 }
 
 async function cargarPedidos () {

@@ -172,7 +172,7 @@ onMounted(() => {
   ]
   linksList.value = baseLinks
   loadFallas()
-  pollTimer = setInterval(() => loadFallas(false), 60000)
+  // pollTimer = setInterval(() => loadFallas(false), 60000)
 
   // const sucursalLinks = {
   //   'Ayacucho': { title: 'Ayacucho', icon: 'event', link: '/reservas', can: 'Todos', color: 'text-green' },

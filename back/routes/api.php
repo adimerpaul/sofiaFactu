@@ -69,6 +69,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/pedidos', [App\Http\Controllers\PedidoController::class, 'index']);
     Route::get('/mis-pedidos', [App\Http\Controllers\PedidoController::class, 'misPedidos']);
+    Route::get('/mis-pedidos/reporte/{tipo}', [App\Http\Controllers\PedidoReporteController::class, 'exportar']);
     Route::post('/pedidos/enviar-mis-pedidos', [App\Http\Controllers\PedidoController::class, 'enviarMisPedidos']);
     Route::put('/pedidos/{pedido}/enviar', [App\Http\Controllers\PedidoController::class, 'enviar']);
     Route::put('/pedidos/{pedido}', [App\Http\Controllers\PedidoController::class, 'update']);

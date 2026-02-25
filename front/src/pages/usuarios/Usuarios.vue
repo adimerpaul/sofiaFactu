@@ -449,23 +449,8 @@ export default {
       try {
         const all = await this.$axios.get('permissions').then(r => r.data)
         const userPermIds = await this.$axios.get(`users/${user.id}/permissions`).then(r => r.data)
-        const valid = new Set([
-          'Usuarios',
-          'Impuestos',
-          'Productos',
-          'Ventas',
-          'Nueva Venta',
-          'Proveedores',
-          'Compras',
-          'Nueva Compra',
-          'Clientes',
-          'Productos por vencer',
-          'Productos vencidos',
-          'Pedidos',
-          'Nuevo Pedido'
-        ])
         this.permissions = all
-          .filter(p => valid.has(p.name))
+          .filter(p => !!p?.id && !!p?.name)
           .map(p => ({ ...p, checked: userPermIds.includes(p.id) }))
       } catch (e) {
         this.$alert.error(e.response?.data?.message || 'Error cargando permisos')

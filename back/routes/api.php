@@ -24,6 +24,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/permissions', [App\Http\Controllers\PermissionController::class, 'index']);
     Route::get('/users/{user}/permissions', [App\Http\Controllers\UserController::class, 'getPermissions']);
     Route::put('/users/{user}/permissions', [App\Http\Controllers\UserController::class, 'syncPermissions']);
+    Route::get('/pedido-zonas', [App\Http\Controllers\PedidoZonaController::class, 'index']);
+    Route::post('/pedido-zonas', [App\Http\Controllers\PedidoZonaController::class, 'store']);
+    Route::put('/pedido-zonas/{pedidoZona}', [App\Http\Controllers\PedidoZonaController::class, 'update']);
+    Route::delete('/pedido-zonas/{pedidoZona}', [App\Http\Controllers\PedidoZonaController::class, 'destroy']);
+    Route::get('/mapa-clientes', [App\Http\Controllers\MapaClienteController::class, 'index']);
+    Route::post('/mapa-clientes/asignar', [App\Http\Controllers\MapaClienteController::class, 'asignar']);
 
 
     Route::get('/productos/{id}/historial-compras-ventas', [App\Http\Controllers\ProductoController::class, 'historialComprasVentas']);
@@ -68,9 +74,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/productos/{id}/historial-compras', [App\Http\Controllers\CompraController::class, 'historialCompras']);
 
     Route::get('/pedidos', [App\Http\Controllers\PedidoController::class, 'index']);
+    Route::get('/pedidos-totales', [App\Http\Controllers\PedidoTotalesController::class, 'index']);
     Route::get('/mis-pedidos', [App\Http\Controllers\PedidoController::class, 'misPedidos']);
     Route::get('/mis-pedidos/reporte/{tipo}', [App\Http\Controllers\PedidoReporteController::class, 'exportar']);
     Route::post('/pedidos/enviar-mis-pedidos', [App\Http\Controllers\PedidoController::class, 'enviarMisPedidos']);
+    Route::post('/pedidos-totales/enviar-emergencia', [App\Http\Controllers\PedidoTotalesController::class, 'enviarEmergencia']);
     Route::put('/pedidos/{pedido}/enviar', [App\Http\Controllers\PedidoController::class, 'enviar']);
     Route::put('/pedidos/{pedido}', [App\Http\Controllers\PedidoController::class, 'update']);
     Route::post('/pedidos', [App\Http\Controllers\PedidoController::class, 'store']);

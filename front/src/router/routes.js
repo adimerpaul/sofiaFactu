@@ -20,6 +20,9 @@ const routes = [
       { path: 'pedidos', name: 'pedidos', component: () => import('pages/pedidos/Pedidos.vue'), meta: { requiresAuth: true } },
       { path: 'pedidosCompra', name: 'pedidosCompra', component: () => import('pages/pedidos/PedidosCompra.vue'), meta: { requiresAuth: true } },
       { path: 'mis-pedidos', name: 'mis-pedidos', component: () => import('pages/pedidos/MisPedidos.vue'), meta: { requiresAuth: true } },
+      { path: 'mis-pedidos-totales', name: 'mis-pedidos-totales', component: () => import('pages/pedidos/MisPedidosTotales.vue'), meta: { requiresAuth: true, permission: 'Mis pedidos totales' } },
+      { path: 'mapa-cliente', name: 'mapa-cliente', component: () => import('pages/mapa/MapaCliente.vue'), meta: { requiresAuth: true, permission: 'Mapa cliente' } },
+      { path: 'mapa-zonas', name: 'mapa-zonas', component: () => import('pages/mapa/ZonasMapa.vue'), meta: { requiresAuth: true, permission: 'Mapa cliente zonas' } },
       { path: 'visitas', name: 'visitas', component: () => import('pages/visitas/Visitas.vue'), meta: { requiresAuth: true } },
     ]
   },

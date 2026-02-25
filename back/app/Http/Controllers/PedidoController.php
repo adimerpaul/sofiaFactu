@@ -357,9 +357,10 @@ class PedidoController extends Controller {
     {
         $user = $request->user();
         $isAdmin = strtoupper((string) ($user->role ?? '')) === 'ADMIN';
+        $canTotales = method_exists($user, 'can') && $user->can('Mis pedidos totales');
         $isOwner = (int) ($pedido->user_id ?? 0) === (int) ($user->id ?? 0);
 
-        abort_unless($isOwner || $isAdmin, 403, 'No autorizado');
+        abort_unless($isOwner || $isAdmin || $canTotales, 403, 'No autorizado');
     }
 
     private function isEditable(Pedido $pedido): bool

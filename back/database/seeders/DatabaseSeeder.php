@@ -47,7 +47,10 @@ class DatabaseSeeder extends Seeder
             'Productos por vencer',
             'Productos vencidos',
             'Pedidos',
-            'Nuevo Pedido'
+            'Nuevo Pedido',
+            'Mis pedidos totales',
+            'Mapa cliente',
+            'Mapa cliente zonas',
         ];
         foreach ($permisos as $permiso) {
             Permission::firstOrCreate(['name' => $permiso]);

@@ -168,6 +168,9 @@ onMounted(() => {
     { title: 'Pedidos', icon: 'real_estate_agent', link: '/pedidos', perm: 'Pedidos'},
     { title: 'Visitas', icon: 'map', link: '/visitas', perm: 'Pedidos'},
     { title: 'Mis pedidos', icon: 'playlist_add_check', link: '/mis-pedidos', perm: 'Pedidos'},
+    { title: 'Mis pedidos totales', icon: 'summarize', link: '/mis-pedidos-totales', perm: 'Mis pedidos totales'},
+    { title: 'Mapa cliente', icon: 'map', link: '/mapa-cliente', perm: 'Mapa cliente'},
+    { title: 'Mapa zonas', icon: 'palette', link: '/mapa-zonas', perm: 'Mapa cliente zonas'},
     { title: 'Realizar pedido', icon: 'shopping_cart_checkout', link: '/pedidosCompra', perm: 'Nuevo Pedido'},
   ]
   linksList.value = baseLinks

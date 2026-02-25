@@ -11,6 +11,8 @@ class Pedido extends Model {
     protected $fillable = [
         'user_id',
         'cliente_id',
+        'pedido_zona_id',
+        'usuario_camion_id',
         'fecha',
         'hora',
         'estado',
@@ -33,6 +35,8 @@ class Pedido extends Model {
         'contiene_res' => 'boolean',
         'contiene_cerdo' => 'boolean',
         'contiene_pollo' => 'boolean',
+        'pedido_zona_id' => 'integer',
+        'usuario_camion_id' => 'integer',
     ];
 
     public function detalles() {
@@ -42,8 +46,17 @@ class Pedido extends Model {
     public function user() {
         return $this->belongsTo(User::class);
     }
+
+    public function usuarioCamion() {
+        return $this->belongsTo(User::class, 'usuario_camion_id');
+    }
+
     public function cliente() {
         return $this->belongsTo(Cliente::class);
+    }
+
+    public function zona() {
+        return $this->belongsTo(PedidoZona::class, 'pedido_zona_id');
     }
     protected $appends = ['textDetalle'];
     public function getTextDetalleAttribute() {

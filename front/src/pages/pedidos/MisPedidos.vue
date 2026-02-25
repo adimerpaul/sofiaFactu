@@ -20,16 +20,13 @@
       <q-separator />
 
       <q-card-section class="row q-col-gutter-sm">
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4">
           <q-chip square color="blue-8" text-color="white" class="full-width justify-center">Total: {{ stats.total }}</q-chip>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4">
           <q-chip square color="orange-8" text-color="white" class="full-width justify-center">Creado: {{ stats.creado }}</q-chip>
         </div>
-        <div class="col-6 col-md-3">
-          <q-chip square color="deep-orange-7" text-color="white" class="full-width justify-center">Pendiente: {{ stats.pendiente }}</q-chip>
-        </div>
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-md-4">
           <q-chip square color="green-8" text-color="white" class="full-width justify-center">Enviado: {{ stats.enviado }}</q-chip>
         </div>
       </q-card-section>
@@ -57,6 +54,17 @@
             <template #append><q-icon name="search" /></template>
           </q-input>
         </div>
+        <div class="col-12 col-md-3">
+          <q-select
+            v-model="tipoFiltro"
+            dense
+            outlined
+            emit-value
+            map-options
+            :options="tipoFiltroOptions"
+            label="Filtrar por tipo"
+          />
+        </div>
         <div class="col-12 col-md-auto">
           <q-chip color="indigo-7" text-color="white">Pedidos: {{ pedidosFiltrados.length }}</q-chip>
         </div>
@@ -68,6 +76,7 @@
           <th>Opciones</th>
           <th>Comanda</th>
           <th>Cliente</th>
+          <th>Tipo</th>
           <th>Producto</th>
           <th>Fec/Hora</th>
           <th>Pago</th>
@@ -93,6 +102,18 @@
           <td>{{ pedido.id }}</td>
           <td>{{ pedido.cliente?.nombre || '-' }}</td>
           <td>
+            <q-chip
+              v-for="tipo in pedidoTipos(pedido)"
+              :key="`${pedido.id}-${tipo}`"
+              dense
+              text-color="white"
+              :color="tipoColor(tipo)"
+              class="q-mr-xs q-mb-xs"
+            >
+              {{ tipo }}
+            </q-chip>
+          </td>
+          <td>
 <!--            <q-list dense separator>-->
 <!--              <q-item v-for="d in (pedido.detalles || [])" :key="d.id" class="q-px-none">-->
 <!--                <q-item-section>-->
@@ -114,7 +135,7 @@
           </td>
         </tr>
         <tr v-if="pedidosFiltrados.length === 0">
-          <td colspan="8" class="text-center text-grey-7">Sin datos disponibles</td>
+          <td colspan="9" class="text-center text-grey-7">Sin datos disponibles</td>
         </tr>
         </tbody>
       </q-markup-table>
@@ -313,6 +334,7 @@ const loading = ref(false)
 const sendingAll = ref(false)
 const saving = ref(false)
 const search = ref('')
+const tipoFiltro = ref('TODOS')
 
 const pedidos = ref([])
 const stats = ref({ total: 0, creado: 0, pendiente: 0, enviado: 0 })
@@ -342,6 +364,13 @@ const horariosPedido = [
 const productosSource = ref([])
 const productosOptions = ref([])
 const newProductoId = ref(null)
+const tipoFiltroOptions = [
+  { label: 'Todos', value: 'TODOS' },
+  { label: 'Normal', value: 'NORMAL' },
+  { label: 'Pollo', value: 'POLLO' },
+  { label: 'Res', value: 'RES' },
+  { label: 'Cerdo', value: 'CERDO' },
+]
 
 const enviables = computed(() => pedidos.value.filter(p => isEditable(p)))
 const totalEdit = computed(() => editForm.value.productos.reduce((acc, p) => acc + (Number(p.cantidad || 0) * Number(p.precio || 0)), 0))
@@ -349,8 +378,10 @@ const detalleTipoLabel = computed(() => detalleTipo.value === 'RES' ? 'Res' : de
 
 const pedidosFiltrados = computed(() => {
   const term = search.value.trim().toLowerCase()
-  if (!term) return pedidos.value
   return pedidos.value.filter((p) => {
+    const cumpleTipo = tipoFiltro.value === 'TODOS' || pedidoTipos(p).includes(tipoFiltro.value)
+    if (!cumpleTipo) return false
+    if (!term) return true
     const cliente = (p.cliente?.nombre || '').toLowerCase()
     const comanda = String(p.id)
     const productos = (p.detalles || []).map(d => d.producto?.nombre || '').join(' ').toLowerCase()
@@ -377,6 +408,22 @@ function tipoColor (tipo) {
   if (tipo === 'RES') return 'red'
   if (tipo === 'CERDO') return 'brown'
   return 'primary'
+}
+
+function pedidoTipos (pedido) {
+  const tipos = []
+  if (pedido?.contiene_normal) tipos.push('NORMAL')
+  if (pedido?.contiene_pollo) tipos.push('POLLO')
+  if (pedido?.contiene_res) tipos.push('RES')
+  if (pedido?.contiene_cerdo) tipos.push('CERDO')
+  if (tipos.length > 0) return tipos
+
+  const tiposDetalle = Array.from(new Set(
+    (pedido?.detalles || [])
+      .map((d) => normalizeTipo(d?.producto?.tipo))
+      .filter(Boolean)
+  ))
+  return tiposDetalle.length > 0 ? tiposDetalle : ['NORMAL']
 }
 
 function isEditable (pedido) {

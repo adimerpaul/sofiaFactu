@@ -30,6 +30,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/pedido-zonas/{pedidoZona}', [App\Http\Controllers\PedidoZonaController::class, 'destroy']);
     Route::get('/mapa-clientes', [App\Http\Controllers\MapaClienteController::class, 'index']);
     Route::post('/mapa-clientes/asignar', [App\Http\Controllers\MapaClienteController::class, 'asignar']);
+    Route::get('/mapa-clientes/reportes/pedidos', [App\Http\Controllers\MapaClienteReporteController::class, 'pedidos']);
+    Route::get('/mapa-clientes/reportes/zona-vehiculo', [App\Http\Controllers\MapaClienteReporteController::class, 'zonaVehiculo']);
+    Route::get('/mapa-clientes/reportes/productos-totales', [App\Http\Controllers\MapaClienteReporteController::class, 'productosTotales']);
+    Route::get('/auxiliar-camara/pedidos', [App\Http\Controllers\AuxiliarCamaraController::class, 'index']);
+    Route::put('/auxiliar-camara/pedidos/{pedido}/procesar', [App\Http\Controllers\AuxiliarCamaraController::class, 'procesar']);
+    Route::get('/auxiliar-camara/reportes/pedidos', [App\Http\Controllers\AuxiliarCamaraController::class, 'reportePedidos']);
+    Route::get('/auxiliar-camara/reportes/productos-totales', [App\Http\Controllers\AuxiliarCamaraController::class, 'reporteProductosTotales']);
 
 
     Route::get('/productos/{id}/historial-compras-ventas', [App\Http\Controllers\ProductoController::class, 'historialComprasVentas']);

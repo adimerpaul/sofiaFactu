@@ -171,6 +171,7 @@ onMounted(() => {
     { title: 'Mis pedidos totales', icon: 'summarize', link: '/mis-pedidos-totales', perm: 'Mis pedidos totales'},
     { title: 'Mapa cliente', icon: 'map', link: '/mapa-cliente', perm: 'Mapa cliente'},
     { title: 'Mapa zonas', icon: 'palette', link: '/mapa-zonas', perm: 'Mapa cliente zonas'},
+    { title: 'Auxiliar de camara', icon: 'warehouse', link: '/auxiliar-camara', perm: 'Auxiliar de camara'},
     { title: 'Realizar pedido', icon: 'shopping_cart_checkout', link: '/pedidosCompra', perm: 'Nuevo Pedido'},
   ]
   linksList.value = baseLinks

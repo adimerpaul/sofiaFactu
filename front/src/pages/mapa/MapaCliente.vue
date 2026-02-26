@@ -14,13 +14,17 @@
         <div class="col-12 col-md-2">
           <q-btn-dropdown color="primary" icon="print" label="Reportes" no-caps class="full-width">
             <q-list>
-              <q-item clickable v-close-popup @click="notifyReportes">
+              <q-item clickable v-close-popup @click="exportarReportePedidos">
                 <q-item-section avatar><q-icon name="description" /></q-item-section>
-                <q-item-section>Reporte general (proximamente)</q-item-section>
+                <q-item-section>Reporte pedidos</q-item-section>
               </q-item>
-              <q-item clickable v-close-popup @click="notifyReportes">
+              <q-item clickable v-close-popup @click="dialogReporteZona = true">
                 <q-item-section avatar><q-icon name="local_shipping" /></q-item-section>
-                <q-item-section>Reporte por zona (proximamente)</q-item-section>
+                <q-item-section>Reporte por zona/vehiculo</q-item-section>
+              </q-item>
+              <q-item clickable v-close-popup @click="exportarReporteProductosTotales">
+                <q-item-section avatar><q-icon name="inventory_2" /></q-item-section>
+                <q-item-section>Productos totales</q-item-section>
               </q-item>
             </q-list>
           </q-btn-dropdown>
@@ -179,6 +183,39 @@
           </q-td>
         </template>
       </q-table>
+
+      <q-separator />
+      <q-card-section class="row q-col-gutter-sm items-center q-py-sm">
+        <div class="col-12 col-md-2">
+          <q-btn
+            color="green"
+            icon="local_shipping"
+            label="Asignar"
+            no-caps
+            class="full-width"
+            :disable="selectedRows.length === 0"
+            @click="openAsignar"
+          />
+        </div>
+        <div class="col-12 col-md-3">
+          <q-btn-dropdown color="primary" icon="print" label="Reportes" no-caps class="full-width">
+            <q-list>
+              <q-item clickable v-close-popup @click="exportarReportePedidos">
+                <q-item-section avatar><q-icon name="description" /></q-item-section>
+                <q-item-section>Reporte pedidos</q-item-section>
+              </q-item>
+              <q-item clickable v-close-popup @click="dialogReporteZona = true">
+                <q-item-section avatar><q-icon name="local_shipping" /></q-item-section>
+                <q-item-section>Reporte por zona/vehiculo</q-item-section>
+              </q-item>
+              <q-item clickable v-close-popup @click="exportarReporteProductosTotales">
+                <q-item-section avatar><q-icon name="inventory_2" /></q-item-section>
+                <q-item-section>Productos totales</q-item-section>
+              </q-item>
+            </q-list>
+          </q-btn-dropdown>
+        </div>
+      </q-card-section>
     </q-card>
 
     <q-dialog v-model="dialogAsignar" persistent>
@@ -233,6 +270,34 @@
         </q-card-section>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="dialogReporteZona">
+      <q-card style="width: 380px; max-width: 95vw;">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">Reporte por vehiculo</div>
+          <q-space />
+          <q-btn flat round dense icon="close" v-close-popup />
+        </q-card-section>
+        <q-card-section>
+          <q-select
+            v-model="reporteZonaCamionId"
+            :options="camionesOptions"
+            option-label="label"
+            option-value="value"
+            emit-value
+            map-options
+            dense
+            outlined
+            label="Camion"
+            :rules="[v => !!v || 'Campo requerido']"
+          />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat color="grey-8" no-caps label="Cancelar" v-close-popup />
+          <q-btn color="primary" no-caps label="Generar" :loading="loadingReport" @click="exportarReporteZonaVehiculo" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -253,9 +318,12 @@ const tipo = ref('TODOS')
 const search = ref('')
 const loading = ref(false)
 const assigning = ref(false)
+const loadingReport = ref(false)
 const dialogAsignar = ref(false)
+const dialogReporteZona = ref(false)
 const zonaFiltroTabla = ref('TODAS')
 const vendedorFiltroTabla = ref('TODOS')
+const reporteZonaCamionId = ref(null)
 
 const rows = ref([])
 const selectedRows = ref([])
@@ -480,8 +548,78 @@ async function asignarSeleccion () {
   }
 }
 
-function notifyReportes () {
-  proxy.$alert.error('Reportes: se habilitaran en el siguiente paso')
+function selectedZonaId () {
+  if (zonaFiltroTabla.value === 'TODAS') return null
+  const zone = zonas.value.find(z => z.nombre === zonaFiltroTabla.value)
+  return zone?.id || null
+}
+
+function baseReportParams () {
+  return {
+    fecha: fecha.value,
+    vendedor_id: vendedorId.value,
+    tipo: tipo.value,
+    pedido_zona_id: selectedZonaId(),
+  }
+}
+
+async function descargarPdf (url, params, defaultFileName) {
+  loadingReport.value = true
+  try {
+    const res = await proxy.$axios.get(url, {
+      params,
+      responseType: 'blob',
+    })
+    const blob = new Blob([res.data], { type: 'application/pdf' })
+    const disposition = res?.headers?.['content-disposition'] || ''
+    const match = disposition.match(/filename="?([^"]+)"?/)
+    const fileName = match?.[1] || defaultFileName
+
+    const fileUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = fileUrl
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(fileUrl)
+  } catch (e) {
+    proxy.$alert.error(e?.response?.data?.message || 'No se pudo generar reporte')
+  } finally {
+    loadingReport.value = false
+  }
+}
+
+async function exportarReportePedidos () {
+  await descargarPdf(
+    '/mapa-clientes/reportes/pedidos',
+    baseReportParams(),
+    `reporte_pedidos_${fecha.value}.pdf`,
+  )
+}
+
+async function exportarReporteZonaVehiculo () {
+  if (!reporteZonaCamionId.value) {
+    proxy.$alert.error('Debes seleccionar un camion')
+    return
+  }
+  await descargarPdf(
+    '/mapa-clientes/reportes/zona-vehiculo',
+    {
+      ...baseReportParams(),
+      usuario_camion_id: reporteZonaCamionId.value,
+    },
+    `reporte_zona_vehiculo_${fecha.value}.pdf`,
+  )
+  dialogReporteZona.value = false
+}
+
+async function exportarReporteProductosTotales () {
+  await descargarPdf(
+    '/mapa-clientes/reportes/productos-totales',
+    baseReportParams(),
+    `reporte_productos_totales_${fecha.value}.pdf`,
+  )
 }
 
 onMounted(() => {

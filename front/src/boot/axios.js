@@ -48,6 +48,10 @@ export default boot(({ app, router }) => {
     color(role) {
       if (role === 'Admin') return 'red'
       if (role === 'Usuario') return 'green'
+      if (role === 'Vendedor') return 'blue'
+      if (role === 'Ruteo') return 'orange'
+      if (role === 'Auxiliar de camara') return 'purple'
+      if (role === 'Digitador') return 'teal'
       return 'grey'
     },
   }

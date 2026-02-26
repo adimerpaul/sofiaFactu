@@ -13,9 +13,15 @@ class Pedido extends Model {
         'cliente_id',
         'pedido_zona_id',
         'usuario_camion_id',
+        'auxiliar_user_id',
+        'venta_id',
         'fecha',
         'hora',
         'estado',
+        'auxiliar_estado',
+        'auxiliar_observacion',
+        'auxiliar_hecho_at',
+        'venta_generada',
         'tipo_pago',
         'facturado',
         'tipo_pedido',
@@ -37,6 +43,10 @@ class Pedido extends Model {
         'contiene_pollo' => 'boolean',
         'pedido_zona_id' => 'integer',
         'usuario_camion_id' => 'integer',
+        'auxiliar_user_id' => 'integer',
+        'venta_id' => 'integer',
+        'auxiliar_hecho_at' => 'datetime',
+        'venta_generada' => 'boolean',
     ];
 
     public function detalles() {
@@ -49,6 +59,12 @@ class Pedido extends Model {
 
     public function usuarioCamion() {
         return $this->belongsTo(User::class, 'usuario_camion_id');
+    }
+    public function auxiliarUser() {
+        return $this->belongsTo(User::class, 'auxiliar_user_id');
+    }
+    public function venta() {
+        return $this->belongsTo(Venta::class, 'venta_id');
     }
 
     public function cliente() {

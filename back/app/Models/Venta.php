@@ -10,6 +10,7 @@ class Venta extends Model{
     protected $fillable = [
         'user_id',
         'cliente_id',
+        'pedido_id',
         'fecha',
         'hora',
         'ci',
@@ -32,6 +33,9 @@ class Venta extends Model{
     }
     function cliente(){
         return $this->belongsTo(Cliente::class);
+    }
+    function pedido(){
+        return $this->belongsTo(Pedido::class);
     }
     function ventaDetalles(){
         return $this->hasMany(VentaDetalle::class);

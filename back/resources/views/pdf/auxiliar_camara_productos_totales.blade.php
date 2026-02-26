@@ -31,6 +31,7 @@
         <th>Producto</th>
         <th style="width: 10%;">Tipo</th>
         <th style="width: 14%;" class="right">Cantidad total</th>
+        <th style="width: 25%;">Clientes</th>
         <th style="width: 15%;" class="right">Importe total</th>
     </tr>
     </thead>
@@ -39,27 +40,29 @@
         <tr>
             <td>
                 <div class="imgbox">
-                    @if($p['imagen_path'])
-                        <img src="{{ $p['imagen_path'] }}" alt="img">
+                    @if($p['imagen_data_url'])
+                        <img src="{{ $p['imagen_data_url'] }}" alt="img">
                     @else
                         -
                     @endif
                 </div>
+{{--                <pre>{{json_encode($p['imagen_data_url'])}}</pre>--}}
             </td>
             <td>{{ $p['codigo'] }}</td>
             <td>{{ $p['nombre'] }}</td>
             <td>{{ $p['tipo'] }}</td>
             <td class="right">{{ rtrim(rtrim(number_format((float) $p['cantidad_total'], 2, '.', ''), '0'), '.') }}</td>
+            <td>{{ $p['clientes'] }}</td>
             <td class="right">{{ number_format((float) $p['importe_total'], 2) }}</td>
         </tr>
     @endforeach
     <tr class="total">
         <td colspan="4">TOTAL GENERAL</td>
         <td class="right">{{ rtrim(rtrim(number_format((float) $cantidadTotal, 2, '.', ''), '0'), '.') }}</td>
+        <td></td>
         <td class="right">{{ number_format((float) $importeTotal, 2) }}</td>
     </tr>
     </tbody>
 </table>
 </body>
 </html>
-

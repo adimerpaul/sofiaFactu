@@ -37,6 +37,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/auxiliar-camara/pedidos/{pedido}/procesar', [App\Http\Controllers\AuxiliarCamaraController::class, 'procesar']);
     Route::get('/auxiliar-camara/reportes/pedidos', [App\Http\Controllers\AuxiliarCamaraController::class, 'reportePedidos']);
     Route::get('/auxiliar-camara/reportes/productos-totales', [App\Http\Controllers\AuxiliarCamaraController::class, 'reporteProductosTotales']);
+    Route::get('/auxiliar-camara/reportes/ventas-generadas', [App\Http\Controllers\AuxiliarCamaraController::class, 'reporteVentasGeneradas']);
 
 
     Route::get('/productos/{id}/historial-compras-ventas', [App\Http\Controllers\ProductoController::class, 'historialComprasVentas']);

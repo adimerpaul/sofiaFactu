@@ -6,20 +6,20 @@
           <q-input v-model="fecha" dense outlined type="date" label="Fecha" />
         </div>
         <div class="col-12 col-md-3">
-          <q-btn color="primary" icon="cloud_download" label="Importar pedidos (offline)" no-caps class="full-width" :loading="loading" @click="importarPedidos" />
-        </div>
-        <div class="col-12 col-md-2">
-          <q-btn color="grey-8" icon="storage" label="Cargar offline" no-caps class="full-width" @click="cargarOffline" />
+          <q-btn color="primary" icon="search" label="Consultar pedidos" no-caps class="full-width" :loading="loading" @click="importarPedidos" />
         </div>
         <div class="col-12 col-md-2">
           <q-btn color="indigo" icon="print" label="PDF pedidos" no-caps class="full-width" :loading="loadingReport" @click="reportePedidos" />
+        </div>
+        <div class="col-12 col-md-2">
+          <q-btn color="secondary" icon="receipt_long" label="Ventas generadas" no-caps class="full-width" :loading="loadingReport" @click="reporteVentasGeneradas" />
         </div>
         <div class="col-12 col-md-3">
           <q-btn color="deep-orange" icon="inventory_2" label="PDF productos totales" no-caps class="full-width" :loading="loadingReport" @click="reporteProductosTotales" />
         </div>
       </q-card-section>
       <q-card-section class="q-pt-none text-caption text-grey-7">
-        Ultima sincronizacion: {{ lastSync || 'sin datos' }} | Fuente: {{ sourceLabel }}
+        Ultima actualizacion: {{ lastSync || 'sin datos' }}
       </q-card-section>
       <q-card-section class="row q-col-gutter-sm q-pt-none">
         <div class="col-6 col-md-2"><q-chip color="blue-8" text-color="white">Pedidos: {{ stats.total_pedidos || 0 }}</q-chip></div>
@@ -60,18 +60,36 @@
 
     <q-card flat bordered>
       <q-card-section class="text-subtitle2">
-        Pedidos filtrados: {{ filteredRows.length }}
+        Pedidos: {{ rows.length }}
       </q-card-section>
       <q-separator />
       <q-list separator>
         <q-expansion-item
-          v-for="pedido in filteredRows"
+          v-for="pedido in rows"
           :key="pedido.id"
-          :label="`#${pedido.id} - ${pedido.cliente?.nombre || 'SIN CLIENTE'}`"
-          :caption="`${pedido.vendedor?.name || '-'} | ${pedido.camion?.name || 'SIN CAMION'} | ${pedido.zona?.nombre || 'SIN ZONA'}`"
           expand-separator
           dense
         >
+          <template #header>
+            <q-item-section>
+              <q-item-label class="text-weight-medium">
+                #{{ pedido.id }} - {{ pedido.cliente?.nombre || 'SIN CLIENTE' }}
+              </q-item-label>
+              <q-item-label caption>
+                {{ pedido.vendedor?.name || '-' }} | {{ pedido.camion?.name || 'SIN CAMION' }} | {{ pedido.zona?.nombre || 'SIN ZONA' }}
+              </q-item-label>
+            </q-item-section>
+            <q-item-section side top>
+              <div class="row no-wrap items-center q-gutter-xs">
+                <q-chip dense color="blue-grey-7" text-color="white">
+                  Bs {{ Number(pedido.total || 0).toFixed(2) }}
+                </q-chip>
+                <q-chip dense :color="chipEstadoColor(pedido.auxiliar_estado)" text-color="white">
+                  {{ pedido.auxiliar_estado || 'PENDIENTE' }}
+                </q-chip>
+              </div>
+            </q-item-section>
+          </template>
           <q-card flat>
             <q-card-section class="row q-col-gutter-sm">
               <div class="col-12 col-md-2">
@@ -116,7 +134,24 @@
                     outlined
                     step="0.01"
                     min="0"
+                    class="edit-input"
+                    :disable="isLocked(pedido)"
                     @update:model-value="(v) => setEditCantidad(pedido.id, props.row.id, v)"
+                  />
+                </q-td>
+              </template>
+              <template #body-cell-precio="props">
+                <q-td :props="props">
+                  <q-input
+                    :model-value="getEditPrecio(pedido.id, props.row)"
+                    type="number"
+                    dense
+                    outlined
+                    step="0.01"
+                    min="0"
+                    class="edit-input"
+                    :disable="isLocked(pedido)"
+                    @update:model-value="(v) => setEditPrecio(pedido.id, props.row.id, v)"
                   />
                 </q-td>
               </template>
@@ -130,13 +165,40 @@
                   outlined
                   label="Observacion auxiliar"
                   maxlength="600"
+                  :disable="isLocked(pedido)"
                 />
               </div>
-              <div class="col-12 col-md-3">
-                <q-btn color="amber-9" text-color="black" icon="edit" label="Guardar modificado" no-caps class="full-width" :loading="processingId === pedido.id" @click="guardarModificado(pedido)" />
-              </div>
-              <div class="col-12 col-md-3">
-                <q-btn color="green" icon="check_circle" label="Hecho + generar venta" no-caps class="full-width" :loading="processingId === pedido.id" :disable="pedido.venta_generada" @click="marcarHecho(pedido)" />
+              <div class="col-12 col-md-6">
+                <q-btn
+                  v-if="!pedido.venta_generada"
+                  color="green"
+                  icon="check_circle"
+                  label="Hecho + generar venta"
+                  no-caps
+                  class="full-width"
+                  :loading="processingId === pedido.id"
+                  @click="marcarHecho(pedido)"
+                />
+                <q-btn
+                  v-else-if="isLocked(pedido)"
+                  color="amber-8"
+                  text-color="black"
+                  icon="lock_open"
+                  label="Volver a modificar"
+                  no-caps
+                  class="full-width"
+                  @click="habilitarEdicion(pedido)"
+                />
+                <q-btn
+                  v-else
+                  color="primary"
+                  icon="save"
+                  label="Guardar cambios"
+                  no-caps
+                  class="full-width"
+                  :loading="processingId === pedido.id"
+                  @click="guardarCambios(pedido)"
+                />
               </div>
             </q-card-section>
           </q-card>
@@ -155,16 +217,17 @@ const fecha = ref(new Date().toISOString().slice(0, 10))
 const loading = ref(false)
 const loadingReport = ref(false)
 const processingId = ref(null)
-const sourceLabel = ref('API')
 const lastSync = ref('')
 
 const rows = ref([])
 const stats = ref({})
 const editCantidad = ref({})
+const editPrecio = ref({})
 const observacionesAux = ref({})
+const unlocked = ref({})
 
 const search = ref('')
-const tipo = ref('TODOS')
+const tipo = ref('NORMAL')
 const auxiliarEstado = ref('TODOS')
 const clienteId = ref(null)
 const vendedorId = ref(null)
@@ -230,39 +293,6 @@ const zonaOptions = computed(() => {
   return [{ label: 'Todas', value: null }, ...Array.from(map.entries()).map(([id, label]) => ({ label, value: id }))]
 })
 
-const filteredRows = computed(() => {
-  const needle = (search.value || '').trim().toLowerCase()
-  return rows.value.filter((r) => {
-    if (clienteId.value && r?.cliente?.id !== clienteId.value) return false
-    if (vendedorId.value && r?.vendedor?.id !== vendedorId.value) return false
-    if (camionId.value && r?.camion?.id !== camionId.value) return false
-    if (zonaId.value && r?.zona?.id !== zonaId.value) return false
-    if (auxiliarEstado.value !== 'TODOS' && (r.auxiliar_estado || 'PENDIENTE') !== auxiliarEstado.value) return false
-    if (tipo.value !== 'TODOS') {
-      if (tipo.value === 'NORMAL' && !r.contiene_normal) return false
-      if (tipo.value === 'POLLO' && !r.contiene_pollo) return false
-      if (tipo.value === 'RES' && !r.contiene_res) return false
-      if (tipo.value === 'CERDO' && !r.contiene_cerdo) return false
-    }
-    if (!needle) return true
-    const stack = [
-      r.id,
-      r?.cliente?.nombre,
-      r?.cliente?.codcli,
-      r?.cliente?.ci,
-      r?.cliente?.direccion,
-      r?.vendedor?.name,
-      r?.camion?.name,
-      r?.zona?.nombre,
-    ].join(' ').toLowerCase()
-    return stack.includes(needle)
-  })
-})
-
-function cacheKey () {
-  return `auxiliar_camara_${fecha.value}`
-}
-
 function imgUrl (path) {
   if (!path) return ''
   const base = String(proxy.$url || '').replace(/\/+$/, '')
@@ -277,16 +307,21 @@ function chipEstadoColor (estado) {
 
 function syncEditMaps () {
   const nextQty = {}
+  const nextPrecio = {}
   const nextObs = {}
   rows.value.forEach((pedido) => {
     nextQty[pedido.id] = {}
+    nextPrecio[pedido.id] = {}
     ;(pedido.detalles || []).forEach((d) => {
       nextQty[pedido.id][d.id] = d.cantidad
+      nextPrecio[pedido.id][d.id] = d.precio
     })
     nextObs[pedido.id] = pedido.auxiliar_observacion || ''
   })
   editCantidad.value = nextQty
+  editPrecio.value = nextPrecio
   observacionesAux.value = nextObs
+  unlocked.value = {}
 }
 
 function getEditCantidad (pedidoId, detalle) {
@@ -297,6 +332,27 @@ function setEditCantidad (pedidoId, detalleId, value) {
   if (!editCantidad.value[pedidoId]) editCantidad.value[pedidoId] = {}
   const num = Number(value)
   editCantidad.value[pedidoId][detalleId] = Number.isFinite(num) && num >= 0 ? num : 0
+}
+
+function getEditPrecio (pedidoId, detalle) {
+  return editPrecio.value?.[pedidoId]?.[detalle.id] ?? detalle.precio
+}
+
+function setEditPrecio (pedidoId, detalleId, value) {
+  if (!editPrecio.value[pedidoId]) editPrecio.value[pedidoId] = {}
+  const num = Number(value)
+  editPrecio.value[pedidoId][detalleId] = Number.isFinite(num) && num >= 0 ? num : 0
+}
+
+function isLocked (pedido) {
+  return !!pedido?.venta_generada && !unlocked.value[pedido.id]
+}
+
+function habilitarEdicion (pedido) {
+  proxy.$alert.dialog('¿Seguro que quieres volver a modificar este pedido?')
+    .onOk(() => {
+      unlocked.value[pedido.id] = true
+    })
 }
 
 function getRequestFilters () {
@@ -318,40 +374,12 @@ async function importarPedidos () {
     const res = await proxy.$axios.get('/auxiliar-camara/pedidos', { params: getRequestFilters() })
     rows.value = Array.isArray(res.data?.data) ? res.data.data : []
     stats.value = res.data?.meta || {}
-    const meta = {
-      rows: rows.value,
-      stats: stats.value,
-      syncedAt: new Date().toISOString(),
-      filters: getRequestFilters(),
-    }
-    localStorage.setItem(cacheKey(), JSON.stringify(meta))
-    sourceLabel.value = 'API'
-    lastSync.value = new Date(meta.syncedAt).toLocaleString()
+    lastSync.value = new Date().toLocaleString()
     syncEditMaps()
-    proxy.$alert.success('Pedidos importados y guardados offline')
   } catch (e) {
-    proxy.$alert.error(e?.response?.data?.message || 'No se pudo importar pedidos')
+    proxy.$alert.error(e?.response?.data?.message || 'No se pudo cargar pedidos')
   } finally {
     loading.value = false
-  }
-}
-
-function cargarOffline () {
-  try {
-    const raw = localStorage.getItem(cacheKey())
-    if (!raw) {
-      proxy.$alert.error('No hay cache offline para la fecha seleccionada')
-      return
-    }
-    const payload = JSON.parse(raw)
-    rows.value = Array.isArray(payload?.rows) ? payload.rows : []
-    stats.value = payload?.stats || {}
-    sourceLabel.value = 'OFFLINE'
-    lastSync.value = payload?.syncedAt ? new Date(payload.syncedAt).toLocaleString() : ''
-    syncEditMaps()
-    proxy.$alert.success('Datos cargados desde offline')
-  } catch (_) {
-    proxy.$alert.error('Cache offline danado')
   }
 }
 
@@ -361,6 +389,7 @@ async function procesarPedido (pedido, generarVenta) {
     const detallesPayload = (pedido.detalles || []).map((d) => ({
       id: d.id,
       cantidad: Number(getEditCantidad(pedido.id, d)),
+      precio: Number(getEditPrecio(pedido.id, d)),
     }))
     await proxy.$axios.put(`/auxiliar-camara/pedidos/${pedido.id}/procesar`, {
       generar_venta: generarVenta,
@@ -375,12 +404,12 @@ async function procesarPedido (pedido, generarVenta) {
   }
 }
 
-async function guardarModificado (pedido) {
-  await procesarPedido(pedido, false)
-}
-
 async function marcarHecho (pedido) {
   await procesarPedido(pedido, true)
+}
+
+async function guardarCambios (pedido) {
+  await procesarPedido(pedido, false)
 }
 
 async function descargarPdf (url, fileName) {
@@ -417,11 +446,16 @@ async function reporteProductosTotales () {
   await descargarPdf('/auxiliar-camara/reportes/productos-totales', `auxiliar_productos_${fecha.value}.pdf`)
 }
 
-watch(fecha, () => {
-  rows.value = []
-  stats.value = {}
-  sourceLabel.value = 'API'
-  lastSync.value = ''
+async function reporteVentasGeneradas () {
+  await descargarPdf('/auxiliar-camara/reportes/ventas-generadas', `auxiliar_ventas_generadas_${fecha.value}.pdf`)
+}
+
+let refreshTimer = null
+watch([fecha, tipo, auxiliarEstado, clienteId, vendedorId, camionId, zonaId, search], () => {
+  if (refreshTimer) clearTimeout(refreshTimer)
+  refreshTimer = setTimeout(() => {
+    importarPedidos()
+  }, 280)
 })
 
 importarPedidos()
@@ -430,5 +464,15 @@ importarPedidos()
 <style scoped>
 .auxiliar-page {
   background: linear-gradient(180deg, #eef4ff 0%, #f8fbff 40%, #ffffff 100%);
+}
+
+.edit-input {
+  width: 110px;
+}
+
+@media (max-width: 768px) {
+  .edit-input {
+    width: 130px;
+  }
 }
 </style>

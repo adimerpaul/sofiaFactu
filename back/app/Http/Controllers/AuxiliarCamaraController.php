@@ -12,6 +12,8 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Throwable;
 
 class AuxiliarCamaraController extends Controller
 {
@@ -31,7 +33,7 @@ class AuxiliarCamaraController extends Controller
         ]);
 
         $fecha = $data['fecha'] ?? now()->toDateString();
-        $tipo = strtoupper((string) ($data['tipo'] ?? 'TODOS'));
+        $tipo = strtoupper((string) ($data['tipo'] ?? 'NORMAL'));
         $auxEstado = strtoupper((string) ($data['auxiliar_estado'] ?? 'TODOS'));
         $search = trim((string) ($data['search'] ?? ''));
 
@@ -43,7 +45,7 @@ class AuxiliarCamaraController extends Controller
                 'auxiliarUser:id,name',
                 'zona:id,nombre,color,orden',
                 'venta:id,total,estado',
-                'detalles:id,pedido_id,producto_id,cantidad,precio,total,observacion_detalle',
+                'detalles:id,pedido_id,producto_id,cantidad,precio,total,observacion_detalle,detalle_extra',
                 'detalles.producto:id,codigo,nombre,tipo,imagen',
             ])
             ->where('tipo_pedido', 'REALIZAR_PEDIDO')
@@ -81,7 +83,24 @@ class AuxiliarCamaraController extends Controller
             })->values();
         }
 
+        if ($tipo !== 'TODOS') {
+            $items = $items
+                ->map(function (Pedido $pedido) use ($tipo) {
+                    $pedido->setRelation('detalles', $pedido->detalles
+                        ->filter(fn (PedidoDetalle $detalle) => $this->normalizeTipo($detalle->producto?->tipo) === $tipo)
+                        ->values());
+                    return $pedido;
+                })
+                ->filter(fn (Pedido $pedido) => $pedido->detalles->isNotEmpty())
+                ->values();
+        }
+
         $rows = $items->map(function (Pedido $pedido) {
+            $tipos = $pedido->detalles
+                ->map(fn (PedidoDetalle $detalle) => $this->normalizeTipo($detalle->producto?->tipo))
+                ->values();
+            $total = (float) $pedido->detalles->sum('total');
+
             return [
                 'id' => $pedido->id,
                 'fecha' => (string) $pedido->fecha,
@@ -92,12 +111,12 @@ class AuxiliarCamaraController extends Controller
                 'auxiliar_hecho_at' => optional($pedido->auxiliar_hecho_at)->toDateTimeString(),
                 'venta_generada' => (bool) $pedido->venta_generada,
                 'venta_id' => $pedido->venta_id,
-                'total' => (float) $pedido->total,
+                'total' => $total,
                 'tipo_pago' => $pedido->tipo_pago,
-                'contiene_normal' => (bool) $pedido->contiene_normal,
-                'contiene_pollo' => (bool) $pedido->contiene_pollo,
-                'contiene_res' => (bool) $pedido->contiene_res,
-                'contiene_cerdo' => (bool) $pedido->contiene_cerdo,
+                'contiene_normal' => $tipos->contains('NORMAL'),
+                'contiene_pollo' => $tipos->contains('POLLO'),
+                'contiene_res' => $tipos->contains('RES'),
+                'contiene_cerdo' => $tipos->contains('CERDO'),
                 'cliente' => [
                     'id' => $pedido->cliente?->id,
                     'nombre' => $pedido->cliente?->nombre,
@@ -128,6 +147,8 @@ class AuxiliarCamaraController extends Controller
                         'codigo' => $detalle->producto?->codigo ?: ('#' . $detalle->producto_id),
                         'producto' => $detalle->producto?->nombre,
                         'tipo' => strtoupper((string) ($detalle->producto?->tipo ?? 'NORMAL')),
+                        'observacion_detalle' => $detalle->observacion_detalle,
+                        'detalle_extra' => $detalle->detalle_extra,
                         'imagen' => $detalle->producto?->imagen,
                         'cantidad' => (float) $detalle->cantidad,
                         'precio' => (float) $detalle->precio,
@@ -164,6 +185,7 @@ class AuxiliarCamaraController extends Controller
             'detalles' => 'nullable|array',
             'detalles.*.id' => 'required_with:detalles|integer|exists:pedido_detalles,id',
             'detalles.*.cantidad' => 'required_with:detalles|numeric|min:0',
+            'detalles.*.precio' => 'nullable|numeric|min:0',
         ]);
 
         $generarVenta = (bool) ($data['generar_venta'] ?? true);
@@ -181,11 +203,15 @@ class AuxiliarCamaraController extends Controller
                         continue;
                     }
                     $newCant = (float) $map[$detalle->id]['cantidad'];
+                    $newPrecio = array_key_exists('precio', $map[$detalle->id]) && $map[$detalle->id]['precio'] !== null
+                        ? (float) $map[$detalle->id]['precio']
+                        : (float) $detalle->precio;
                     if ($newCant < 0) {
                         abort(422, 'Cantidad invalida');
                     }
-                    if (abs((float) $detalle->cantidad - $newCant) > 0.0001) {
+                    if (abs((float) $detalle->cantidad - $newCant) > 0.0001 || abs((float) $detalle->precio - $newPrecio) > 0.0001) {
                         $detalle->cantidad = $newCant;
+                        $detalle->precio = $newPrecio;
                         $detalle->total = round($newCant * (float) $detalle->precio, 3);
                         $detalle->save();
                         $updated = true;
@@ -237,12 +263,30 @@ class AuxiliarCamaraController extends Controller
             'user:id,name',
             'usuarioCamion:id,name,placa',
             'zona:id,nombre,color',
+            'detalles:id,pedido_id,producto_id,cantidad,precio,total,observacion_detalle,detalle_extra',
             'detalles.producto:id,codigo,nombre,imagen,tipo',
         ])->orderBy('hora')->orderBy('id')->get();
+
+        $pedidos = $pedidos
+            ->map(function (Pedido $pedido) {
+                $pedido->setRelation('detalles', $pedido->detalles->filter(function (PedidoDetalle $detalle) {
+                    return $this->normalizeTipo($detalle->producto?->tipo) === 'NORMAL';
+                })->values());
+                return $pedido;
+            })
+            ->filter(fn (Pedido $pedido) => $pedido->detalles->isNotEmpty())
+            ->values();
 
         if ($pedidos->isEmpty()) {
             return response()->json(['message' => 'No hay pedidos para los filtros seleccionados'], 404);
         }
+
+        $pedidos = $pedidos->map(function (Pedido $pedido) {
+            $pedido->detalles->each(function (PedidoDetalle $detalle) {
+                $detalle->setAttribute('imagen_data_url', $this->toDataImage((string) ($detalle->producto?->imagen ?? '')));
+            });
+            return $pedido;
+        });
 
         $fecha = (string) ($request->input('fecha') ?: now()->toDateString());
         $pdf = Pdf::loadView('pdf.auxiliar_camara_pedidos', [
@@ -256,6 +300,8 @@ class AuxiliarCamaraController extends Controller
     public function reporteProductosTotales(Request $request)
     {
         $pedidos = $this->queryForReports($request)->with([
+            'cliente:id,nombre',
+            'detalles:id,pedido_id,producto_id,cantidad,total',
             'detalles.producto:id,codigo,nombre,imagen,tipo',
         ])->get();
 
@@ -265,23 +311,41 @@ class AuxiliarCamaraController extends Controller
 
         $productos = $pedidos
             ->flatMap(fn (Pedido $pedido) => $pedido->detalles)
-            ->filter(fn (PedidoDetalle $d) => $d->producto !== null)
+            ->filter(fn (PedidoDetalle $d) => $d->producto !== null && $this->normalizeTipo($d->producto?->tipo) === 'NORMAL')
             ->groupBy('producto_id')
-            ->map(function (Collection $group) {
+            ->map(function (Collection $group) use ($pedidos) {
                 $producto = $group->first()->producto;
-                $img = trim((string) ($producto->imagen ?? ''));
-                $path = public_path($img);
+                $clientes = $group
+                    ->groupBy(fn (PedidoDetalle $d) => (int) ($pedidos->firstWhere('id', $d->pedido_id)?->cliente?->id ?? 0))
+                    ->map(function (Collection $rows, int $clienteId) use ($pedidos) {
+                        $pedido = $pedidos->firstWhere('id', $rows->first()->pedido_id);
+                        $nombre = $pedido?->cliente?->nombre ?: ('Cliente #' . $clienteId);
+                        $cantidad = (float) $rows->sum('cantidad');
+                        return [
+                            'nombre' => $nombre,
+                            'cantidad' => $cantidad,
+                        ];
+                    })
+                    ->sortByDesc('cantidad')
+                    ->values()
+                    ->map(fn ($row) => $row['nombre'] . ' (' . rtrim(rtrim(number_format((float) $row['cantidad'], 2, '.', ''), '0'), '.') . ')')
+                    ->implode(', ');
                 return [
                     'codigo' => $producto->codigo ?: ('#' . $producto->id),
                     'nombre' => $producto->nombre,
                     'tipo' => strtoupper((string) ($producto->tipo ?? 'NORMAL')),
                     'cantidad_total' => (float) $group->sum('cantidad'),
                     'importe_total' => (float) $group->sum('total'),
-                    'imagen_path' => ($img !== '' && file_exists($path)) ? $path : null,
+                    'clientes' => $clientes,
+                    'imagen_data_url' => $this->toDataImage((string) ($producto->imagen ?? '')),
                 ];
             })
-            ->sortBy('nombre')
+            ->sortByDesc('cantidad_total')
             ->values();
+
+        if ($productos->isEmpty()) {
+            return response()->json(['message' => 'No hay productos tipo NORMAL para los filtros seleccionados'], 404);
+        }
 
         $fecha = (string) ($request->input('fecha') ?: now()->toDateString());
         $pdf = Pdf::loadView('pdf.auxiliar_camara_productos_totales', [
@@ -294,6 +358,35 @@ class AuxiliarCamaraController extends Controller
         return $pdf->download('auxiliar_productos_' . str_replace('-', '', $fecha) . '.pdf');
     }
 
+    public function reporteVentasGeneradas(Request $request)
+    {
+        $pedidos = $this->queryForReports($request)->with([
+            'cliente:id,nombre,codcli,ci',
+            'user:id,name',
+            'usuarioCamion:id,name,placa',
+            'zona:id,nombre,color',
+            'venta:id,pedido_id,total,estado,fecha,hora,tipo_pago',
+        ])
+            ->where('venta_generada', true)
+            ->whereNotNull('venta_id')
+            ->orderBy('hora')
+            ->orderBy('id')
+            ->get();
+
+        if ($pedidos->isEmpty()) {
+            return response()->json(['message' => 'No hay ventas generadas para los filtros seleccionados'], 404);
+        }
+
+        $fecha = (string) ($request->input('fecha') ?: now()->toDateString());
+        $pdf = Pdf::loadView('pdf.auxiliar_camara_ventas_generadas', [
+            'pedidos' => $pedidos,
+            'fecha' => $fecha,
+            'totalVentas' => (float) $pedidos->sum(fn (Pedido $p) => (float) ($p->venta?->total ?? 0)),
+        ])->setPaper('letter');
+
+        return $pdf->download('auxiliar_ventas_generadas_' . str_replace('-', '', $fecha) . '.pdf');
+    }
+
     private function queryForReports(Request $request)
     {
         $this->authorizeAuxiliarAccess($request);
@@ -303,26 +396,19 @@ class AuxiliarCamaraController extends Controller
             'cliente_id' => 'nullable|integer|exists:clientes,id',
             'usuario_camion_id' => 'nullable|integer|exists:users,id',
             'pedido_zona_id' => 'nullable|integer|exists:pedido_zonas,id',
-            'tipo' => 'nullable|string|in:TODOS,NORMAL,POLLO,RES,CERDO',
         ]);
 
         $fecha = $data['fecha'] ?? now()->toDateString();
-        $tipo = strtoupper((string) ($data['tipo'] ?? 'TODOS'));
 
         return Pedido::query()
             ->where('tipo_pedido', 'REALIZAR_PEDIDO')
             ->where('estado', 'Enviado')
             ->whereDate('fecha', $fecha)
+            ->where('contiene_normal', true)
             ->when(!empty($data['vendedor_id']), fn ($q) => $q->where('user_id', (int) $data['vendedor_id']))
             ->when(!empty($data['cliente_id']), fn ($q) => $q->where('cliente_id', (int) $data['cliente_id']))
             ->when(!empty($data['usuario_camion_id']), fn ($q) => $q->where('usuario_camion_id', (int) $data['usuario_camion_id']))
-            ->when(!empty($data['pedido_zona_id']), fn ($q) => $q->where('pedido_zona_id', (int) $data['pedido_zona_id']))
-            ->when($tipo !== 'TODOS', function ($q) use ($tipo) {
-                if ($tipo === 'NORMAL') $q->where('contiene_normal', true);
-                if ($tipo === 'POLLO') $q->where('contiene_pollo', true);
-                if ($tipo === 'RES') $q->where('contiene_res', true);
-                if ($tipo === 'CERDO') $q->where('contiene_cerdo', true);
-            });
+            ->when(!empty($data['pedido_zona_id']), fn ($q) => $q->where('pedido_zona_id', (int) $data['pedido_zona_id']));
     }
 
     private function recalcularPedido(Pedido $pedido): array
@@ -343,7 +429,7 @@ class AuxiliarCamaraController extends Controller
 
     private function crearVentaDesdePedido(Pedido $pedido, int $auxiliarUserId): Venta
     {
-        $pedido->loadMissing(['detalles.producto:id,nombre', 'user:id,agencia', 'cliente:id,nombre,ci']);
+        $pedido->loadMissing(['detalles.producto:id,nombre,tipo', 'user:id,agencia', 'cliente:id,nombre,ci']);
         $detalles = $pedido->detalles;
         if ($detalles->isEmpty()) {
             abort(422, 'Pedido sin productos para generar venta');
@@ -371,13 +457,27 @@ class AuxiliarCamaraController extends Controller
             if ($cantidad <= 0) continue;
             $precio = (float) $detalle->precio;
             $nombre = (string) ($detalle->producto?->nombre ?? 'Producto');
-            $total += $this->consumirStockFifo(
-                ventaId: (int) $venta->id,
-                productoId: (int) $detalle->producto_id,
-                cantidad: $cantidad,
-                precio: $precio,
-                nombreProducto: $nombre
-            );
+            $tipo = $this->normalizeTipo($detalle->producto?->tipo);
+
+            if ($tipo === 'NORMAL') {
+                $total += $this->consumirStockPorVencimiento(
+                    ventaId: (int) $venta->id,
+                    productoId: (int) $detalle->producto_id,
+                    cantidad: $cantidad,
+                    precio: $precio,
+                    nombreProducto: $nombre
+                );
+                continue;
+            }
+
+            VentaDetalle::create([
+                'venta_id' => $venta->id,
+                'producto_id' => $detalle->producto_id,
+                'cantidad' => $cantidad,
+                'precio' => $precio,
+                'nombre' => $nombre,
+            ]);
+            $total += ($cantidad * $precio);
         }
 
         $venta->total = round($total, 3);
@@ -386,7 +486,7 @@ class AuxiliarCamaraController extends Controller
         return $venta;
     }
 
-    private function consumirStockFifo(int $ventaId, int $productoId, float $cantidad, float $precio, string $nombreProducto): float
+    private function consumirStockPorVencimiento(int $ventaId, int $productoId, float $cantidad, float $precio, string $nombreProducto): float
     {
         $restante = $cantidad;
         $sum = 0.0;
@@ -426,7 +526,7 @@ class AuxiliarCamaraController extends Controller
         }
 
         if ($restante > 0.0001) {
-            abort(422, 'Stock insuficiente para generar venta (FIFO)');
+            abort(422, 'Stock insuficiente para productos tipo NORMAL');
         }
 
         return $sum;
@@ -441,5 +541,89 @@ class AuxiliarCamaraController extends Controller
         $canAuxiliar = method_exists($user, 'can') && $user->can('Auxiliar de camara');
         abort_unless($isAdmin || $canAuxiliar, 403, 'No autorizado');
     }
-}
 
+    private function toDataImage(string $imagePath): ?string
+    {
+        $path = trim($imagePath);
+        if ($path === '') {
+            return null;
+        }
+
+        $normalized = str_replace(['\\', '/'], DIRECTORY_SEPARATOR, trim($path, "\\/"));
+        $fullPath = public_path($normalized);
+        if (!is_file($fullPath)) {
+            return null;
+        }
+
+        // Try to convert to JPEG first to maximize PDF/browser compatibility
+        // (AVIF is not consistently supported by renderers like DOMPDF).
+        $jpegData = $this->toJpegBinary($fullPath);
+        if ($jpegData !== null) {
+            return 'data:image/jpeg;base64,' . base64_encode($jpegData);
+        }
+
+        $content = @file_get_contents($fullPath);
+        if ($content === false) {
+            return null;
+        }
+
+        $mime = @mime_content_type($fullPath);
+        if (!is_string($mime) || !Str::startsWith($mime, 'image/')) {
+            $mime = 'image/jpeg';
+        }
+
+        // Final guard: avoid returning AVIF when renderer cannot display it.
+        if ($mime === 'image/avif') {
+            return null;
+        }
+
+        return 'data:' . $mime . ';base64,' . base64_encode($content);
+    }
+
+    private function normalizeTipo(?string $tipo): string
+    {
+        return strtoupper((string) ($tipo ?? 'NORMAL'));
+    }
+
+    private function toJpegBinary(string $fullPath): ?string
+    {
+        // 1) Native Imagick conversion (best AVIF support when extension is installed).
+        if (class_exists(\Imagick::class)) {
+            try {
+                $img = new \Imagick($fullPath);
+                $img = $img->mergeImageLayers(\Imagick::LAYERMETHOD_MERGE);
+                $img->setImageBackgroundColor('white');
+                $img->setImageAlphaChannel(\Imagick::ALPHACHANNEL_REMOVE);
+                $img->setImageFormat('jpeg');
+                $img->setImageCompressionQuality(80);
+                $blob = $img->getImagesBlob();
+                $img->clear();
+                $img->destroy();
+                if (is_string($blob) && $blob !== '') {
+                    return $blob;
+                }
+            } catch (Throwable) {
+                // Continue with fallback.
+            }
+        }
+
+        // 2) GD fallback for classic formats.
+        try {
+            $bytes = @file_get_contents($fullPath);
+            if ($bytes === false) {
+                return null;
+            }
+            $resource = @imagecreatefromstring($bytes);
+            if ($resource === false) {
+                return null;
+            }
+            ob_start();
+            imagejpeg($resource, null, 80);
+            $jpeg = ob_get_clean();
+            imagedestroy($resource);
+            return is_string($jpeg) && $jpeg !== '' ? $jpeg : null;
+        } catch (Throwable) {
+            return null;
+        }
+    }
+}

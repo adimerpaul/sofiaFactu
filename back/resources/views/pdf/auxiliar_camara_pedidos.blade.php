@@ -66,15 +66,11 @@
             </thead>
             <tbody>
             @foreach($pedido->detalles as $detalle)
-                @php
-                    $img = trim((string) ($detalle->producto->imagen ?? ''));
-                    $path = public_path($img);
-                @endphp
                 <tr>
                     <td>
                         <div class="imgbox">
-                            @if($img !== '' && file_exists($path))
-                                <img src="{{ $path }}" alt="img">
+                            @if(!empty($detalle->imagen_data_url))
+                                <img src="{{ $detalle->imagen_data_url }}" alt="img">
                             @else
                                 -
                             @endif
@@ -94,4 +90,3 @@
 @endforeach
 </body>
 </html>
-

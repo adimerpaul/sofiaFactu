@@ -114,6 +114,7 @@ class VentaController extends Controller{
             'ci'        => 'nullable|string',
             'nombre'    => 'nullable|string',
             'tipo_pago' => 'required|string|in:Efectivo,QR',
+            'facturado' => 'nullable|boolean',
             'agencia'   => 'nullable|string',
             'productos' => 'required|array|min:1',
 
@@ -163,6 +164,8 @@ class VentaController extends Controller{
                 'estado'           => 'Activo',
                 'tipo_comprobante' => 'NOTA',
                 'tipo_pago'        => $data['tipo_pago'],
+                'facturado'        => (bool) ($data['facturado'] ?? false),
+                'factura_estado'   => !empty($data['facturado']) ? 'PENDIENTE' : 'SIN_GESTION',
                 'agencia'          => $data['agencia'] ?? ($user->agencia ?? null),
                 'total'            => 0,
             ]);

@@ -52,6 +52,7 @@ class DatabaseSeeder extends Seeder
             'Mapa cliente',
             'Mapa cliente zonas',
             'Auxiliar de camara',
+            'Digitador factura',
         ];
         foreach ($permisos as $permiso) {
             Permission::firstOrCreate(['name' => $permiso]);

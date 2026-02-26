@@ -38,6 +38,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/auxiliar-camara/reportes/pedidos', [App\Http\Controllers\AuxiliarCamaraController::class, 'reportePedidos']);
     Route::get('/auxiliar-camara/reportes/productos-totales', [App\Http\Controllers\AuxiliarCamaraController::class, 'reporteProductosTotales']);
     Route::get('/auxiliar-camara/reportes/ventas-generadas', [App\Http\Controllers\AuxiliarCamaraController::class, 'reporteVentasGeneradas']);
+    Route::get('/digitador-factura/pedidos', [App\Http\Controllers\DigitadorFacturaController::class, 'index']);
+    Route::put('/digitador-factura/pedidos/{pedido}', [App\Http\Controllers\DigitadorFacturaController::class, 'updatePedido']);
+    Route::put('/digitador-factura/ventas/{venta}', [App\Http\Controllers\DigitadorFacturaController::class, 'updateVenta']);
+    Route::post('/digitador-factura/generar-factura-todos', [App\Http\Controllers\DigitadorFacturaController::class, 'generarFacturaTodos']);
 
 
     Route::get('/productos/{id}/historial-compras-ventas', [App\Http\Controllers\ProductoController::class, 'historialComprasVentas']);

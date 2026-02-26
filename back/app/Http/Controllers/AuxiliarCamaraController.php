@@ -446,6 +446,8 @@ class AuxiliarCamaraController extends Controller
             'estado' => 'Activo',
             'tipo_comprobante' => 'NOTA',
             'tipo_pago' => $pedido->tipo_pago ?: 'Efectivo',
+            'facturado' => (bool) $pedido->facturado,
+            'factura_estado' => $pedido->facturado ? 'PENDIENTE' : 'SIN_GESTION',
             'agencia' => $pedido->user?->agencia,
             'total' => 0,
             'online' => false,

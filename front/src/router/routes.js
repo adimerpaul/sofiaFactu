@@ -24,6 +24,7 @@ const routes = [
       { path: 'mapa-cliente', name: 'mapa-cliente', component: () => import('pages/mapa/MapaCliente.vue'), meta: { requiresAuth: true, permission: 'Mapa cliente' } },
       { path: 'mapa-zonas', name: 'mapa-zonas', component: () => import('pages/mapa/ZonasMapa.vue'), meta: { requiresAuth: true, permission: 'Mapa cliente zonas' } },
       { path: 'auxiliar-camara', name: 'auxiliar-camara', component: () => import('pages/auxiliar/AuxiliarCamara.vue'), meta: { requiresAuth: true, permission: 'Auxiliar de camara' } },
+      { path: 'digitador-factura', name: 'digitador-factura', component: () => import('pages/facturas/DigitadorFactura.vue'), meta: { requiresAuth: true, permission: 'Digitador factura' } },
       { path: 'visitas', name: 'visitas', component: () => import('pages/visitas/Visitas.vue'), meta: { requiresAuth: true } },
     ]
   },

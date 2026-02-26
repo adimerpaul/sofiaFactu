@@ -20,12 +20,18 @@ class Venta extends Model{
         'total',
 //        'tipo_venta',
         'tipo_pago',
+        'facturado',
+        'factura_estado',
         'agencia',
         'cuf',
         'leyenda',
         'online',
         'cufd'
 //        'pagado_interno'
+    ];
+    protected $casts = [
+        'facturado' => 'boolean',
+        'online' => 'boolean',
     ];
     protected $hidden = ['created_at', 'updated_at', 'deleted_at'];
     function user(){

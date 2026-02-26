@@ -172,6 +172,7 @@ onMounted(() => {
     { title: 'Mapa cliente', icon: 'map', link: '/mapa-cliente', perm: 'Mapa cliente'},
     { title: 'Mapa zonas', icon: 'palette', link: '/mapa-zonas', perm: 'Mapa cliente zonas'},
     { title: 'Auxiliar de camara', icon: 'warehouse', link: '/auxiliar-camara', perm: 'Auxiliar de camara'},
+    { title: 'Digitador factura', icon: 'receipt_long', link: '/digitador-factura', perm: 'Digitador factura'},
     { title: 'Realizar pedido', icon: 'shopping_cart_checkout', link: '/pedidosCompra', perm: 'Nuevo Pedido'},
   ]
   linksList.value = baseLinks

@@ -42,6 +42,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/digitador-factura/pedidos/{pedido}', [App\Http\Controllers\DigitadorFacturaController::class, 'updatePedido']);
     Route::put('/digitador-factura/ventas/{venta}', [App\Http\Controllers\DigitadorFacturaController::class, 'updateVenta']);
     Route::post('/digitador-factura/generar-factura-todos', [App\Http\Controllers\DigitadorFacturaController::class, 'generarFacturaTodos']);
+    Route::get('/digitador-factura/reportes/facturas', [App\Http\Controllers\DigitadorFacturaController::class, 'imprimirFacturas']);
+    Route::get('/digitador-factura/reportes/vouchers', [App\Http\Controllers\DigitadorFacturaController::class, 'imprimirVouchers']);
+    Route::get('/digitador-factura/reportes/facturas/{venta}', [App\Http\Controllers\DigitadorFacturaController::class, 'imprimirFacturaVenta']);
+    Route::get('/digitador-factura/reportes/vouchers/{venta}', [App\Http\Controllers\DigitadorFacturaController::class, 'imprimirVoucherVenta']);
 
 
     Route::get('/productos/{id}/historial-compras-ventas', [App\Http\Controllers\ProductoController::class, 'historialComprasVentas']);

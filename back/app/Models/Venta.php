@@ -22,6 +22,7 @@ class Venta extends Model{
         'tipo_pago',
         'facturado',
         'factura_estado',
+        'factura_error',
         'agencia',
         'cuf',
         'leyenda',

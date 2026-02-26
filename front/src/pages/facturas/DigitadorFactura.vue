@@ -43,16 +43,44 @@
         </div>
       </q-card-section>
       <q-card-section class="q-pt-none">
-        <q-btn
-          color="deep-orange"
-          icon="receipt_long"
-          label="Generar factura de todos (pendiente)"
-          no-caps
-          size="lg"
-          class="full-width text-weight-bold"
-          :loading="loadingFacturar"
-          @click="generarFacturaTodos"
-        />
+        <div class="row q-col-gutter-sm">
+          <div class="col-12 col-md-4">
+            <q-btn
+              color="deep-orange"
+              icon="receipt_long"
+              label="Generar factura de todos"
+              no-caps
+              size="lg"
+              class="full-width text-weight-bold"
+              :loading="loadingFacturar"
+              @click="generarFacturaTodos"
+            />
+          </div>
+          <div class="col-12 col-md-4">
+            <q-btn
+              color="primary"
+              icon="print"
+              label="Imprimir todas facturas"
+              no-caps
+              size="lg"
+              class="full-width text-weight-bold"
+              :loading="loadingPrintFacturas"
+              @click="imprimirFacturasMasivo"
+            />
+          </div>
+          <div class="col-12 col-md-4">
+            <q-btn
+              color="teal"
+              icon="receipt"
+              label="Imprimir todos vouchers"
+              no-caps
+              size="lg"
+              class="full-width text-weight-bold"
+              :loading="loadingPrintVouchers"
+              @click="imprimirVouchersMasivo"
+            />
+          </div>
+        </div>
       </q-card-section>
     </q-card>
 
@@ -79,16 +107,43 @@
             <th>Fec/Hora</th>
             <th>Pago</th>
             <th>Factura</th>
-            <th>Estado</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="venta in ventasFiltradas" :key="venta.venta_id">
             <td>
               <q-btn-dropdown color="primary" label="Opciones" dense no-caps size="10px">
-                <q-item clickable v-close-popup @click="abrirEdicion(venta)">
+                <q-item clickable v-close-popup @click="abrirEdicion(venta)" :disable="isBloqueada(venta)">
                   <q-item-section avatar><q-icon name="edit" /></q-item-section>
-                  <q-item-section>Editar</q-item-section>
+                  <q-item-section>{{ isBloqueada(venta) ? 'Edicion bloqueada' : 'Editar' }}</q-item-section>
+                </q-item>
+                <q-item clickable v-close-popup @click="verificarImpuestos(venta)" v-if="venta.cuf">
+                  <q-item-section avatar><q-icon name="fact_check" /></q-item-section>
+                  <q-item-section>Verificar impuestos</q-item-section>
+                </q-item>
+                <q-item clickable v-close-popup @click="imprimirImpuestos(venta)" v-if="venta.cuf">
+                  <q-item-section avatar><q-icon name="receipt_long" /></q-item-section>
+                  <q-item-section>Imprimir impuesto</q-item-section>
+                </q-item>
+                <q-item clickable v-close-popup @click="imprimirFacturaIndividual(venta)" v-if="venta.cuf && venta.factura_estado === 'FACTURADO'">
+                  <q-item-section avatar><q-icon name="print" /></q-item-section>
+                  <q-item-section>Imprimir factura</q-item-section>
+                </q-item>
+                <q-item clickable v-close-popup @click="imprimirVoucherIndividual(venta)">
+                  <q-item-section avatar><q-icon name="description" /></q-item-section>
+                  <q-item-section>Imprimir voucher</q-item-section>
+                </q-item>
+                <q-item clickable v-close-popup @click="mandarWhatsappFactura(venta)" v-if="venta.cuf && venta.factura_estado === 'FACTURADO'">
+                  <q-item-section avatar><q-icon name="chat" /></q-item-section>
+                  <q-item-section>WhatsApp factura</q-item-section>
+                </q-item>
+                <q-item clickable v-close-popup @click="mandarWhatsappVoucher(venta)">
+                  <q-item-section avatar><q-icon name="chat_bubble" /></q-item-section>
+                  <q-item-section>WhatsApp voucher</q-item-section>
+                </q-item>
+                <q-item clickable v-close-popup @click="anularVenta(venta)">
+                  <q-item-section avatar><q-icon name="delete" /></q-item-section>
+                  <q-item-section>Anular</q-item-section>
                 </q-item>
               </q-btn-dropdown>
             </td>
@@ -116,13 +171,30 @@
             </td>
             <td>{{ venta.fecha }} {{ venta.hora || '' }}</td>
             <td>{{ venta.pago || '-' }}</td>
-            <td>{{ venta.facturado ? 'SI' : 'NO' }}</td>
             <td>
-              <q-chip dense :color="estadoColor(venta.estado)" text-color="white">{{ venta.estado }}</q-chip>
+              <q-chip dense :color="venta.facturado ? 'green-8' : 'negative'" text-color="white">
+                {{ venta.facturado ? 'SI' : 'NO' }}
+              </q-chip>
+              <q-chip dense :color="venta.online ? 'green-7' : 'blue-8'" text-color="white" class="q-ml-xs">
+                {{ venta.factura_estado || 'SIN_GESTION' }}
+              </q-chip>
+              <q-chip dense :color="venta.online ? 'green' : 'red'" text-color="white" class="q-ml-xs">
+                {{ venta.online ? 'ONLINE' : 'OFFLINE' }}
+              </q-chip>
+              <q-chip
+                v-if="venta.factura_error"
+                dense
+                color="negative"
+                text-color="white"
+                class="q-ml-xs"
+              >
+                Error
+                <q-tooltip style="max-width: 360px; white-space: normal;">{{ venta.factura_error }}</q-tooltip>
+              </q-chip>
             </td>
           </tr>
           <tr v-if="ventasFiltradas.length === 0">
-            <td colspan="10" class="text-center text-grey-7">Sin datos disponibles</td>
+            <td colspan="9" class="text-center text-grey-7">Sin datos disponibles</td>
           </tr>
         </tbody>
       </q-markup-table>
@@ -177,6 +249,9 @@
             <div class="col-12 col-md-3">
               <q-select v-model="editForm.factura_estado" :options="facturaEstadoOptions" dense outlined emit-value map-options label="Estado factura" />
             </div>
+            <div class="col-12 col-md-4">
+              <q-input v-model="editForm.observaciones" dense outlined label="Observacion" maxlength="600" />
+            </div>
           </div>
           <q-markup-table dense flat bordered class="q-mt-sm">
             <thead>
@@ -224,6 +299,8 @@ const fechaInicio = ref(today)
 const fechaFin = ref(today)
 const loading = ref(false)
 const loadingFacturar = ref(false)
+const loadingPrintFacturas = ref(false)
+const loadingPrintVouchers = ref(false)
 const saving = ref(false)
 const search = ref('')
 const soloFactura = ref(false)
@@ -245,6 +322,7 @@ const editForm = ref({
   tipo_pago: 'Efectivo',
   facturado: false,
   factura_estado: 'SIN_GESTION',
+  observaciones: '',
   productos: [],
 })
 
@@ -284,10 +362,11 @@ function tipoColor(tipo) {
   return 'primary'
 }
 
-function estadoColor(estado) {
-  if (estado === 'Activo') return 'green'
-  if (estado === 'Anulada') return 'negative'
-  return 'primary'
+function isBloqueada(venta) {
+  const facturado = !!venta?.facturado
+  const emitida = String(venta?.factura_estado || '').toUpperCase() === 'FACTURADO'
+  const activa = String(venta?.estado || '').toUpperCase() === 'ACTIVO'
+  return facturado && emitida && activa
 }
 
 async function cargarVentas() {
@@ -311,11 +390,16 @@ async function cargarVentas() {
 }
 
 function abrirEdicion(venta) {
+  if (isBloqueada(venta)) {
+    proxy.$alert.error('La factura ya fue generada. Anule la venta para volver a editar.')
+    return
+  }
   editForm.value = {
     venta_id: venta.venta_id,
     tipo_pago: venta?.detalle_edit?.tipo_pago || venta.pago || 'Efectivo',
     facturado: !!(venta?.detalle_edit?.facturado ?? venta.facturado),
     factura_estado: venta?.detalle_edit?.factura_estado || venta.factura_estado || 'SIN_GESTION',
+    observaciones: venta?.detalle_edit?.observaciones || venta.observaciones || '',
     productos: (venta?.detalle_edit?.productos || venta.productos || []).map((p) => ({
       id: p.id,
       codigo: p.codigo,
@@ -336,6 +420,7 @@ async function guardarEdicion() {
       tipo_pago: editForm.value.tipo_pago,
       facturado: !!editForm.value.facturado,
       factura_estado: editForm.value.factura_estado,
+      observaciones: editForm.value.observaciones || null,
       productos: (editForm.value.productos || []).map((d) => ({
         id: d.id,
         cantidad: Number(d.cantidad || 0),
@@ -352,20 +437,169 @@ async function guardarEdicion() {
   }
 }
 
+async function verificarImpuestos(venta) {
+  if (!venta?.cuf) return
+  try {
+    const res = await proxy.$axios.post(`/verificarImpuestos/${venta.cuf}`)
+    proxy.$q.dialog({
+      title: 'Verificacion de impuestos',
+      fullWidth: true,
+      message: `<pre>${JSON.stringify(res.data, null, 2)}</pre>`,
+      html: true,
+      ok: true,
+    })
+  } catch (e) {
+    proxy.$alert.error(e?.response?.data?.message || 'No se pudo verificar en impuestos')
+  }
+}
+
+function imprimirImpuestos(venta) {
+  if (!venta?.cuf) return
+  window.open(`${proxy.$store.env.url2}consulta/QR?nit=${proxy.$store.env.nit}&cuf=${venta.cuf}&numero=${venta.venta_id}&t=2`, '_blank')
+}
+
+async function anularVenta(venta) {
+  const ok = await new Promise((resolve) => {
+    proxy.$alert.dialog('Desea anular la venta?')
+      .onOk(() => resolve(true))
+      .onCancel(() => resolve(false))
+  })
+  if (!ok) return
+
+  try {
+    await proxy.$axios.put(`/ventasAnular/${venta.venta_id}`)
+    proxy.$alert.success('Venta anulada')
+    await cargarVentas()
+  } catch (e) {
+    proxy.$alert.error(e?.response?.data?.message || 'No se pudo anular la venta')
+  }
+}
+
 async function generarFacturaTodos() {
+  const ok = await new Promise((resolve) => {
+    proxy.$alert.dialog('Seguro que quiere facturar todas las ventas pendientes del rango?')
+      .onOk(() => resolve(true))
+      .onCancel(() => resolve(false))
+  })
+  if (!ok) return
+
   loadingFacturar.value = true
   try {
     const res = await proxy.$axios.post('/digitador-factura/generar-factura-todos', {
       fecha_inicio: fechaInicio.value,
       fecha_fin: fechaFin.value,
     })
-    proxy.$alert.success(`${res.data?.message || 'Proceso ejecutado'}: ${res.data?.ventas_marcadas || 0}`)
+    const ok = Number(res.data?.facturadas || 0)
+    const err = Number(res.data?.errores || 0)
+    proxy.$alert.success(`${res.data?.message || 'Proceso ejecutado'} | Facturadas: ${ok} | Errores: ${err}`)
     await cargarVentas()
   } catch (e) {
     proxy.$alert.error(e?.response?.data?.message || 'No se pudo marcar facturacion masiva')
   } finally {
     loadingFacturar.value = false
   }
+}
+
+async function descargarPdf(url, loadingRef) {
+  loadingRef.value = true
+  try {
+    const res = await proxy.$axios.get(url, {
+      params: {
+        fecha_inicio: fechaInicio.value,
+        fecha_fin: fechaFin.value,
+      },
+      responseType: 'blob',
+    })
+    const blob = new Blob([res.data], { type: 'application/pdf' })
+    const disposition = res?.headers?.['content-disposition'] || ''
+    const match = disposition.match(/filename="?([^"]+)"?/)
+    const fileName = match?.[1] || 'reporte.pdf'
+    const link = document.createElement('a')
+    const fileUrl = window.URL.createObjectURL(blob)
+    link.href = fileUrl
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(fileUrl)
+  } catch (e) {
+    proxy.$alert.error(e?.response?.data?.message || 'No se pudo generar el PDF')
+  } finally {
+    loadingRef.value = false
+  }
+}
+
+async function descargarPdfIndividual(url) {
+  try {
+    const res = await proxy.$axios.get(url, { responseType: 'blob' })
+    const blob = new Blob([res.data], { type: 'application/pdf' })
+    const disposition = res?.headers?.['content-disposition'] || ''
+    const match = disposition.match(/filename="?([^"]+)"?/)
+    const fileName = match?.[1] || 'documento.pdf'
+    const link = document.createElement('a')
+    const fileUrl = window.URL.createObjectURL(blob)
+    link.href = fileUrl
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(fileUrl)
+  } catch (e) {
+    proxy.$alert.error(e?.response?.data?.message || 'No se pudo generar el PDF')
+  }
+}
+
+async function imprimirFacturaIndividual(venta) {
+  await descargarPdfIndividual(`/digitador-factura/reportes/facturas/${venta.venta_id}`)
+}
+
+async function imprimirVoucherIndividual(venta) {
+  await descargarPdfIndividual(`/digitador-factura/reportes/vouchers/${venta.venta_id}`)
+}
+
+async function compartirPdf(url, fallbackName) {
+  try {
+    const res = await proxy.$axios.get(url, { responseType: 'blob' })
+    const blob = new Blob([res.data], { type: 'application/pdf' })
+    const disposition = res?.headers?.['content-disposition'] || ''
+    const match = disposition.match(/filename="?([^"]+)"?/)
+    const fileName = match?.[1] || fallbackName
+
+    const file = new File([blob], fileName, { type: 'application/pdf' })
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: fileName })
+      return
+    }
+
+    // Fallback: descarga directa si el navegador no soporta compartir archivos.
+    const link = document.createElement('a')
+    const fileUrl = window.URL.createObjectURL(blob)
+    link.href = fileUrl
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(fileUrl)
+    proxy.$alert.error('Tu navegador no permite compartir PDF directo. Se descargó el archivo para enviarlo por WhatsApp.')
+  } catch (e) {
+    proxy.$alert.error(e?.response?.data?.message || 'No se pudo preparar el PDF para compartir')
+  }
+}
+
+async function mandarWhatsappFactura(venta) {
+  await compartirPdf(`/digitador-factura/reportes/facturas/${venta.venta_id}`, `factura_venta_${venta.venta_id}.pdf`)
+}
+
+async function mandarWhatsappVoucher(venta) {
+  await compartirPdf(`/digitador-factura/reportes/vouchers/${venta.venta_id}`, `voucher_venta_${venta.venta_id}.pdf`)
+}
+
+async function imprimirFacturasMasivo() {
+  await descargarPdf('/digitador-factura/reportes/facturas', loadingPrintFacturas)
+}
+
+async function imprimirVouchersMasivo() {
+  await descargarPdf('/digitador-factura/reportes/vouchers', loadingPrintVouchers)
 }
 
 onMounted(cargarVentas)
@@ -383,4 +617,3 @@ onMounted(cargarVentas)
     #fff;
 }
 </style>
-

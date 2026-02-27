@@ -54,6 +54,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/despachador/reportes/vouchers', [App\Http\Controllers\DespachadorController::class, 'imprimirVouchers']);
     Route::get('/despachador/reportes/vouchers/{venta}', [App\Http\Controllers\DespachadorController::class, 'imprimirVoucherVenta']);
     Route::get('/cobranzas/deudores', [App\Http\Controllers\CobranzasController::class, 'deudores']);
+    Route::get('/cobranzas/historial-clientes', [App\Http\Controllers\CobranzasController::class, 'historialClientes']);
     Route::get('/cobranzas/clientes', [App\Http\Controllers\CobranzasController::class, 'clientes']);
     Route::post('/cobranzas/deudas-manuales', [App\Http\Controllers\CobranzasController::class, 'crearDeudaManual']);
     Route::post('/cobranzas/pagos/ventas', [App\Http\Controllers\CobranzasController::class, 'registrarPagoVenta']);

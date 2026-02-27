@@ -184,6 +184,166 @@ class CobranzasController extends Controller
         ]);
     }
 
+    public function historialClientes(Request $request)
+    {
+        $this->authorizeCobranzas($request);
+        $data = $request->validate([
+            'search' => 'nullable|string|max:120',
+        ]);
+
+        $search = mb_strtolower(trim((string) ($data['search'] ?? '')));
+
+        $ventasCredito = Venta::query()
+            ->with([
+                'cliente:id,nombre,ci,telefono,direccion',
+                'pagos:id,venta_id,monto,fecha_hora,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
+                'pagos.user:id,name',
+            ])
+            ->where(function (Builder $q) {
+                $q->whereRaw('UPPER(tipo_pago) LIKE ?', ['%CRED%']);
+            })
+            ->whereRaw('UPPER(COALESCE(estado, ?)) <> ?', ['ACTIVO', 'ANULADO'])
+            ->orderByDesc('fecha')
+            ->orderByDesc('id')
+            ->get();
+
+        $deudasManuales = CobranzasDeuda::query()
+            ->with([
+                'cliente:id,nombre,ci,telefono,direccion',
+                'pagos:id,deuda_id,monto,fecha_hora,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
+                'pagos.user:id,name',
+            ])
+            ->orderByDesc('fecha')
+            ->orderByDesc('id')
+            ->get();
+
+        $map = collect();
+
+        foreach ($ventasCredito as $venta) {
+            $total = round((float) ($venta->total ?? 0), 2);
+            $pagado = round((float) $venta->pagos->where('considerar_en_cobranza', true)->sum('monto'), 2);
+            $saldo = $this->saldoConTolerancia($total, $pagado, 0.99);
+
+            $key = 'cli-' . ($venta->cliente_id ?? ('venta-' . $venta->id));
+            $row = $map->get($key, $this->emptyClienteRow(
+                $key,
+                $venta->cliente_id,
+                (string) ($venta->cliente?->nombre ?: ($venta->nombre ?: 'Cliente sin nombre')),
+                (string) ($venta->cliente?->ci ?: $venta->ci),
+                (string) ($venta->cliente?->telefono ?? ''),
+                (string) ($venta->cliente?->direccion ?? '')
+            ));
+
+            $row['monto_total'] += $total;
+            $row['cobrado_total'] += $pagado;
+            $row['saldo_total'] += $saldo;
+            $row['items'][] = [
+                'tipo' => 'VENTA',
+                'id' => $venta->id,
+                'referencia' => 'Venta #' . $venta->id,
+                'fecha' => (string) ($venta->fecha ?? ''),
+                'tipo_pago' => (string) ($venta->tipo_pago ?? ''),
+                'monto_total' => $total,
+                'cobrado' => $pagado,
+                'saldo' => $saldo,
+                'estado' => (string) ($venta->estado ?? ''),
+                'tolerancia_centavos' => 0.99,
+                'pagos' => $venta->pagos->map(fn (Pago $p) => [
+                    'id' => $p->id,
+                    'monto' => round((float) $p->monto, 2),
+                    'fecha_hora' => optional($p->fecha_hora)->format('Y-m-d H:i:s'),
+                    'metodo_pago' => $p->metodo_pago,
+                    'considerar_en_cobranza' => (bool) $p->considerar_en_cobranza,
+                    'nro_pago' => $p->nro_pago,
+                    'observacion' => $p->observacion,
+                    'comprobante_path' => $p->comprobante_path,
+                    'comprobante_url' => $this->comprobanteUrl($p->comprobante_path),
+                    'registrado_por' => $p->user?->name,
+                ])->values(),
+            ];
+            $map->put($key, $row);
+        }
+
+        foreach ($deudasManuales as $deuda) {
+            $total = round((float) ($deuda->monto_total ?? 0), 2);
+            $pagado = round((float) $deuda->pagos->where('considerar_en_cobranza', true)->sum('monto'), 2);
+            $tol = round((float) ($deuda->tolerancia_centavos ?? 0.99), 2);
+            $saldo = $this->saldoConTolerancia($total, $pagado, $tol);
+
+            $nombre = (string) ($deuda->cliente?->nombre ?: $deuda->nombre_cliente ?: 'Cliente manual');
+            $ci = (string) ($deuda->cliente?->ci ?: $deuda->ci_nit ?: '');
+            $tel = (string) ($deuda->cliente?->telefono ?: $deuda->telefono ?: '');
+            $dir = (string) ($deuda->cliente?->direccion ?: $deuda->direccion ?: '');
+            $key = $deuda->cliente_id ? ('cli-' . $deuda->cliente_id) : ('man-' . $deuda->id);
+            $row = $map->get($key, $this->emptyClienteRow($key, $deuda->cliente_id, $nombre, $ci, $tel, $dir));
+
+            $row['monto_total'] += $total;
+            $row['cobrado_total'] += $pagado;
+            $row['saldo_total'] += $saldo;
+            $row['items'][] = [
+                'tipo' => 'DEUDA_MANUAL',
+                'id' => $deuda->id,
+                'referencia' => 'Deuda manual #' . $deuda->id,
+                'fecha' => (string) ($deuda->fecha ?? ''),
+                'tipo_pago' => 'CREDITO',
+                'monto_total' => $total,
+                'cobrado' => $pagado,
+                'saldo' => $saldo,
+                'estado' => (string) ($deuda->estado ?? 'ACTIVA'),
+                'tolerancia_centavos' => $tol,
+                'pagos' => $deuda->pagos->map(fn (CobranzasDeudaPago $p) => [
+                    'id' => $p->id,
+                    'monto' => round((float) $p->monto, 2),
+                    'fecha_hora' => optional($p->fecha_hora)->format('Y-m-d H:i:s'),
+                    'metodo_pago' => $p->metodo_pago,
+                    'considerar_en_cobranza' => (bool) $p->considerar_en_cobranza,
+                    'nro_pago' => $p->nro_pago,
+                    'observacion' => $p->observacion,
+                    'comprobante_path' => $p->comprobante_path,
+                    'comprobante_url' => $this->comprobanteUrl($p->comprobante_path),
+                    'registrado_por' => $p->user?->name,
+                ])->values(),
+            ];
+            $map->put($key, $row);
+        }
+
+        $rows = $map->values()
+            ->map(function (array $row) {
+                $row['monto_total'] = round((float) $row['monto_total'], 2);
+                $row['cobrado_total'] = round((float) $row['cobrado_total'], 2);
+                $row['saldo_total'] = round((float) $row['saldo_total'], 2);
+                $row['documentos'] = count($row['items']);
+                $row['pagos_total'] = collect($row['items'])->sum(fn ($it) => count($it['pagos'] ?? []));
+                return $row;
+            })
+            ->filter(function (array $row) use ($search) {
+                if ($search === '') {
+                    return true;
+                }
+                $stack = mb_strtolower(implode(' ', [
+                    $row['cliente_nombre'] ?? '',
+                    $row['ci_nit'] ?? '',
+                    $row['telefono'] ?? '',
+                    $row['direccion'] ?? '',
+                ]));
+                return str_contains($stack, $search);
+            })
+            ->sortByDesc('monto_total')
+            ->values();
+
+        return response()->json([
+            'data' => $rows,
+            'stats' => [
+                'clientes' => $rows->count(),
+                'documentos' => (int) $rows->sum('documentos'),
+                'pagos' => (int) $rows->sum('pagos_total'),
+                'monto_total' => round((float) $rows->sum('monto_total'), 2),
+                'cobrado_total' => round((float) $rows->sum('cobrado_total'), 2),
+                'saldo_total' => round((float) $rows->sum('saldo_total'), 2),
+            ],
+        ]);
+    }
+
     public function crearDeudaManual(Request $request)
     {
         $this->authorizeCobranzas($request);

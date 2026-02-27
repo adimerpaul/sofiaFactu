@@ -95,7 +95,7 @@
                           <q-item-section avatar><q-icon name="payments" /></q-item-section>
                           <q-item-section>Pagar</q-item-section>
                         </q-item>
-                        <q-item clickable v-close-popup @click="abrirPagoItem(item, ultimoPago(item))" :disable="!ultimoPago(item)">
+                        <q-item clickable v-close-popup @click="abrirPagoItem(item, ultimoPago(item))" :disable="!ultimoPago(item) || !item.considerar_en_cobranza">
                           <q-item-section avatar><q-icon name="edit" /></q-item-section>
                           <q-item-section>Modificar ultimo pago</q-item-section>
                         </q-item>
@@ -111,16 +111,45 @@
                   <td colspan="8" class="bg-grey-1">
                     <div class="text-caption text-grey-7 text-weight-bold q-mb-xs">Pagos:</div>
                     <div v-if="!(item.pagos || []).length" class="text-caption text-grey-7">Sin pagos</div>
-                    <div v-for="pg in (item.pagos || [])" :key="`pg-${item.tipo}-${item.id}-${pg.id}`" class="row items-center q-col-gutter-sm q-py-xs">
-                      <div class="col-12 col-md-2">#{{ pg.id }} - {{ money(pg.monto) }}</div>
-                      <div class="col-12 col-md-2">{{ pg.metodo_pago }}</div>
-                      <div class="col-12 col-md-2">{{ pg.nro_pago || '-' }}</div>
-                      <div class="col-12 col-md-2">{{ pg.fecha_hora || '-' }}</div>
-                      <div class="col-12 col-md-2">{{ pg.registrado_por || '-' }}</div>
-                      <div class="col-12 col-md-2">
-                        <q-img v-if="pg.comprobante_url" :src="pg.comprobante_url" style="width: 42px; height: 42px; border-radius: 6px;" fit="cover">
-                          <q-tooltip>Comprobante</q-tooltip>
-                        </q-img>
+                    <div v-for="pg in (item.pagos || [])" :key="`pg-${item.tipo}-${item.id}-${pg.id}`" class="row items-center no-wrap q-col-gutter-sm q-py-xs">
+                      <div class="col-auto">#{{ pg.id }} - {{ money(pg.monto) }}</div>
+                      <div class="col-auto">
+                        <q-chip dense :color="String(pg.estado || 'ACTIVO').toUpperCase() === 'ANULADO' ? 'negative' : 'positive'" text-color="white">
+                          {{ String(pg.estado || 'ACTIVO').toUpperCase() }}
+                        </q-chip>
+                      </div>
+                      <div class="col-auto">{{ pg.metodo_pago }}</div>
+                      <div class="col-auto">{{ pg.nro_pago || '-' }}</div>
+                      <div class="col-auto">{{ pg.fecha_hora || '-' }}</div>
+                      <div class="col-auto">
+                        {{ pg.registrado_por || 'Sin usuario' }}
+                        <div v-if="pg.anulado_por" class="text-negative">Anulado: {{ pg.anulado_por }}</div>
+                      </div>
+                      <div class="col-auto">
+                        <q-btn
+                          v-if="pg.comprobante_url"
+                          dense
+                          flat
+                          color="primary"
+                          icon="attach_file"
+                          label="Ver comp."
+                          no-caps
+                          :href="pg.comprobante_url"
+                          target="_blank"
+                        />
+                        <q-img v-if="isImageComprobante(pg.comprobante_url)" :src="pg.comprobante_url" style="width: 28px; height: 28px; border-radius: 4px;" fit="cover" class="q-ml-xs" />
+                      </div>
+                      <div class="col-auto">
+                        <q-btn
+                          v-if="String(pg.estado || 'ACTIVO').toUpperCase() !== 'ANULADO'"
+                          dense
+                          flat
+                          color="negative"
+                          icon="cancel"
+                          label="Anular"
+                          no-caps
+                          @click="anularPago(item, pg)"
+                        />
                       </div>
                     </div>
                   </td>
@@ -264,6 +293,11 @@ function money(v) {
   return Number(v || 0).toFixed(2)
 }
 
+function isImageComprobante(url) {
+  if (!url) return false
+  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(String(url))
+}
+
 async function cargarDeudores() {
   loading.value = true
   try {
@@ -286,7 +320,8 @@ function abrirDetalle(row) {
 
 function ultimoPago(item) {
   const pagos = Array.isArray(item?.pagos) ? item.pagos : []
-  return pagos.length ? pagos[pagos.length - 1] : null
+  const activos = pagos.filter((p) => String(p?.estado || 'ACTIVO').toUpperCase() !== 'ANULADO')
+  return activos.length ? activos[activos.length - 1] : null
 }
 
 function abrirPagoRapido(row) {
@@ -371,6 +406,34 @@ async function guardarPago() {
     proxy.$alert.error(e?.response?.data?.message || 'No se pudo guardar pago')
   } finally {
     loadingPago.value = false
+  }
+}
+
+async function anularPago(item, pago) {
+  const ok = await new Promise((resolve) => {
+    proxy.$q.dialog({
+      title: 'Anular pago',
+      message: `Se anulara el pago #${pago?.id}. Desea continuar?`,
+      cancel: true,
+      persistent: true,
+    }).onOk(() => resolve(true)).onCancel(() => resolve(false))
+  })
+  if (!ok) return
+
+  try {
+    if (item.tipo === 'VENTA') {
+      await proxy.$axios.put(`/cobranzas/pagos/ventas/${pago.id}/anular`, {})
+    } else {
+      await proxy.$axios.put(`/cobranzas/deudas-manuales/pagos/${pago.id}/anular`, {})
+    }
+    proxy.$alert.success('Pago anulado')
+    await cargarDeudores()
+    if (deudorActual.value) {
+      const found = rows.value.find((r) => r.key === deudorActual.value.key)
+      if (found) deudorActual.value = found
+    }
+  } catch (e) {
+    proxy.$alert.error(e?.response?.data?.message || 'No se pudo anular pago')
   }
 }
 

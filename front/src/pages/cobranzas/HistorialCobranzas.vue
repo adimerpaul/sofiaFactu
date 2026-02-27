@@ -10,13 +10,7 @@
           </q-input>
         </div>
         <div class="col-6 col-md-2">
-          <q-select
-            v-model="perPage"
-            :options="[20, 50, 100, 150, 200]"
-            dense
-            outlined
-            label="Filas"
-          />
+          <q-select v-model="perPage" :options="[20, 50, 100, 150, 200]" dense outlined label="Filas" />
         </div>
         <div class="col-6 col-md-3">
           <q-btn color="primary" no-caps icon="search" label="Consultar" class="full-width" :loading="loading" @click="loadRows(1)" />
@@ -24,34 +18,22 @@
       </q-card-section>
       <q-card-section class="row q-col-gutter-sm q-pt-none">
         <div class="col-6 col-md-3"><q-chip color="blue-8" text-color="white">Clientes: {{ pagination.total || 0 }}</q-chip></div>
-        <div class="col-6 col-md-3"><q-chip color="indigo-8" text-color="white">Docs página: {{ stats.documentos || 0 }}</q-chip></div>
-        <div class="col-6 col-md-3"><q-chip color="green-8" text-color="white">Pagos página: {{ stats.pagos || 0 }}</q-chip></div>
-        <div class="col-6 col-md-3"><q-chip color="negative" text-color="white">Saldo página: {{ money(stats.saldo_total) }}</q-chip></div>
+        <div class="col-6 col-md-3"><q-chip color="indigo-8" text-color="white">Docs pagina: {{ stats.documentos || 0 }}</q-chip></div>
+        <div class="col-6 col-md-3"><q-chip color="green-8" text-color="white">Pagos pagina: {{ stats.pagos || 0 }}</q-chip></div>
+        <div class="col-6 col-md-3"><q-chip color="negative" text-color="white">Saldo pagina: {{ money(stats.saldo_total) }}</q-chip></div>
       </q-card-section>
     </q-card>
 
     <q-card flat bordered>
-      <q-table
-        dense
-        flat
-        row-key="cliente_id"
-        :rows="rows"
-        :columns="columns"
-        :loading="loading"
-        :pagination="{ rowsPerPage: 0 }"
-      >
+      <q-table dense flat row-key="cliente_id" :rows="rows" :columns="columns" :loading="loading" :pagination="{ rowsPerPage: 0 }">
         <template #body-cell-estado="props">
           <q-td :props="props">
-            <q-chip dense :color="props.row.estado === 'DEBE' ? 'negative' : 'positive'" text-color="white">
-              {{ props.row.estado }}
-            </q-chip>
+            <q-chip dense :color="props.row.estado === 'DEBE' ? 'negative' : 'positive'" text-color="white">{{ props.row.estado }}</q-chip>
           </q-td>
         </template>
         <template #body-cell-saldo_total="props">
           <q-td :props="props">
-            <q-chip dense :color="Number(props.row.saldo_total || 0) > 0 ? 'negative' : 'positive'" text-color="white">
-              {{ money(props.row.saldo_total) }}
-            </q-chip>
+            <q-chip dense :color="Number(props.row.saldo_total || 0) > 0 ? 'negative' : 'positive'" text-color="white">{{ money(props.row.saldo_total) }}</q-chip>
           </q-td>
         </template>
         <template #body-cell-actions="props">
@@ -69,7 +51,7 @@
         <template #bottom>
           <div class="row full-width items-center justify-end q-gutter-sm q-pa-sm">
             <q-btn flat dense icon="chevron_left" :disable="pagination.page <= 1 || loading" @click="loadRows(pagination.page - 1)" />
-            <div class="text-caption">Página {{ pagination.page }} / {{ pagination.last_page }}</div>
+            <div class="text-caption">Pagina {{ pagination.page }} / {{ pagination.last_page }}</div>
             <q-btn flat dense icon="chevron_right" :disable="pagination.page >= pagination.last_page || loading" @click="loadRows(pagination.page + 1)" />
           </div>
         </template>
@@ -121,7 +103,7 @@
                           <q-item-section avatar><q-icon name="payments" /></q-item-section>
                           <q-item-section>Pagar</q-item-section>
                         </q-item>
-                        <q-item clickable v-close-popup @click="abrirPagoItem(item, ultimoPago(item))" :disable="!ultimoPago(item)">
+                        <q-item clickable v-close-popup @click="abrirPagoItem(item, ultimoPago(item))" :disable="!ultimoPago(item) || !item.considerar_en_cobranza">
                           <q-item-section avatar><q-icon name="edit" /></q-item-section>
                           <q-item-section>Modificar ultimo pago</q-item-section>
                         </q-item>
@@ -137,16 +119,40 @@
                   <td colspan="8" class="bg-grey-1">
                     <div class="text-caption text-grey-7 text-weight-bold q-mb-xs">Pagos:</div>
                     <div v-if="!(item.pagos || []).length" class="text-caption text-grey-7">Sin pagos</div>
-                    <div v-for="pg in (item.pagos || [])" :key="`pg-${item.tipo}-${item.id}-${pg.id}`" class="row items-center q-col-gutter-sm q-py-xs">
-                      <div class="col-12 col-md-2">#{{ pg.id }} - {{ money(pg.monto) }}</div>
-                      <div class="col-12 col-md-2">{{ pg.metodo_pago }}</div>
-                      <div class="col-12 col-md-2">{{ pg.nro_pago || '-' }}</div>
-                      <div class="col-12 col-md-2">{{ pg.fecha_hora || '-' }}</div>
-                      <div class="col-12 col-md-2">{{ pg.registrado_por || '-' }}</div>
-                      <div class="col-12 col-md-2">
-                        <q-img v-if="pg.comprobante_url" :src="pg.comprobante_url" style="width: 42px; height: 42px; border-radius: 6px;" fit="cover">
-                          <q-tooltip>Comprobante</q-tooltip>
-                        </q-img>
+                    <div v-for="pg in (item.pagos || [])" :key="`pg-${item.tipo}-${item.id}-${pg.id}`" class="row items-center no-wrap q-col-gutter-sm q-py-xs">
+                      <div class="col-auto">#{{ pg.id }} - {{ money(pg.monto) }}</div>
+                      <div class="col-auto">
+                        <q-chip dense :color="String(pg.estado || 'ACTIVO').toUpperCase() === 'ANULADO' ? 'negative' : 'positive'" text-color="white">
+                          {{ String(pg.estado || 'ACTIVO').toUpperCase() }}
+                        </q-chip>
+                      </div>
+                      <div class="col-auto">{{ pg.metodo_pago }}</div>
+                      <div class="col-auto">{{ pg.nro_pago || '-' }}</div>
+                      <div class="col-auto">{{ pg.fecha_hora || '-' }}</div>
+                      <div class="col-auto">
+                        {{ pg.registrado_por || 'Sin usuario' }}
+                        <div v-if="pg.anulado_por" class="text-negative">Anulado: {{ pg.anulado_por }}</div>
+                      </div>
+                      <div class="col-auto">
+                        <q-btn
+                          v-if="pg.comprobante_url"
+                          dense
+                          flat
+                          color="primary"
+                          icon="attach_file"
+                          label="Ver comp."
+                          no-caps
+                          :href="pg.comprobante_url"
+                          target="_blank"
+                        />
+                        <q-img v-if="isImageComprobante(pg.comprobante_url)" :src="pg.comprobante_url" style="width: 28px; height: 28px; border-radius: 4px;" fit="cover" class="q-ml-xs" />
+                      </div>
+                      <div class="col-auto">
+                        <q-btn
+                          v-if="String(pg.estado || 'ACTIVO').toUpperCase() !== 'ANULADO'"
+                          dense flat color="negative" icon="cancel" label="Anular" no-caps
+                          @click="anularPago(item, pg)"
+                        />
                       </div>
                     </div>
                   </td>
@@ -229,6 +235,11 @@ function money(v) {
   return Number(v || 0).toFixed(2)
 }
 
+function isImageComprobante(url) {
+  if (!url) return false
+  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(String(url))
+}
+
 async function loadRows(page = 1) {
   loading.value = true
   try {
@@ -262,7 +273,8 @@ async function openDetalle(row) {
 
 function ultimoPago(item) {
   const pagos = Array.isArray(item?.pagos) ? item.pagos : []
-  return pagos.length ? pagos[pagos.length - 1] : null
+  const activos = pagos.filter((p) => String(p?.estado || 'ACTIVO').toUpperCase() !== 'ANULADO')
+  return activos.length ? activos[activos.length - 1] : null
 }
 
 function abrirPagoItem(item, pago) {
@@ -339,7 +351,33 @@ async function guardarPago() {
   }
 }
 
+async function anularPago(item, pago) {
+  const ok = await new Promise((resolve) => {
+    proxy.$q.dialog({
+      title: 'Anular pago',
+      message: `Se anulara el pago #${pago?.id}. Desea continuar?`,
+      cancel: true,
+      persistent: true,
+    }).onOk(() => resolve(true)).onCancel(() => resolve(false))
+  })
+  if (!ok) return
+
+  try {
+    if (item.tipo === 'VENTA') {
+      await proxy.$axios.put(`/cobranzas/pagos/ventas/${pago.id}/anular`, {})
+    } else {
+      await proxy.$axios.put(`/cobranzas/deudas-manuales/pagos/${pago.id}/anular`, {})
+    }
+    proxy.$alert.success('Pago anulado')
+    if (detalleCliente.value?.id) {
+      await openDetalle({ cliente_id: detalleCliente.value.id })
+    }
+    await loadRows(pagination.value.page || 1)
+  } catch (e) {
+    proxy.$alert.error(e?.response?.data?.message || 'No se pudo anular pago')
+  }
+}
+
 watch(perPage, () => loadRows(1))
 onMounted(() => loadRows(1))
 </script>
-

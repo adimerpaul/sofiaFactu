@@ -29,7 +29,7 @@ class CobranzasController extends Controller
         $ventasCredito = Venta::query()
             ->with([
                 'cliente:id,nombre,ci,telefono,direccion',
-                'pagos:id,venta_id,monto,estado,fecha_hora,anulado_at,anulado_user_id,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
+                'pagos:id,venta_id,user_id,monto,estado,fecha_hora,anulado_at,anulado_user_id,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
                 'pagos.user:id,name',
                 'pagos.anuladoPor:id,name',
             ])
@@ -48,7 +48,7 @@ class CobranzasController extends Controller
         $deudasManuales = CobranzasDeuda::query()
             ->with([
                 'cliente:id,nombre,ci,telefono,direccion',
-                'pagos:id,deuda_id,monto,estado,fecha_hora,anulado_at,anulado_user_id,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
+                'pagos:id,deuda_id,user_id,monto,estado,fecha_hora,anulado_at,anulado_user_id,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
                 'pagos.user:id,name',
                 'pagos.anuladoPor:id,name',
             ])
@@ -533,7 +533,7 @@ class CobranzasController extends Controller
 
         $ventas = Venta::query()
             ->with([
-                'pagos:id,venta_id,monto,estado,fecha_hora,anulado_at,anulado_user_id,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
+                'pagos:id,venta_id,user_id,monto,estado,fecha_hora,anulado_at,anulado_user_id,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
                 'pagos.user:id,name',
                 'pagos.anuladoPor:id,name',
             ])
@@ -548,7 +548,7 @@ class CobranzasController extends Controller
 
         $deudas = CobranzasDeuda::query()
             ->with([
-                'pagos:id,deuda_id,monto,estado,fecha_hora,anulado_at,anulado_user_id,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
+                'pagos:id,deuda_id,user_id,monto,estado,fecha_hora,anulado_at,anulado_user_id,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
                 'pagos.user:id,name',
                 'pagos.anuladoPor:id,name',
             ])

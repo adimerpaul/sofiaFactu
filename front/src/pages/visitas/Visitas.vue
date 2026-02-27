@@ -148,6 +148,7 @@
                 outlined
                 emit-value
                 map-options
+                clearable
               />
             </div>
             <div class="col-12 col-md-12">
@@ -398,6 +399,7 @@ export default {
       facturadoPedido: false,
       fechaPedido: new Date().toISOString().slice(0, 10),
       horariosPedido: [
+        { label: 'Sin horario', value: null },
         { label: '06:00-07:30', value: '06:00-07:30' },
         { label: '07:30-09:00', value: '07:30-09:00' },
         { label: '09:00-10:30', value: '09:00-10:30' },
@@ -405,7 +407,7 @@ export default {
         { label: 'SEGUNDA VUELTA', value: 'SEGUNDA VUELTA' },
         { label: 'SE RECOGE', value: 'SE RECOGE' },
       ],
-      horaPedido: '06:00-07:30',
+      horaPedido: null,
       productos: [],
       productosSource: [],
       productoSeleccionado: null,
@@ -726,7 +728,7 @@ export default {
         this.pedidoItems = []
         this.facturadoPedido = false
         this.fechaPedido = new Date().toISOString().slice(0, 10)
-        this.horaPedido = this.horariosPedido[0].value
+        this.horaPedido = null
         this.dialogPedido = true
         return
       }

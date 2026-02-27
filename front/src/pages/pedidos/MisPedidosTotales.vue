@@ -123,6 +123,10 @@
         <tr v-for="pedido in pedidosFiltrados" :key="pedido.id">
           <td>
             <q-btn-dropdown v-if="isEditable(pedido)" color="primary" label="Opciones" dense no-caps size="10px">
+              <q-item clickable v-close-popup @click="verPedido(pedido)">
+                <q-item-section avatar><q-icon name="visibility" /></q-item-section>
+                <q-item-section>Ver</q-item-section>
+              </q-item>
               <q-item clickable v-close-popup @click="editarPedido(pedido)">
                 <q-item-section avatar><q-icon name="edit" /></q-item-section>
                 <q-item-section>Editar</q-item-section>
@@ -132,7 +136,10 @@
                 <q-item-section>Mandar</q-item-section>
               </q-item>
             </q-btn-dropdown>
-            <q-chip v-else dense color="green-7" text-color="white">Ya mandado</q-chip>
+            <div v-else class="row items-center q-gutter-xs">
+              <q-chip dense color="green-7" text-color="white">Ya mandado</q-chip>
+              <q-btn dense flat color="primary" icon="visibility" label="Ver" no-caps @click="verPedido(pedido)" />
+            </div>
           </td>
           <td>{{ pedido.id }}</td>
           <td>{{ pedido.user?.name || '-' }}</td>
@@ -357,6 +364,46 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="dialogView">
+      <q-card style="width: 900px; max-width: 98vw;">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">Pedido #{{ viewPedido?.id }}</div>
+          <q-space />
+          <q-btn flat round dense icon="close" v-close-popup />
+        </q-card-section>
+        <q-card-section class="q-pt-sm">
+          <div class="row q-col-gutter-sm q-mb-sm">
+            <div class="col-12 col-md-3"><b>Vendedor:</b> {{ viewPedido?.user?.name || '-' }}</div>
+            <div class="col-12 col-md-3"><b>Cliente:</b> {{ viewPedido?.cliente?.nombre || '-' }}</div>
+            <div class="col-12 col-md-2"><b>Fecha/Hora:</b> {{ viewPedido?.fecha || '-' }} {{ viewPedido?.hora || '-' }}</div>
+            <div class="col-12 col-md-2"><b>Pago:</b> {{ viewPedido?.tipo_pago || '-' }}</div>
+            <div class="col-12 col-md-2"><b>Estado:</b> {{ viewPedido?.estado || '-' }}</div>
+          </div>
+          <q-markup-table dense flat bordered>
+            <thead>
+            <tr>
+              <th>Codigo</th>
+              <th>Producto</th>
+              <th>Cantidad</th>
+              <th>Precio</th>
+              <th>Subtotal</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr v-for="d in (viewPedido?.detalles || [])" :key="d.id">
+              <td>{{ d.producto?.codigo || d.producto_id }}</td>
+              <td>{{ d.producto?.nombre || ('Producto ' + d.producto_id) }}</td>
+              <td>{{ Number(d.cantidad || 0).toFixed(2) }}</td>
+              <td>{{ Number(d.precio || 0).toFixed(2) }}</td>
+              <td>{{ (Number(d.cantidad || 0) * Number(d.precio || 0)).toFixed(2) }}</td>
+            </tr>
+            </tbody>
+          </q-markup-table>
+          <div class="text-h6 q-mt-sm text-right">Total: {{ totalView.toFixed(2) }} Bs.</div>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -396,6 +443,8 @@ const stats = ref({
 
 const dialogEdit = ref(false)
 const dialogDetalle = ref(false)
+const dialogView = ref(false)
+const viewPedido = ref(null)
 const detalleEditIndex = ref(-1)
 const detalleEdit = ref({})
 const detalleTipo = ref('NORMAL')
@@ -429,6 +478,7 @@ const tipoFiltroOptions = [
 
 const enviables = computed(() => pedidosFiltrados.value.filter(p => isEditable(p)))
 const totalEdit = computed(() => editForm.value.productos.reduce((acc, p) => acc + (Number(p.cantidad || 0) * Number(p.precio || 0)), 0))
+const totalView = computed(() => (viewPedido.value?.detalles || []).reduce((acc, d) => acc + (Number(d.cantidad || 0) * Number(d.precio || 0)), 0))
 const detalleTipoLabel = computed(() => detalleTipo.value === 'RES' ? 'Res' : detalleTipo.value === 'CERDO' ? 'Cerdo' : detalleTipo.value === 'POLLO' ? 'Pollo' : 'Normal')
 
 const pedidosFiltrados = computed(() => {
@@ -591,6 +641,11 @@ function editarPedido (pedido) {
     }))
   }
   dialogEdit.value = true
+}
+
+function verPedido (pedido) {
+  viewPedido.value = pedido
+  dialogView.value = true
 }
 
 async function guardarEdicion () {

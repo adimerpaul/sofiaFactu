@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <q-page class="q-pa-sm misped-page">
     <q-card flat bordered class="hero-card q-mb-sm">
       <q-card-section class="row items-center q-col-gutter-sm">
@@ -289,320 +289,305 @@
   </q-page>
 </template>
 
-<script setup>
-import { computed, getCurrentInstance, onMounted, ref } from 'vue'
-
-const { proxy } = getCurrentInstance()
-
-const today = new Date().toISOString().slice(0, 10)
-const fechaInicio = ref(today)
-const fechaFin = ref(today)
-const loading = ref(false)
-const loadingFacturar = ref(false)
-const loadingPrintFacturas = ref(false)
-const loadingPrintVouchers = ref(false)
-const saving = ref(false)
-const search = ref('')
-const soloFactura = ref(false)
-
-const ventas = ref([])
-const pedidosSinVenta = ref([])
-const stats = ref({
-  total_ventas: 0,
-  monto_total_ventas: 0,
-  ventas_facturadas: 0,
-  ventas_no_facturadas: 0,
-  pendientes_factura: 0,
-  pedidos_sin_venta: 0,
-})
-
-const dialogEdit = ref(false)
-const editForm = ref({
-  venta_id: null,
-  tipo_pago: 'Efectivo',
-  facturado: false,
-  factura_estado: 'SIN_GESTION',
-  observaciones: '',
-  productos: [],
-})
-
-const tipoPagoVentaOptions = [
-  { label: 'Efectivo', value: 'Efectivo' },
-  { label: 'QR', value: 'QR' },
-  { label: 'Contado', value: 'Contado' },
-  { label: 'Credito', value: 'Credito' },
-  { label: 'Boleta anterior', value: 'Boleta anterior' },
-]
-
-const facturaEstadoOptions = [
-  { label: 'Sin gestion', value: 'SIN_GESTION' },
-  { label: 'Pendiente', value: 'PENDIENTE' },
-  { label: 'Facturado', value: 'FACTURADO' },
-]
-
-const ventasFiltradas = computed(() => {
-  const term = search.value.trim().toLowerCase()
-  if (!term) return ventas.value
-  return ventas.value.filter((v) => {
-    const productos = (v.productos || []).map(x => `${x.nombre} ${x.codigo}`).join(' ').toLowerCase()
-    const s = `${v.comanda || ''} ${v.vendedor || ''} ${v.cliente || ''} ${v.venta_id || ''} ${productos}`.toLowerCase()
-    return s.includes(term)
-  })
-})
-
-const totalEdit = computed(() => {
-  return (editForm.value.productos || []).reduce((acc, d) => acc + (Number(d.cantidad || 0) * Number(d.precio || 0)), 0)
-})
-
-function tipoColor(tipo) {
-  const t = String(tipo || 'NORMAL').toUpperCase()
-  if (t === 'POLLO') return 'orange'
-  if (t === 'RES') return 'red'
-  if (t === 'CERDO') return 'brown'
-  return 'primary'
-}
-
-function isBloqueada(venta) {
-  const facturado = !!venta?.facturado
-  const emitida = String(venta?.factura_estado || '').toUpperCase() === 'FACTURADO'
-  const activa = String(venta?.estado || '').toUpperCase() === 'ACTIVO'
-  return facturado && emitida && activa
-}
-
-async function cargarVentas() {
-  loading.value = true
-  try {
-    const res = await proxy.$axios.get('/digitador-factura/pedidos', {
-      params: {
-        fecha_inicio: fechaInicio.value,
-        fecha_fin: fechaFin.value,
-        solo_factura: soloFactura.value,
+<script>
+export default {
+  name: 'DigitadorFactura',
+  data() {
+    const today = new Date().toISOString().slice(0, 10)
+    return {
+      fechaInicio: today,
+      fechaFin: today,
+      loading: false,
+      loadingFacturar: false,
+      loadingPrintFacturas: false,
+      loadingPrintVouchers: false,
+      saving: false,
+      search: '',
+      soloFactura: false,
+      ventas: [],
+      pedidosSinVenta: [],
+      stats: {
+        total_ventas: 0,
+        monto_total_ventas: 0,
+        ventas_facturadas: 0,
+        ventas_no_facturadas: 0,
+        pendientes_factura: 0,
+        pedidos_sin_venta: 0,
       },
-    })
-    ventas.value = Array.isArray(res.data?.data) ? res.data.data : []
-    pedidosSinVenta.value = Array.isArray(res.data?.pedidos_sin_venta) ? res.data.pedidos_sin_venta : []
-    stats.value = res.data?.stats || stats.value
-  } catch (e) {
-    proxy.$alert.error(e?.response?.data?.message || 'No se pudo cargar ventas de digitador factura')
-  } finally {
-    loading.value = false
-  }
-}
-
-function abrirEdicion(venta) {
-  if (isBloqueada(venta)) {
-    proxy.$alert.error('La factura ya fue generada. Anule la venta para volver a editar.')
-    return
-  }
-  editForm.value = {
-    venta_id: venta.venta_id,
-    tipo_pago: venta?.detalle_edit?.tipo_pago || venta.pago || 'Efectivo',
-    facturado: !!(venta?.detalle_edit?.facturado ?? venta.facturado),
-    factura_estado: venta?.detalle_edit?.factura_estado || venta.factura_estado || 'SIN_GESTION',
-    observaciones: venta?.detalle_edit?.observaciones || venta.observaciones || '',
-    productos: (venta?.detalle_edit?.productos || venta.productos || []).map((p) => ({
-      id: p.id,
-      codigo: p.codigo,
-      nombre: p.nombre,
-      tipo: p.tipo,
-      cantidad: Number(p.cantidad || 0),
-      precio: Number(p.precio || 0),
-    })),
-  }
-  dialogEdit.value = true
-}
-
-async function guardarEdicion() {
-  if (!editForm.value.venta_id) return
-  try {
-    saving.value = true
-    await proxy.$axios.put(`/digitador-factura/ventas/${editForm.value.venta_id}`, {
-      tipo_pago: editForm.value.tipo_pago,
-      facturado: !!editForm.value.facturado,
-      factura_estado: editForm.value.factura_estado,
-      observaciones: editForm.value.observaciones || null,
-      productos: (editForm.value.productos || []).map((d) => ({
-        id: d.id,
-        cantidad: Number(d.cantidad || 0),
-        precio: Number(d.precio || 0),
-      })),
-    })
-    proxy.$alert.success('Venta actualizada')
-    dialogEdit.value = false
-    await cargarVentas()
-  } catch (e) {
-    proxy.$alert.error(e?.response?.data?.message || 'No se pudo actualizar venta')
-  } finally {
-    saving.value = false
-  }
-}
-
-async function verificarImpuestos(venta) {
-  if (!venta?.cuf) return
-  try {
-    const res = await proxy.$axios.post(`/verificarImpuestos/${venta.cuf}`)
-    proxy.$q.dialog({
-      title: 'Verificacion de impuestos',
-      fullWidth: true,
-      message: `<pre>${JSON.stringify(res.data, null, 2)}</pre>`,
-      html: true,
-      ok: true,
-    })
-  } catch (e) {
-    proxy.$alert.error(e?.response?.data?.message || 'No se pudo verificar en impuestos')
-  }
-}
-
-function imprimirImpuestos(venta) {
-  if (!venta?.cuf) return
-  window.open(`${proxy.$store.env.url2}consulta/QR?nit=${proxy.$store.env.nit}&cuf=${venta.cuf}&numero=${venta.venta_id}&t=2`, '_blank')
-}
-
-async function anularVenta(venta) {
-  const ok = await new Promise((resolve) => {
-    proxy.$alert.dialog('Desea anular la venta?')
-      .onOk(() => resolve(true))
-      .onCancel(() => resolve(false))
-  })
-  if (!ok) return
-
-  try {
-    await proxy.$axios.put(`/ventasAnular/${venta.venta_id}`)
-    proxy.$alert.success('Venta anulada')
-    await cargarVentas()
-  } catch (e) {
-    proxy.$alert.error(e?.response?.data?.message || 'No se pudo anular la venta')
-  }
-}
-
-async function generarFacturaTodos() {
-  const ok = await new Promise((resolve) => {
-    proxy.$alert.dialog('Seguro que quiere facturar todas las ventas pendientes del rango?')
-      .onOk(() => resolve(true))
-      .onCancel(() => resolve(false))
-  })
-  if (!ok) return
-
-  loadingFacturar.value = true
-  try {
-    const res = await proxy.$axios.post('/digitador-factura/generar-factura-todos', {
-      fecha_inicio: fechaInicio.value,
-      fecha_fin: fechaFin.value,
-    })
-    const ok = Number(res.data?.facturadas || 0)
-    const err = Number(res.data?.errores || 0)
-    proxy.$alert.success(`${res.data?.message || 'Proceso ejecutado'} | Facturadas: ${ok} | Errores: ${err}`)
-    await cargarVentas()
-  } catch (e) {
-    proxy.$alert.error(e?.response?.data?.message || 'No se pudo marcar facturacion masiva')
-  } finally {
-    loadingFacturar.value = false
-  }
-}
-
-async function descargarPdf(url, loadingRef) {
-  loadingRef.value = true
-  try {
-    const res = await proxy.$axios.get(url, {
-      params: {
-        fecha_inicio: fechaInicio.value,
-        fecha_fin: fechaFin.value,
+      dialogEdit: false,
+      editForm: {
+        venta_id: null,
+        tipo_pago: 'Efectivo',
+        facturado: false,
+        factura_estado: 'SIN_GESTION',
+        observaciones: '',
+        productos: [],
       },
-      responseType: 'blob',
-    })
-    const blob = new Blob([res.data], { type: 'application/pdf' })
-    const disposition = res?.headers?.['content-disposition'] || ''
-    const match = disposition.match(/filename="?([^"]+)"?/)
-    const fileName = match?.[1] || 'reporte.pdf'
-    const link = document.createElement('a')
-    const fileUrl = window.URL.createObjectURL(blob)
-    link.href = fileUrl
-    link.download = fileName
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    window.URL.revokeObjectURL(fileUrl)
-  } catch (e) {
-    proxy.$alert.error(e?.response?.data?.message || 'No se pudo generar el PDF')
-  } finally {
-    loadingRef.value = false
-  }
-}
-
-async function descargarPdfIndividual(url) {
-  try {
-    const res = await proxy.$axios.get(url, { responseType: 'blob' })
-    const blob = new Blob([res.data], { type: 'application/pdf' })
-    const disposition = res?.headers?.['content-disposition'] || ''
-    const match = disposition.match(/filename="?([^"]+)"?/)
-    const fileName = match?.[1] || 'documento.pdf'
-    const link = document.createElement('a')
-    const fileUrl = window.URL.createObjectURL(blob)
-    link.href = fileUrl
-    link.download = fileName
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    window.URL.revokeObjectURL(fileUrl)
-  } catch (e) {
-    proxy.$alert.error(e?.response?.data?.message || 'No se pudo generar el PDF')
-  }
-}
-
-async function imprimirFacturaIndividual(venta) {
-  await descargarPdfIndividual(`/digitador-factura/reportes/facturas/${venta.venta_id}`)
-}
-
-async function imprimirVoucherIndividual(venta) {
-  await descargarPdfIndividual(`/digitador-factura/reportes/vouchers/${venta.venta_id}`)
-}
-
-async function compartirPdf(url, fallbackName) {
-  try {
-    const res = await proxy.$axios.get(url, { responseType: 'blob' })
-    const blob = new Blob([res.data], { type: 'application/pdf' })
-    const disposition = res?.headers?.['content-disposition'] || ''
-    const match = disposition.match(/filename="?([^"]+)"?/)
-    const fileName = match?.[1] || fallbackName
-
-    const file = new File([blob], fileName, { type: 'application/pdf' })
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: fileName })
-      return
+      tipoPagoVentaOptions: [
+        { label: 'Efectivo', value: 'Efectivo' },
+        { label: 'QR', value: 'QR' },
+        { label: 'Contado', value: 'Contado' },
+        { label: 'Credito', value: 'Credito' },
+        { label: 'Boleta anterior', value: 'Boleta anterior' },
+      ],
+      facturaEstadoOptions: [
+        { label: 'Sin gestion', value: 'SIN_GESTION' },
+        { label: 'Pendiente', value: 'PENDIENTE' },
+        { label: 'Facturado', value: 'FACTURADO' },
+      ],
     }
+  },
+  computed: {
+    ventasFiltradas() {
+      const term = String(this.search || '').trim().toLowerCase()
+      if (!term) return this.ventas
+      return this.ventas.filter((v) => {
+        const productos = (v.productos || []).map((x) => `${x.nombre} ${x.codigo}`).join(' ').toLowerCase()
+        const s = `${v.comanda || ''} ${v.vendedor || ''} ${v.cliente || ''} ${v.venta_id || ''} ${productos}`.toLowerCase()
+        return s.includes(term)
+      })
+    },
+    totalEdit() {
+      return (this.editForm.productos || []).reduce((acc, d) => acc + (Number(d.cantidad || 0) * Number(d.precio || 0)), 0)
+    },
+  },
+  mounted() {
+    this.cargarVentas()
+  },
+  methods: {
+    tipoColor(tipo) {
+      const t = String(tipo || 'NORMAL').toUpperCase()
+      if (t === 'POLLO') return 'orange'
+      if (t === 'RES') return 'red'
+      if (t === 'CERDO') return 'brown'
+      return 'primary'
+    },
+    isBloqueada(venta) {
+      const facturado = !!(venta && venta.facturado)
+      const emitida = String((venta && venta.factura_estado) || '').toUpperCase() === 'FACTURADO'
+      const activa = String((venta && venta.estado) || '').toUpperCase() === 'ACTIVO'
+      return facturado && emitida && activa
+    },
+    async cargarVentas() {
+      this.loading = true
+      try {
+        const res = await this.$axios.get('/digitador-factura/pedidos', {
+          params: {
+            fecha_inicio: this.fechaInicio,
+            fecha_fin: this.fechaFin,
+            solo_factura: this.soloFactura,
+          },
+        })
+        const data = res && res.data ? res.data : {}
+        this.ventas = Array.isArray(data.data) ? data.data : []
+        this.pedidosSinVenta = Array.isArray(data.pedidos_sin_venta) ? data.pedidos_sin_venta : []
+        this.stats = data.stats || this.stats
+      } catch (e) {
+        this.$alert.error((e && e.response && e.response.data && e.response.data.message) || 'No se pudo cargar ventas de digitador factura')
+      } finally {
+        this.loading = false
+      }
+    },
+    abrirEdicion(venta) {
+      if (this.isBloqueada(venta)) {
+        this.$alert.error('La factura ya fue generada. Anule la venta para volver a editar.')
+        return
+      }
+      const detalleEdit = venta && venta.detalle_edit ? venta.detalle_edit : {}
+      this.editForm = {
+        venta_id: venta.venta_id,
+        tipo_pago: detalleEdit.tipo_pago || venta.pago || 'Efectivo',
+        facturado: !!(typeof detalleEdit.facturado !== 'undefined' ? detalleEdit.facturado : venta.facturado),
+        factura_estado: detalleEdit.factura_estado || venta.factura_estado || 'SIN_GESTION',
+        observaciones: detalleEdit.observaciones || venta.observaciones || '',
+        productos: (detalleEdit.productos || venta.productos || []).map((p) => ({
+          id: p.id,
+          codigo: p.codigo,
+          nombre: p.nombre,
+          tipo: p.tipo,
+          cantidad: Number(p.cantidad || 0),
+          precio: Number(p.precio || 0),
+        })),
+      }
+      this.dialogEdit = true
+    },
+    async guardarEdicion() {
+      if (!this.editForm.venta_id) return
+      try {
+        this.saving = true
+        await this.$axios.put(`/digitador-factura/ventas/${this.editForm.venta_id}`, {
+          tipo_pago: this.editForm.tipo_pago,
+          facturado: !!this.editForm.facturado,
+          factura_estado: this.editForm.factura_estado,
+          observaciones: this.editForm.observaciones || null,
+          productos: (this.editForm.productos || []).map((d) => ({
+            id: d.id,
+            cantidad: Number(d.cantidad || 0),
+            precio: Number(d.precio || 0),
+          })),
+        })
+        this.$alert.success('Venta actualizada')
+        this.dialogEdit = false
+        await this.cargarVentas()
+      } catch (e) {
+        this.$alert.error((e && e.response && e.response.data && e.response.data.message) || 'No se pudo actualizar venta')
+      } finally {
+        this.saving = false
+      }
+    },
+    async verificarImpuestos(venta) {
+      if (!(venta && venta.cuf)) return
+      try {
+        const res = await this.$axios.post(`/verificarImpuestos/${venta.cuf}`)
+        this.$q.dialog({
+          title: 'Verificacion de impuestos',
+          fullWidth: true,
+          message: `<pre>${JSON.stringify(res.data, null, 2)}</pre>`,
+          html: true,
+          ok: true,
+        })
+      } catch (e) {
+        this.$alert.error((e && e.response && e.response.data && e.response.data.message) || 'No se pudo verificar en impuestos')
+      }
+    },
+    imprimirImpuestos(venta) {
+      if (!(venta && venta.cuf)) return
+      window.open(`${this.$store.env.url2}consulta/QR?nit=${this.$store.env.nit}&cuf=${venta.cuf}&numero=${venta.venta_id}&t=2`, '_blank')
+    },
+    async anularVenta(venta) {
+      const ok = await new Promise((resolve) => {
+        this.$alert.dialog('Desea anular la venta?')
+          .onOk(() => resolve(true))
+          .onCancel(() => resolve(false))
+      })
+      if (!ok) return
 
-    // Fallback: descarga directa si el navegador no soporta compartir archivos.
-    const link = document.createElement('a')
-    const fileUrl = window.URL.createObjectURL(blob)
-    link.href = fileUrl
-    link.download = fileName
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    window.URL.revokeObjectURL(fileUrl)
-    proxy.$alert.error('Tu navegador no permite compartir PDF directo. Se descargó el archivo para enviarlo por WhatsApp.')
-  } catch (e) {
-    proxy.$alert.error(e?.response?.data?.message || 'No se pudo preparar el PDF para compartir')
-  }
+      try {
+        await this.$axios.put(`/ventasAnular/${venta.venta_id}`)
+        this.$alert.success('Venta anulada')
+        await this.cargarVentas()
+      } catch (e) {
+        this.$alert.error((e && e.response && e.response.data && e.response.data.message) || 'No se pudo anular la venta')
+      }
+    },
+    async generarFacturaTodos() {
+      const ok = await new Promise((resolve) => {
+        this.$alert.dialog('Seguro que quiere facturar todas las ventas pendientes del rango?')
+          .onOk(() => resolve(true))
+          .onCancel(() => resolve(false))
+      })
+      if (!ok) return
+
+      this.loadingFacturar = true
+      try {
+        const res = await this.$axios.post('/digitador-factura/generar-factura-todos', {
+          fecha_inicio: this.fechaInicio,
+          fecha_fin: this.fechaFin,
+        })
+        const okCount = Number((res && res.data && res.data.facturadas) || 0)
+        const errCount = Number((res && res.data && res.data.errores) || 0)
+        this.$alert.success(`${(res && res.data && res.data.message) || 'Proceso ejecutado'} | Facturadas: ${okCount} | Errores: ${errCount}`)
+        await this.cargarVentas()
+      } catch (e) {
+        this.$alert.error((e && e.response && e.response.data && e.response.data.message) || 'No se pudo marcar facturacion masiva')
+      } finally {
+        this.loadingFacturar = false
+      }
+    },
+    async descargarPdf(url, loadingKey) {
+      this[loadingKey] = true
+      try {
+        const res = await this.$axios.get(url, {
+          params: {
+            fecha_inicio: this.fechaInicio,
+            fecha_fin: this.fechaFin,
+          },
+          responseType: 'blob',
+        })
+        const blob = new Blob([res.data], { type: 'application/pdf' })
+        const disposition = (res && res.headers && res.headers['content-disposition']) || ''
+        const match = disposition.match(/filename="?([^"]+)"?/)
+        const fileName = (match && match[1]) || 'reporte.pdf'
+        const link = document.createElement('a')
+        const fileUrl = window.URL.createObjectURL(blob)
+        link.href = fileUrl
+        link.download = fileName
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.URL.revokeObjectURL(fileUrl)
+      } catch (e) {
+        this.$alert.error((e && e.response && e.response.data && e.response.data.message) || 'No se pudo generar el PDF')
+      } finally {
+        this[loadingKey] = false
+      }
+    },
+    async descargarPdfIndividual(url) {
+      try {
+        const res = await this.$axios.get(url, { responseType: 'blob' })
+        const blob = new Blob([res.data], { type: 'application/pdf' })
+        const disposition = (res && res.headers && res.headers['content-disposition']) || ''
+        const match = disposition.match(/filename="?([^"]+)"?/)
+        const fileName = (match && match[1]) || 'documento.pdf'
+        const link = document.createElement('a')
+        const fileUrl = window.URL.createObjectURL(blob)
+        link.href = fileUrl
+        link.download = fileName
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.URL.revokeObjectURL(fileUrl)
+      } catch (e) {
+        this.$alert.error((e && e.response && e.response.data && e.response.data.message) || 'No se pudo generar el PDF')
+      }
+    },
+    async imprimirFacturaIndividual(venta) {
+      await this.descargarPdfIndividual(`/digitador-factura/reportes/facturas/${venta.venta_id}`)
+    },
+    async imprimirVoucherIndividual(venta) {
+      await this.descargarPdfIndividual(`/digitador-factura/reportes/vouchers/${venta.venta_id}`)
+    },
+    async compartirPdf(url, fallbackName) {
+      try {
+        const res = await this.$axios.get(url, { responseType: 'blob' })
+        const blob = new Blob([res.data], { type: 'application/pdf' })
+        const disposition = (res && res.headers && res.headers['content-disposition']) || ''
+        const match = disposition.match(/filename="?([^"]+)"?/)
+        const fileName = (match && match[1]) || fallbackName
+
+        const file = new File([blob], fileName, { type: 'application/pdf' })
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: fileName })
+          return
+        }
+
+        const link = document.createElement('a')
+        const fileUrl = window.URL.createObjectURL(blob)
+        link.href = fileUrl
+        link.download = fileName
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.URL.revokeObjectURL(fileUrl)
+        this.$alert.error('Tu navegador no permite compartir PDF directo. Se descargo el archivo para enviarlo por WhatsApp.')
+      } catch (e) {
+        this.$alert.error((e && e.response && e.response.data && e.response.data.message) || 'No se pudo preparar el PDF para compartir')
+      }
+    },
+    async mandarWhatsappFactura(venta) {
+      await this.compartirPdf(`/digitador-factura/reportes/facturas/${venta.venta_id}`, `factura_venta_${venta.venta_id}.pdf`)
+    },
+    async mandarWhatsappVoucher(venta) {
+      await this.compartirPdf(`/digitador-factura/reportes/vouchers/${venta.venta_id}`, `voucher_venta_${venta.venta_id}.pdf`)
+    },
+    async imprimirFacturasMasivo() {
+      await this.descargarPdf('/digitador-factura/reportes/facturas', 'loadingPrintFacturas')
+    },
+    async imprimirVouchersMasivo() {
+      await this.descargarPdf('/digitador-factura/reportes/vouchers', 'loadingPrintVouchers')
+    },
+  },
 }
-
-async function mandarWhatsappFactura(venta) {
-  await compartirPdf(`/digitador-factura/reportes/facturas/${venta.venta_id}`, `factura_venta_${venta.venta_id}.pdf`)
-}
-
-async function mandarWhatsappVoucher(venta) {
-  await compartirPdf(`/digitador-factura/reportes/vouchers/${venta.venta_id}`, `voucher_venta_${venta.venta_id}.pdf`)
-}
-
-async function imprimirFacturasMasivo() {
-  await descargarPdf('/digitador-factura/reportes/facturas', loadingPrintFacturas)
-}
-
-async function imprimirVouchersMasivo() {
-  await descargarPdf('/digitador-factura/reportes/vouchers', loadingPrintVouchers)
-}
-
-onMounted(cargarVentas)
 </script>
 
 <style scoped>
@@ -617,3 +602,4 @@ onMounted(cargarVentas)
     #fff;
 }
 </style>
+

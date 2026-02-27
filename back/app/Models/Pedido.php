@@ -19,6 +19,9 @@ class Pedido extends Model {
         'hora',
         'estado',
         'auxiliar_estado',
+        'despacho_estado',
+        'entrega_at',
+        'despachador_user_id',
         'auxiliar_observacion',
         'auxiliar_hecho_at',
         'venta_generada',
@@ -44,8 +47,10 @@ class Pedido extends Model {
         'pedido_zona_id' => 'integer',
         'usuario_camion_id' => 'integer',
         'auxiliar_user_id' => 'integer',
+        'despachador_user_id' => 'integer',
         'venta_id' => 'integer',
         'auxiliar_hecho_at' => 'datetime',
+        'entrega_at' => 'datetime',
         'venta_generada' => 'boolean',
     ];
 
@@ -62,6 +67,9 @@ class Pedido extends Model {
     }
     public function auxiliarUser() {
         return $this->belongsTo(User::class, 'auxiliar_user_id');
+    }
+    public function despachadorUser() {
+        return $this->belongsTo(User::class, 'despachador_user_id');
     }
     public function venta() {
         return $this->belongsTo(Venta::class, 'venta_id');

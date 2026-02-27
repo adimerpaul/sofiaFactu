@@ -46,6 +46,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/digitador-factura/reportes/vouchers', [App\Http\Controllers\DigitadorFacturaController::class, 'imprimirVouchers']);
     Route::get('/digitador-factura/reportes/facturas/{venta}', [App\Http\Controllers\DigitadorFacturaController::class, 'imprimirFacturaVenta']);
     Route::get('/digitador-factura/reportes/vouchers/{venta}', [App\Http\Controllers\DigitadorFacturaController::class, 'imprimirVoucherVenta']);
+    Route::get('/despachador/rutas', [App\Http\Controllers\DespachadorController::class, 'rutas']);
+    Route::post('/despachador/pagos', [App\Http\Controllers\DespachadorController::class, 'registrarPago']);
+    Route::put('/despachador/pagos/{pago}', [App\Http\Controllers\DespachadorController::class, 'actualizarPago']);
+    Route::put('/despachador/pedidos/{pedido}/estado', [App\Http\Controllers\DespachadorController::class, 'actualizarEstadoPedido']);
+    Route::get('/despachador/despacho', [App\Http\Controllers\DespachadorController::class, 'despacho']);
+    Route::get('/despachador/reportes/vouchers', [App\Http\Controllers\DespachadorController::class, 'imprimirVouchers']);
+    Route::get('/despachador/reportes/vouchers/{venta}', [App\Http\Controllers\DespachadorController::class, 'imprimirVoucherVenta']);
 
 
     Route::get('/productos/{id}/historial-compras-ventas', [App\Http\Controllers\ProductoController::class, 'historialComprasVentas']);

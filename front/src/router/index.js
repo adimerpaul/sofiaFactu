@@ -34,8 +34,10 @@ export default defineRouter(function (/* { store, ssrContext } */) {
   Router.beforeEach((to, from, next) => {
     if (to.matched.some(record => record.meta.requiresAuth)) {
       if (useCounterStore().isLogged) {
+        const isCamion = !!useCounterStore().user?.es_camion
         const requiredPermission = to.meta?.permission
-        if (requiredPermission && !hasPermission(useCounterStore().permissions, requiredPermission)) {
+        const allowCamion = !!to.meta?.allowCamion
+        if (requiredPermission && !hasPermission(useCounterStore().permissions, requiredPermission) && !(allowCamion && isCamion)) {
           next('/')
           return
         }

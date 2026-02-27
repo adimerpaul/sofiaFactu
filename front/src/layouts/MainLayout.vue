@@ -173,6 +173,8 @@ onMounted(() => {
     { title: 'Mapa zonas', icon: 'palette', link: '/mapa-zonas', perm: 'Mapa cliente zonas'},
     { title: 'Auxiliar de camara', icon: 'warehouse', link: '/auxiliar-camara', perm: 'Auxiliar de camara'},
     { title: 'Digitador factura', icon: 'receipt_long', link: '/digitador-factura', perm: 'Digitador factura'},
+    { title: 'Rutas', icon: 'route', link: '/rutas-camion', perm: 'Rutas', esCamion: true },
+    { title: 'Despacho', icon: 'local_shipping', link: '/despacho-camion', perm: 'Despacho', esCamion: true },
     { title: 'Realizar pedido', icon: 'shopping_cart_checkout', link: '/pedidosCompra', perm: 'Nuevo Pedido'},
   ]
   linksList.value = baseLinks
@@ -230,9 +232,11 @@ function logout() {
 function canSee(link) {
   if (!link || !proxy.$store?.user) return false
   if (link.always) return true
+  const isCamion = !!proxy.$store.user.es_camion
   const perms = (proxy.$store.permissions || []).map(p => typeof p === 'string' ? p : p?.name).filter(Boolean)
   const requiredPerm = link.perm || link.title
-  return perms.includes(requiredPerm)
+  if (perms.includes(requiredPerm)) return true
+  return !!link.esCamion && isCamion
 }
 function loadFallas(showError = false) {
   proxy.$axios.get('/impuestos/fallas')

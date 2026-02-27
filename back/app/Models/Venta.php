@@ -47,6 +47,9 @@ class Venta extends Model{
     function ventaDetalles(){
         return $this->hasMany(VentaDetalle::class);
     }
+    function pagos(){
+        return $this->hasMany(Pago::class);
+    }
     protected $appends = ['detailsText'];
     function getDetailsTextAttribute(){
         $detailsText = '';

@@ -20,6 +20,7 @@ class Venta extends Model{
         'total',
 //        'tipo_venta',
         'tipo_pago',
+        'considerar_en_cobranza',
         'facturado',
         'factura_estado',
         'factura_error',
@@ -33,6 +34,7 @@ class Venta extends Model{
     protected $casts = [
         'facturado' => 'boolean',
         'online' => 'boolean',
+        'considerar_en_cobranza' => 'boolean',
     ];
     protected $hidden = ['created_at', 'updated_at', 'deleted_at'];
     function user(){

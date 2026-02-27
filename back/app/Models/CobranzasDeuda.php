@@ -17,6 +17,7 @@ class CobranzasDeuda extends Model
         'direccion',
         'monto_total',
         'tolerancia_centavos',
+        'considerar_en_cobranza',
         'fecha',
         'estado',
         'observacion',
@@ -25,6 +26,7 @@ class CobranzasDeuda extends Model
     protected $casts = [
         'monto_total' => 'float',
         'tolerancia_centavos' => 'float',
+        'considerar_en_cobranza' => 'boolean',
         'fecha' => 'date:Y-m-d',
     ];
 
@@ -43,4 +45,3 @@ class CobranzasDeuda extends Model
         return $this->hasMany(CobranzasDeudaPago::class, 'deuda_id');
     }
 }
-

@@ -55,7 +55,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/despachador/reportes/vouchers/{venta}', [App\Http\Controllers\DespachadorController::class, 'imprimirVoucherVenta']);
     Route::get('/cobranzas/deudores', [App\Http\Controllers\CobranzasController::class, 'deudores']);
     Route::get('/cobranzas/historial-clientes', [App\Http\Controllers\CobranzasController::class, 'historialClientes']);
+    Route::get('/cobranzas/historial-clientes/{cliente}', [App\Http\Controllers\CobranzasController::class, 'historialClienteDetalle']);
     Route::get('/cobranzas/clientes', [App\Http\Controllers\CobranzasController::class, 'clientes']);
+    Route::put('/cobranzas/ventas/{venta}/considerar', [App\Http\Controllers\CobranzasController::class, 'cambiarConsiderarVenta']);
+    Route::put('/cobranzas/deudas-manuales/{deuda}/considerar', [App\Http\Controllers\CobranzasController::class, 'cambiarConsiderarDeuda']);
     Route::post('/cobranzas/deudas-manuales', [App\Http\Controllers\CobranzasController::class, 'crearDeudaManual']);
     Route::post('/cobranzas/pagos/ventas', [App\Http\Controllers\CobranzasController::class, 'registrarPagoVenta']);
     Route::put('/cobranzas/pagos/ventas/{pago}', [App\Http\Controllers\CobranzasController::class, 'actualizarPagoVenta']);

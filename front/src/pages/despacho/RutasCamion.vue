@@ -30,8 +30,8 @@
       <q-table
         dense
         flat
-        row-key="pedido_id"
-        :rows="rows"
+        row-key="cliente_key"
+        :rows="rowsClientes"
         :columns="columns"
         :pagination="{ rowsPerPage: 0 }"
         @row-click="(_, row) => openClienteDialog(row)"
@@ -75,21 +75,29 @@
               <template v-for="(p, idx) in dialogPedidos" :key="p.pedido_id">
                 <tr>
                   <td style="white-space: nowrap;">
-                    <q-btn-dropdown dense color="primary" no-caps label="Opciones" size="sm">
+                    <q-btn-dropdown
+                      dense
+                      color="primary"
+                      no-caps
+                      label="Opciones"
+                      size="sm"
+                      :loading="!!actionLoading[p.pedido_id]"
+                      :disable="loadingSaveAll || loadingEstado"
+                    >
                       <q-list>
                         <q-item clickable v-close-popup @click="toggleDetallePedido(p.pedido_id)">
                           <q-item-section avatar><q-icon :name="expandedPedidos[p.pedido_id] ? 'visibility_off' : 'visibility'" /></q-item-section>
                           <q-item-section>{{ expandedPedidos[p.pedido_id] ? 'Ocultar detalle' : 'Ver detalle' }}</q-item-section>
                         </q-item>
-                        <q-item clickable v-close-popup @click="cobrarPedido(p)" :disable="!p.venta_id || Number(p.saldo || 0) <= 0">
+                        <q-item clickable v-close-popup @click="cobrarPedido(p)" :disable="!p.venta_id || Number(p.saldo || 0) <= 0 || loadingSaveAll || loadingEstado || !!actionLoading[p.pedido_id]">
                           <q-item-section avatar><q-icon name="payments" /></q-item-section>
                           <q-item-section>Cobrar</q-item-section>
                         </q-item>
-                        <q-item clickable v-close-popup @click="guardarYSiguiente(p, idx)" :disable="!p.venta_id || Number(p.saldo || 0) <= 0">
+                        <q-item clickable v-close-popup @click="guardarYSiguiente(p, idx)" :disable="!p.venta_id || Number(p.saldo || 0) <= 0 || loadingSaveAll || loadingEstado || !!actionLoading[p.pedido_id]">
                           <q-item-section avatar><q-icon name="arrow_downward" /></q-item-section>
                           <q-item-section>Siguiente</q-item-section>
                         </q-item>
-                        <q-item clickable v-close-popup @click="modificarCobro(p)" :disable="!ultimoPagoId(p)">
+                        <q-item clickable v-close-popup @click="modificarCobro(p)" :disable="!ultimoPagoId(p) || loadingSaveAll || loadingEstado || !!actionLoading[p.pedido_id]">
                           <q-item-section avatar><q-icon name="edit" /></q-item-section>
                           <q-item-section>Modificar cobro</q-item-section>
                         </q-item>
@@ -119,6 +127,7 @@
                       type="number"
                       min="0"
                       step="0.01"
+                      :disable="loadingSaveAll || loadingEstado || !!actionLoading[p.pedido_id]"
                       @keyup.enter="guardarYSiguiente(p, idx)"
                     />
                   </td>
@@ -143,10 +152,10 @@
         </q-card-section>
         <q-separator />
         <q-card-actions align="right">
-          <q-btn color="primary" no-caps label="Guardar todo y bloquear" @click="guardarTodoYBloquear" />
-          <q-btn v-if="mostrarAccionesEstado" color="positive" no-caps label="Entregado" @click="actualizarEstadosCliente('ENTREGADO')" />
-          <q-btn v-if="mostrarAccionesEstado" color="amber-8" no-caps label="Volver mas tarde" @click="actualizarEstadosCliente('NO ENTREGADO')" />
-          <q-btn v-if="mostrarAccionesEstado" color="negative" no-caps label="Rechazado" @click="actualizarEstadosCliente('RECHAZADO')" />
+          <q-btn color="primary" no-caps label="Guardar todo y bloquear" :loading="loadingSaveAll" :disable="loadingEstado" @click="guardarTodoYBloquear" />
+          <q-btn v-if="mostrarAccionesEstado" color="positive" no-caps label="Entregado" :loading="loadingEstado" :disable="loadingSaveAll" @click="actualizarEstadosCliente('ENTREGADO')" />
+          <q-btn v-if="mostrarAccionesEstado" color="amber-8" no-caps label="Volver mas tarde" :loading="loadingEstado" :disable="loadingSaveAll" @click="actualizarEstadosCliente('NO ENTREGADO')" />
+          <q-btn v-if="mostrarAccionesEstado" color="negative" no-caps label="Rechazado" :loading="loadingEstado" :disable="loadingSaveAll" @click="actualizarEstadosCliente('RECHAZADO')" />
           <q-btn flat no-caps color="grey-8" label="Cerrar" v-close-popup />
         </q-card-actions>
       </q-card>
@@ -170,6 +179,9 @@ const selectedCliente = ref(null)
 const dialogPedidos = ref([])
 const expandedPedidos = ref({})
 const pagoInputRefs = ref({})
+const actionLoading = ref({})
+const loadingSaveAll = ref(false)
+const loadingEstado = ref(false)
 
 const mapRef = ref(null)
 const map = ref(null)
@@ -177,7 +189,7 @@ const layer = ref(null)
 let searchTimer = null
 
 const columns = [
-  { name: 'comanda', label: 'Comanda', field: 'comanda', align: 'left' },
+  { name: 'pedidos_count', label: 'Pedidos', field: 'pedidos_count', align: 'left' },
   { name: 'cliente', label: 'Cliente', field: 'cliente', align: 'left' },
   { name: 'tipo_pago_venta', label: 'Tipo pago', field: 'tipo_pago_venta', align: 'left' },
   { name: 'estado', label: 'Estado', field: 'despacho_estado', align: 'left' },
@@ -191,6 +203,58 @@ const mostrarAccionesEstado = computed(() => {
   if (!Array.isArray(dialogPedidos.value) || dialogPedidos.value.length === 0) return true
   return dialogPedidos.value.some((p) => !estadosFinales.includes(String(p.despacho_estado || '').toUpperCase()))
 })
+
+const rowsClientes = computed(() => {
+  const map = new Map()
+  rows.value.forEach((r) => {
+    const key = r?.cliente_id ? `cli-${r.cliente_id}` : `ped-${r.pedido_id}`
+    const base = map.get(key) || {
+      cliente_key: key,
+      cliente_id: r.cliente_id,
+      source_pedido_ids: [],
+      cliente: r.cliente,
+      telefono: r.telefono,
+      direccion: r.direccion,
+      latitud: r.latitud,
+      longitud: r.longitud,
+      pedidos_count: 0,
+      total: 0,
+      pagado: 0,
+      saldo: 0,
+      tipo_pago_venta: r.tipo_pago_venta || '',
+      despacho_estado: r.despacho_estado || 'PENDIENTE',
+    }
+    base.pedidos_count += 1
+    base.source_pedido_ids.push(r.pedido_id)
+    base.total = Number(base.total) + Number(r.total || 0)
+    base.pagado = Number(base.pagado) + Number(r.pagado || 0)
+    base.saldo = Number(base.saldo) + Number(r.saldo || 0)
+    if (String(base.tipo_pago_venta || '').toUpperCase().includes('CRED') || String(r.tipo_pago_venta || '').toUpperCase().includes('CRED')) {
+      base.tipo_pago_venta = 'MIXTO/CREDITO'
+    }
+    base.despacho_estado = mergeEstado(base.despacho_estado, r.despacho_estado)
+    map.set(key, base)
+  })
+  return Array.from(map.values()).map((x) => ({
+    ...x,
+    total: Number(x.total.toFixed(2)),
+    pagado: Number(x.pagado.toFixed(2)),
+    saldo: Number(x.saldo.toFixed(2)),
+  }))
+})
+
+function mergeEstado(a, b) {
+  const rank = {
+    'PENDIENTE': 0,
+    'PARCIAL': 1,
+    'NO ENTREGADO': 2,
+    'RECHAZADO': 3,
+    'ENTREGADO': 4,
+  }
+  const ea = String(a || 'PENDIENTE').toUpperCase()
+  const eb = String(b || 'PENDIENTE').toUpperCase()
+  return (rank[eb] ?? 0) > (rank[ea] ?? 0) ? eb : ea
+}
 
 function money(v) {
   const n = Number(v || 0)
@@ -255,8 +319,12 @@ async function loadRutas() {
 
 function openClienteDialog(row) {
   selectedCliente.value = row
+  const ids = Array.isArray(row?.source_pedido_ids) ? row.source_pedido_ids : []
   dialogPedidos.value = rows.value
-    .filter((x) => String(x.cliente_id) === String(row.cliente_id))
+    .filter((x) => {
+      if (ids.length) return ids.includes(x.pedido_id)
+      return String(x.cliente_id) === String(row.cliente_id)
+    })
     .map((x) => ({ ...x, pagoMonto: initialCobroMonto(x) }))
   expandedPedidos.value = {}
   pagoInputRefs.value = {}
@@ -290,6 +358,8 @@ function getCurrentLocation() {
 }
 
 async function cobrarPedido(p, reload = true) {
+  const pedidoKey = p?.pedido_id
+  actionLoading.value[pedidoKey] = true
   try {
     const monto = Number(Number(p.pagoMonto || 0).toFixed(2))
     if (!Number.isFinite(monto) || monto <= 0) {
@@ -324,6 +394,8 @@ async function cobrarPedido(p, reload = true) {
   } catch (e) {
     proxy.$alert.error(e?.response?.data?.message || 'No se pudo registrar cobro')
     return false
+  } finally {
+    actionLoading.value[pedidoKey] = false
   }
 }
 
@@ -400,29 +472,35 @@ async function guardarYSiguiente(p, idx) {
 }
 
 async function guardarTodoYBloquear() {
-  for (const p of dialogPedidos.value) {
-    const montoEscrito = Number(Number(p.pagoMonto || 0).toFixed(2))
-    const yaTienePago = !!ultimoPagoId(p)
-    if (montoEscrito <= 0 && yaTienePago) continue
-    if (montoEscrito <= 0 && !yaTienePago) continue
-    const ok = await cobrarPedido(p, false)
-    if (!ok) return
-  }
-  await loadRutas()
-  if (selectedCliente.value) {
-    const pick = rows.value.find((x) => String(x.cliente_id) === String(selectedCliente.value.cliente_id))
-    if (pick) {
-      openClienteDialog(pick)
-      for (const p of dialogPedidos.value) {
-        const saldo = Number(Number(p.saldo || 0).toFixed(2))
-        p.pagoMonto = saldo > 0 ? initialCobroMonto(p) : 0
+  loadingSaveAll.value = true
+  try {
+    for (const p of dialogPedidos.value) {
+      const montoEscrito = Number(Number(p.pagoMonto || 0).toFixed(2))
+      const yaTienePago = !!ultimoPagoId(p)
+      if (montoEscrito <= 0 && yaTienePago) continue
+      if (montoEscrito <= 0 && !yaTienePago) continue
+      const ok = await cobrarPedido(p, false)
+      if (!ok) return
+    }
+    await loadRutas()
+    if (selectedCliente.value) {
+      const pick = rows.value.find((x) => String(x.cliente_id) === String(selectedCliente.value.cliente_id))
+      if (pick) {
+        openClienteDialog(pick)
+        for (const p of dialogPedidos.value) {
+          const saldo = Number(Number(p.saldo || 0).toFixed(2))
+          p.pagoMonto = saldo > 0 ? initialCobroMonto(p) : 0
+        }
       }
     }
+    await actualizarEstadosCliente('ENTREGADO')
+  } finally {
+    loadingSaveAll.value = false
   }
-  await actualizarEstadosCliente('ENTREGADO')
 }
 
 async function actualizarEstadosCliente(estado) {
+  loadingEstado.value = true
   try {
     await Promise.all(dialogPedidos.value.map((p) => proxy.$axios.put(`/despachador/pedidos/${p.pedido_id}/estado`, { estado })))
     proxy.$alert.success('Estado actualizado')
@@ -430,6 +508,8 @@ async function actualizarEstadosCliente(estado) {
     dialogCliente.value = false
   } catch (e) {
     proxy.$alert.error(e?.response?.data?.message || 'No se pudo actualizar estado')
+  } finally {
+    loadingEstado.value = false
   }
 }
 

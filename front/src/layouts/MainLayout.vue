@@ -173,6 +173,7 @@ onMounted(() => {
     { title: 'Mapa zonas', icon: 'palette', link: '/mapa-zonas', perm: 'Mapa cliente zonas'},
     { title: 'Auxiliar de camara', icon: 'warehouse', link: '/auxiliar-camara', perm: 'Auxiliar de camara'},
     { title: 'Digitador factura', icon: 'receipt_long', link: '/digitador-factura', perm: 'Digitador factura'},
+    { title: 'Cobranzas', icon: 'payments', link: '/cobranzas', perm: 'Cobranzas' },
     { title: 'Rutas', icon: 'route', link: '/rutas-camion', perm: 'Rutas', esCamion: true },
     { title: 'Despacho', icon: 'local_shipping', link: '/despacho-camion', perm: 'Despacho', esCamion: true },
     { title: 'Realizar pedido', icon: 'shopping_cart_checkout', link: '/pedidosCompra', perm: 'Nuevo Pedido'},
@@ -233,9 +234,11 @@ function canSee(link) {
   if (!link || !proxy.$store?.user) return false
   if (link.always) return true
   const isCamion = !!proxy.$store.user.es_camion
+  const isCobrador = String(proxy.$store.user.role || '').toUpperCase() === 'COBRADOR'
   const perms = (proxy.$store.permissions || []).map(p => typeof p === 'string' ? p : p?.name).filter(Boolean)
   const requiredPerm = link.perm || link.title
   if (perms.includes(requiredPerm)) return true
+  if (requiredPerm === 'Cobranzas' && isCobrador) return true
   return !!link.esCamion && isCamion
 }
 function loadFallas(showError = false) {

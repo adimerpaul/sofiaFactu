@@ -292,7 +292,7 @@ export default {
         { label: 'Sí', value: 'yes' },
         { label: 'No', value: 'no' },
       ],
-      roles: ['Admin', 'Usuario', 'Vendedor', 'Ruteo', 'Auxiliar de camara', 'Digitador'],
+      roles: ['Admin', 'Usuario', 'Vendedor', 'Ruteo', 'Auxiliar de camara', 'Digitador', 'Cobrador'],
       columns: [
         { name: 'actions', label: 'Acciones', align: 'center' },
         { name: 'name', label: 'Nombre', align: 'left', field: 'name' },

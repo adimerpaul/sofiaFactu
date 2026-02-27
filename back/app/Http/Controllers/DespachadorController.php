@@ -168,14 +168,74 @@ class DespachadorController extends Controller
             $pagadoActual = round((float) $venta->pagos->sum('monto'), 2);
             $saldo = round(max(0, $total - $pagadoActual), 2);
             $monto = round((float) $data['monto'], 2);
+            $tipoPago = strtoupper((string) $data['tipo_pago']);
+            $metodoPago = strtoupper((string) $data['metodo_pago']);
+
+            $ultimoPago = $venta->pagos->sortByDesc('id')->first();
+            if ($ultimoPago) {
+                $otrosPagos = round(max(0, $pagadoActual - (float) $ultimoPago->monto), 2);
+                $maximoNuevo = round(max(0, $total - $otrosPagos), 2);
+                if ($monto - $maximoNuevo > 0.0001) {
+                    return response()->json([
+                        'message' => 'El monto supera el saldo pendiente',
+                        'meta' => [
+                            'total' => $total,
+                            'pagado_actual' => $pagadoActual,
+                            'saldo_actual' => $saldo,
+                            'maximo_permitido' => $maximoNuevo,
+                        ],
+                    ], 422);
+                }
+                if ($tipoPago === 'CONTADO' && ($maximoNuevo - $monto) > 0.99) {
+                    return response()->json(['message' => 'Para contado se permite diferencia maxima de 0.99'], 422);
+                }
+
+                $ultimoPago->update([
+                    'tipo_pago' => $tipoPago,
+                    'metodo_pago' => $metodoPago,
+                    'monto' => $monto,
+                    'fecha_hora' => now(),
+                    'observacion' => $data['observacion'] ?? $ultimoPago->observacion,
+                    'latitud' => $data['latitud'] ?? $ultimoPago->latitud,
+                    'longitud' => $data['longitud'] ?? $ultimoPago->longitud,
+                ]);
+
+                $pagadoNuevo = round($otrosPagos + $monto, 2);
+                $saldoNuevo = $this->saldoConTolerancia($total, $pagadoNuevo);
+
+                if ($pedido) {
+                    $pedido->despacho_estado = $saldoNuevo <= 0 ? 'ENTREGADO' : 'PARCIAL';
+                    $pedido->entrega_at = now();
+                    $pedido->despachador_user_id = $user->id;
+                    $pedido->save();
+                }
+
+                return response()->json([
+                    'message' => 'Cobro actualizado',
+                    'pago' => $ultimoPago->fresh(),
+                    'resumen' => [
+                        'total' => round($total, 2),
+                        'pagado' => round($pagadoNuevo, 2),
+                        'saldo' => round($saldoNuevo, 2),
+                        'cancelado' => $saldoNuevo <= 0,
+                    ],
+                ]);
+            }
 
             if ($saldo <= 0) {
                 return response()->json(['message' => 'La venta ya fue cancelada'], 422);
             }
             if ($monto - $saldo > 0.0001) {
-                return response()->json(['message' => 'El monto supera el saldo pendiente'], 422);
+                return response()->json([
+                    'message' => 'El monto supera el saldo pendiente',
+                    'meta' => [
+                        'total' => $total,
+                        'pagado_actual' => $pagadoActual,
+                        'saldo_actual' => $saldo,
+                    ],
+                ], 422);
             }
-            if (strtoupper($data['tipo_pago']) === 'CONTADO' && ($saldo - $monto) > 0.99) {
+            if ($tipoPago === 'CONTADO' && ($saldo - $monto) > 0.99) {
                 return response()->json(['message' => 'Para contado se permite diferencia maxima de 0.99'], 422);
             }
 
@@ -184,8 +244,8 @@ class DespachadorController extends Controller
                 'pedido_id' => $pedido?->id,
                 'cliente_id' => $venta->cliente_id,
                 'user_id' => $user->id,
-                'tipo_pago' => strtoupper($data['tipo_pago']),
-                'metodo_pago' => strtoupper($data['metodo_pago']),
+                'tipo_pago' => $tipoPago,
+                'metodo_pago' => $metodoPago,
                 'monto' => $monto,
                 'fecha_hora' => now(),
                 'observacion' => $data['observacion'] ?? null,

@@ -55,6 +55,7 @@ class DatabaseSeeder extends Seeder
             'Digitador factura',
             'Rutas',
             'Despacho',
+            'Cobranzas',
         ];
         foreach ($permisos as $permiso) {
             Permission::firstOrCreate(['name' => $permiso]);

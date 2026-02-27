@@ -46,6 +46,7 @@ class User extends Authenticatable{
         $roles = [
             'Admin' => 'red',
             'Usuario' => 'green',
+            'Cobrador' => 'teal',
         ];
         return $roles[$this->role] ?? 'blue';
     }

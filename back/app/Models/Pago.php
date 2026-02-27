@@ -16,6 +16,9 @@ class Pago extends Model
         'monto',
         'fecha_hora',
         'observacion',
+        'considerar_en_cobranza',
+        'nro_pago',
+        'comprobante_path',
         'latitud',
         'longitud',
     ];
@@ -23,6 +26,7 @@ class Pago extends Model
     protected $casts = [
         'monto' => 'float',
         'fecha_hora' => 'datetime',
+        'considerar_en_cobranza' => 'boolean',
         'latitud' => 'float',
         'longitud' => 'float',
     ];
@@ -47,4 +51,3 @@ class Pago extends Model
         return $this->belongsTo(User::class);
     }
 }
-

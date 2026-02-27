@@ -11,10 +11,13 @@ class Pago extends Model
         'pedido_id',
         'cliente_id',
         'user_id',
+        'anulado_user_id',
         'tipo_pago',
         'metodo_pago',
         'monto',
+        'estado',
         'fecha_hora',
+        'anulado_at',
         'observacion',
         'considerar_en_cobranza',
         'nro_pago',
@@ -25,7 +28,9 @@ class Pago extends Model
 
     protected $casts = [
         'monto' => 'float',
+        'estado' => 'string',
         'fecha_hora' => 'datetime',
+        'anulado_at' => 'datetime',
         'considerar_en_cobranza' => 'boolean',
         'latitud' => 'float',
         'longitud' => 'float',
@@ -49,5 +54,10 @@ class Pago extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function anuladoPor()
+    {
+        return $this->belongsTo(User::class, 'anulado_user_id');
     }
 }

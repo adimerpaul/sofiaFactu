@@ -29,8 +29,9 @@ class CobranzasController extends Controller
         $ventasCredito = Venta::query()
             ->with([
                 'cliente:id,nombre,ci,telefono,direccion',
-                'pagos:id,venta_id,monto,fecha_hora,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
+                'pagos:id,venta_id,monto,estado,fecha_hora,anulado_at,anulado_user_id,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
                 'pagos.user:id,name',
+                'pagos.anuladoPor:id,name',
             ])
             ->where('estado', 'Activo')
             ->when($fechaInicio && $fechaFin, fn (Builder $q) => $q->whereBetween('fecha', [$fechaInicio, $fechaFin]))
@@ -47,8 +48,9 @@ class CobranzasController extends Controller
         $deudasManuales = CobranzasDeuda::query()
             ->with([
                 'cliente:id,nombre,ci,telefono,direccion',
-                'pagos:id,deuda_id,monto,fecha_hora,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
+                'pagos:id,deuda_id,monto,estado,fecha_hora,anulado_at,anulado_user_id,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
                 'pagos.user:id,name',
+                'pagos.anuladoPor:id,name',
             ])
             ->whereIn('estado', ['ACTIVA', 'PENDIENTE'])
             ->where('considerar_en_cobranza', true)
@@ -60,7 +62,7 @@ class CobranzasController extends Controller
 
         foreach ($ventasCredito as $venta) {
             $total = round((float) ($venta->total ?? 0), 2);
-            $pagado = round((float) $venta->pagos->sum('monto'), 2);
+            $pagado = round((float) $this->sumPagosActivos($venta->pagos), 2);
             $saldo = $this->saldoConTolerancia($total, $pagado, 0.99);
             if ($saldo <= 0) {
                 continue;
@@ -109,7 +111,7 @@ class CobranzasController extends Controller
 
         foreach ($deudasManuales as $deuda) {
             $total = round((float) ($deuda->monto_total ?? 0), 2);
-            $pagado = round((float) $deuda->pagos->sum('monto'), 2);
+            $pagado = round((float) $this->sumPagosActivos($deuda->pagos), 2);
             $tol = round((float) ($deuda->tolerancia_centavos ?? 0.99), 2);
             $saldo = $this->saldoConTolerancia($total, $pagado, $tol);
             if ($saldo <= 0) {
@@ -214,7 +216,7 @@ class CobranzasController extends Controller
         $clienteIds = collect($clientes->items())->pluck('id')->values();
 
         $ventas = Venta::query()
-            ->with(['pagos:id,venta_id,monto'])
+            ->with(['pagos:id,venta_id,monto,estado'])
             ->whereIn('cliente_id', $clienteIds)
             ->where(function (Builder $q) {
                 $q->whereRaw('UPPER(tipo_pago) LIKE ?', ['%CRED%']);
@@ -223,7 +225,7 @@ class CobranzasController extends Controller
             ->get();
 
         $deudas = CobranzasDeuda::query()
-            ->with(['pagos:id,deuda_id,monto'])
+            ->with(['pagos:id,deuda_id,monto,estado'])
             ->whereIn('cliente_id', $clienteIds)
             ->get();
 
@@ -233,20 +235,22 @@ class CobranzasController extends Controller
         $rows = collect($clientes->items())->map(function (Cliente $c) use ($ventasByCliente, $deudasByCliente) {
             $ventasCliente = collect($ventasByCliente->get($c->id, collect()));
             $deudasCliente = collect($deudasByCliente->get($c->id, collect()));
+            $ventasConsideradas = $ventasCliente->filter(fn (Venta $v) => (bool) ($v->considerar_en_cobranza ?? true));
+            $deudasConsideradas = $deudasCliente->filter(fn (CobranzasDeuda $d) => (bool) ($d->considerar_en_cobranza ?? true));
 
             $totalVentas = round((float) $ventasCliente->sum(fn (Venta $v) => (float) ($v->total ?? 0)), 2);
-            $pagadoVentas = round((float) $ventasCliente->sum(fn (Venta $v) => (float) collect($v->pagos)->sum('monto')), 2);
-            $saldoVentas = round((float) $ventasCliente->sum(function (Venta $v) {
+            $pagadoVentas = round((float) $ventasCliente->sum(fn (Venta $v) => (float) $this->sumPagosActivos($v->pagos)), 2);
+            $saldoVentas = round((float) $ventasConsideradas->sum(function (Venta $v) {
                 $total = round((float) ($v->total ?? 0), 2);
-                $pagado = round((float) collect($v->pagos)->sum('monto'), 2);
+                $pagado = round((float) $this->sumPagosActivos($v->pagos), 2);
                 return $this->saldoConTolerancia($total, $pagado, 0.99);
             }), 2);
 
             $totalDeudas = round((float) $deudasCliente->sum(fn (CobranzasDeuda $d) => (float) ($d->monto_total ?? 0)), 2);
-            $pagadoDeudas = round((float) $deudasCliente->sum(fn (CobranzasDeuda $d) => (float) collect($d->pagos)->sum('monto')), 2);
-            $saldoDeudas = round((float) $deudasCliente->sum(function (CobranzasDeuda $d) {
+            $pagadoDeudas = round((float) $deudasCliente->sum(fn (CobranzasDeuda $d) => (float) $this->sumPagosActivos($d->pagos)), 2);
+            $saldoDeudas = round((float) $deudasConsideradas->sum(function (CobranzasDeuda $d) {
                 $total = round((float) ($d->monto_total ?? 0), 2);
-                $pagado = round((float) collect($d->pagos)->sum('monto'), 2);
+                $pagado = round((float) $this->sumPagosActivos($d->pagos), 2);
                 $tol = round((float) ($d->tolerancia_centavos ?? 0.99), 2);
                 return $this->saldoConTolerancia($total, $pagado, $tol);
             }), 2);
@@ -258,6 +262,8 @@ class CobranzasController extends Controller
             $saldoTotal = round($saldoVentas + $saldoDeudas, 2);
             $cobradoTotal = round($pagadoVentas + $pagadoDeudas, 2);
             $montoTotal = round($totalVentas + $totalDeudas, 2);
+            $documentosConsiderados = $ventasConsideradas->count() + $deudasConsideradas->count();
+            $estado = $saldoTotal > 0 ? 'DEBE' : ($documentosConsiderados > 0 ? 'SALDADO' : 'NO_CONSIDERAR');
 
             return [
                 'cliente_id' => $c->id,
@@ -270,7 +276,7 @@ class CobranzasController extends Controller
                 'monto_total' => $montoTotal,
                 'cobrado_total' => $cobradoTotal,
                 'saldo_total' => $saldoTotal,
-                'estado' => $saldoTotal > 0 ? 'DEBE' : 'SALDADO',
+                'estado' => $estado,
             ];
         })->values();
 
@@ -347,8 +353,11 @@ class CobranzasController extends Controller
 
         return DB::transaction(function () use ($request, $data) {
             $venta = Venta::query()->with('pagos')->lockForUpdate()->findOrFail((int) $data['venta_id']);
+            if (!(bool) ($venta->considerar_en_cobranza ?? true)) {
+                return response()->json(['message' => 'Esta venta esta marcada como no considerar en cobranza'], 422);
+            }
             $total = round((float) ($venta->total ?? 0), 2);
-            $pagado = round((float) $venta->pagos->sum('monto'), 2);
+            $pagado = round((float) $this->sumPagosActivos($venta->pagos), 2);
             $saldo = $this->saldoConTolerancia($total, $pagado, 0.99);
             $monto = round((float) $data['monto'], 2);
             if ($monto - $saldo > 0.0001) {
@@ -365,6 +374,7 @@ class CobranzasController extends Controller
                 'tipo_pago' => 'CREDITO',
                 'metodo_pago' => strtoupper((string) ($data['metodo_pago'] ?? 'EFECTIVO')),
                 'monto' => $monto,
+                'estado' => 'ACTIVO',
                 'fecha_hora' => now(),
                 'observacion' => $data['observacion'] ?? null,
                 'considerar_en_cobranza' => true,
@@ -392,11 +402,18 @@ class CobranzasController extends Controller
 
         return DB::transaction(function () use ($request, $pago, $data) {
             $pago = Pago::query()->lockForUpdate()->findOrFail($pago->id);
+            if (strtoupper((string) ($pago->estado ?? 'ACTIVO')) === 'ANULADO') {
+                return response()->json(['message' => 'El pago esta anulado y no se puede modificar'], 422);
+            }
             $venta = Venta::query()->with('pagos')->lockForUpdate()->findOrFail((int) $pago->venta_id);
+            if (!(bool) ($venta->considerar_en_cobranza ?? true)) {
+                return response()->json(['message' => 'Esta venta esta marcada como no considerar en cobranza'], 422);
+            }
             $montoNuevo = round((float) $data['monto'], 2);
             $total = round((float) ($venta->total ?? 0), 2);
             $otros = round((float) $venta->pagos
                 ->where('id', '!=', $pago->id)
+                ->where('estado', '!=', 'ANULADO')
                 ->sum('monto'), 2);
             if (($otros + $montoNuevo) - $total > 0.0001) {
                 return response()->json(['message' => 'El monto supera el total pendiente'], 422);
@@ -431,8 +448,11 @@ class CobranzasController extends Controller
 
         return DB::transaction(function () use ($request, $deuda, $data) {
             $deuda = CobranzasDeuda::query()->with('pagos')->lockForUpdate()->findOrFail($deuda->id);
+            if (!(bool) ($deuda->considerar_en_cobranza ?? true)) {
+                return response()->json(['message' => 'Esta deuda esta marcada como no considerar en cobranza'], 422);
+            }
             $total = round((float) $deuda->monto_total, 2);
-            $pagado = round((float) $deuda->pagos->sum('monto'), 2);
+            $pagado = round((float) $this->sumPagosActivos($deuda->pagos), 2);
             $tol = round((float) ($deuda->tolerancia_centavos ?? 0.99), 2);
             $saldo = $this->saldoConTolerancia($total, $pagado, $tol);
             $monto = round((float) $data['monto'], 2);
@@ -445,6 +465,7 @@ class CobranzasController extends Controller
                 'deuda_id' => $deuda->id,
                 'user_id' => $request->user()->id,
                 'monto' => $monto,
+                'estado' => 'ACTIVO',
                 'fecha_hora' => now(),
                 'metodo_pago' => strtoupper((string) ($data['metodo_pago'] ?? 'EFECTIVO')),
                 'considerar_en_cobranza' => true,
@@ -473,11 +494,18 @@ class CobranzasController extends Controller
 
         return DB::transaction(function () use ($request, $pago, $data) {
             $pago = CobranzasDeudaPago::query()->lockForUpdate()->findOrFail($pago->id);
+            if (strtoupper((string) ($pago->estado ?? 'ACTIVO')) === 'ANULADO') {
+                return response()->json(['message' => 'El pago esta anulado y no se puede modificar'], 422);
+            }
             $deuda = CobranzasDeuda::query()->with('pagos')->lockForUpdate()->findOrFail((int) $pago->deuda_id);
+            if (!(bool) ($deuda->considerar_en_cobranza ?? true)) {
+                return response()->json(['message' => 'Esta deuda esta marcada como no considerar en cobranza'], 422);
+            }
             $montoNuevo = round((float) $data['monto'], 2);
             $total = round((float) $deuda->monto_total, 2);
             $otros = round((float) $deuda->pagos
                 ->where('id', '!=', $pago->id)
+                ->where('estado', '!=', 'ANULADO')
                 ->sum('monto'), 2);
             if (($otros + $montoNuevo) - $total > 0.0001) {
                 return response()->json(['message' => 'El monto supera el saldo de la deuda'], 422);
@@ -505,8 +533,9 @@ class CobranzasController extends Controller
 
         $ventas = Venta::query()
             ->with([
-                'pagos:id,venta_id,monto,fecha_hora,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
+                'pagos:id,venta_id,monto,estado,fecha_hora,anulado_at,anulado_user_id,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
                 'pagos.user:id,name',
+                'pagos.anuladoPor:id,name',
             ])
             ->where('cliente_id', $cliente->id)
             ->where(function (Builder $q) {
@@ -519,8 +548,9 @@ class CobranzasController extends Controller
 
         $deudas = CobranzasDeuda::query()
             ->with([
-                'pagos:id,deuda_id,monto,fecha_hora,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
+                'pagos:id,deuda_id,monto,estado,fecha_hora,anulado_at,anulado_user_id,metodo_pago,considerar_en_cobranza,nro_pago,observacion,comprobante_path',
                 'pagos.user:id,name',
+                'pagos.anuladoPor:id,name',
             ])
             ->where('cliente_id', $cliente->id)
             ->orderByDesc('fecha')
@@ -530,8 +560,9 @@ class CobranzasController extends Controller
         $items = collect();
         foreach ($ventas as $venta) {
             $total = round((float) ($venta->total ?? 0), 2);
-            $pagado = round((float) $venta->pagos->sum('monto'), 2);
-            $saldo = $this->saldoConTolerancia($total, $pagado, 0.99);
+            $pagado = round((float) $this->sumPagosActivos($venta->pagos), 2);
+            $considerar = (bool) ($venta->considerar_en_cobranza ?? true);
+            $saldo = $considerar ? $this->saldoConTolerancia($total, $pagado, 0.99) : 0.0;
             $items->push([
                 'tipo' => 'VENTA',
                 'id' => $venta->id,
@@ -541,8 +572,8 @@ class CobranzasController extends Controller
                 'monto_total' => $total,
                 'cobrado' => $pagado,
                 'saldo' => $saldo,
-                'estado' => (string) ($venta->estado ?? ''),
-                'considerar_en_cobranza' => (bool) ($venta->considerar_en_cobranza ?? true),
+                'estado' => $considerar ? (string) ($venta->estado ?? '') : 'NO_CONSIDERAR',
+                'considerar_en_cobranza' => $considerar,
                 'tolerancia_centavos' => 0.99,
                 'pagos' => $venta->pagos->map(fn (Pago $p) => $this->mapPagoVenta($p))->values(),
             ]);
@@ -550,9 +581,10 @@ class CobranzasController extends Controller
 
         foreach ($deudas as $deuda) {
             $total = round((float) ($deuda->monto_total ?? 0), 2);
-            $pagado = round((float) $deuda->pagos->sum('monto'), 2);
+            $pagado = round((float) $this->sumPagosActivos($deuda->pagos), 2);
             $tol = round((float) ($deuda->tolerancia_centavos ?? 0.99), 2);
-            $saldo = $this->saldoConTolerancia($total, $pagado, $tol);
+            $considerar = (bool) ($deuda->considerar_en_cobranza ?? true);
+            $saldo = $considerar ? $this->saldoConTolerancia($total, $pagado, $tol) : 0.0;
             $items->push([
                 'tipo' => 'DEUDA_MANUAL',
                 'id' => $deuda->id,
@@ -562,8 +594,8 @@ class CobranzasController extends Controller
                 'monto_total' => $total,
                 'cobrado' => $pagado,
                 'saldo' => $saldo,
-                'estado' => (string) ($deuda->estado ?? 'ACTIVA'),
-                'considerar_en_cobranza' => (bool) ($deuda->considerar_en_cobranza ?? true),
+                'estado' => $considerar ? (string) ($deuda->estado ?? 'ACTIVA') : 'NO_CONSIDERAR',
+                'considerar_en_cobranza' => $considerar,
                 'tolerancia_centavos' => $tol,
                 'pagos' => $deuda->pagos->map(fn (CobranzasDeudaPago $p) => $this->mapPagoDeuda($p))->values(),
             ]);
@@ -601,6 +633,62 @@ class CobranzasController extends Controller
         $deuda->considerar_en_cobranza = (bool) $data['considerar_en_cobranza'];
         $deuda->save();
         return response()->json(['message' => 'Deuda actualizada', 'deuda' => $deuda->only(['id', 'considerar_en_cobranza'])]);
+    }
+
+    public function anularPagoVenta(Request $request, Pago $pago)
+    {
+        $this->authorizeCobranzas($request);
+        $data = $request->validate([
+            'motivo' => 'nullable|string|max:600',
+        ]);
+
+        return DB::transaction(function () use ($request, $pago, $data) {
+            $pago = Pago::query()->lockForUpdate()->findOrFail($pago->id);
+            if (strtoupper((string) ($pago->estado ?? 'ACTIVO')) === 'ANULADO') {
+                return response()->json(['message' => 'El pago ya esta anulado'], 422);
+            }
+
+            $pago->estado = 'ANULADO';
+            $pago->anulado_user_id = $request->user()->id;
+            $pago->anulado_at = now();
+            if (!empty($data['motivo'])) {
+                $pago->observacion = trim(((string) ($pago->observacion ?? '')) . ' | ANULADO: ' . $data['motivo']);
+            }
+            $pago->save();
+
+            return response()->json([
+                'message' => 'Pago anulado',
+                'pago' => $this->mapPagoVenta($pago->fresh(['user:id,name', 'anuladoPor:id,name'])),
+            ]);
+        });
+    }
+
+    public function anularPagoDeuda(Request $request, CobranzasDeudaPago $pago)
+    {
+        $this->authorizeCobranzas($request);
+        $data = $request->validate([
+            'motivo' => 'nullable|string|max:600',
+        ]);
+
+        return DB::transaction(function () use ($request, $pago, $data) {
+            $pago = CobranzasDeudaPago::query()->lockForUpdate()->findOrFail($pago->id);
+            if (strtoupper((string) ($pago->estado ?? 'ACTIVO')) === 'ANULADO') {
+                return response()->json(['message' => 'El pago ya esta anulado'], 422);
+            }
+
+            $pago->estado = 'ANULADO';
+            $pago->anulado_user_id = $request->user()->id;
+            $pago->anulado_at = now();
+            if (!empty($data['motivo'])) {
+                $pago->observacion = trim(((string) ($pago->observacion ?? '')) . ' | ANULADO: ' . $data['motivo']);
+            }
+            $pago->save();
+
+            return response()->json([
+                'message' => 'Pago anulado',
+                'pago' => $this->mapPagoDeuda($pago->fresh(['user:id,name', 'anuladoPor:id,name'])),
+            ]);
+        });
     }
 
     public function clientes(Request $request)
@@ -668,7 +756,9 @@ class CobranzasController extends Controller
         return [
             'id' => $p->id,
             'monto' => round((float) $p->monto, 2),
+            'estado' => (string) ($p->estado ?? 'ACTIVO'),
             'fecha_hora' => optional($p->fecha_hora)->format('Y-m-d H:i:s'),
+            'anulado_at' => optional($p->anulado_at)->format('Y-m-d H:i:s'),
             'metodo_pago' => $p->metodo_pago,
             'considerar_en_cobranza' => (bool) $p->considerar_en_cobranza,
             'nro_pago' => $p->nro_pago,
@@ -676,6 +766,7 @@ class CobranzasController extends Controller
             'comprobante_path' => $p->comprobante_path,
             'comprobante_url' => $this->comprobanteUrl($p->comprobante_path),
             'registrado_por' => $p->user?->name,
+            'anulado_por' => $p->anuladoPor?->name,
         ];
     }
 
@@ -684,7 +775,9 @@ class CobranzasController extends Controller
         return [
             'id' => $p->id,
             'monto' => round((float) $p->monto, 2),
+            'estado' => (string) ($p->estado ?? 'ACTIVO'),
             'fecha_hora' => optional($p->fecha_hora)->format('Y-m-d H:i:s'),
+            'anulado_at' => optional($p->anulado_at)->format('Y-m-d H:i:s'),
             'metodo_pago' => $p->metodo_pago,
             'considerar_en_cobranza' => (bool) $p->considerar_en_cobranza,
             'nro_pago' => $p->nro_pago,
@@ -692,7 +785,15 @@ class CobranzasController extends Controller
             'comprobante_path' => $p->comprobante_path,
             'comprobante_url' => $this->comprobanteUrl($p->comprobante_path),
             'registrado_por' => $p->user?->name,
+            'anulado_por' => $p->anuladoPor?->name,
         ];
+    }
+
+    private function sumPagosActivos($pagos): float
+    {
+        return (float) collect($pagos)->filter(function ($p) {
+            return strtoupper((string) ($p->estado ?? 'ACTIVO')) !== 'ANULADO';
+        })->sum('monto');
     }
 
     private function authorizeCobranzas(Request $request): void

@@ -62,8 +62,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/cobranzas/deudas-manuales', [App\Http\Controllers\CobranzasController::class, 'crearDeudaManual']);
     Route::post('/cobranzas/pagos/ventas', [App\Http\Controllers\CobranzasController::class, 'registrarPagoVenta']);
     Route::put('/cobranzas/pagos/ventas/{pago}', [App\Http\Controllers\CobranzasController::class, 'actualizarPagoVenta']);
+    Route::put('/cobranzas/pagos/ventas/{pago}/anular', [App\Http\Controllers\CobranzasController::class, 'anularPagoVenta']);
     Route::post('/cobranzas/deudas-manuales/{deuda}/pagos', [App\Http\Controllers\CobranzasController::class, 'registrarPagoDeudaManual']);
     Route::put('/cobranzas/deudas-manuales/pagos/{pago}', [App\Http\Controllers\CobranzasController::class, 'actualizarPagoDeudaManual']);
+    Route::put('/cobranzas/deudas-manuales/pagos/{pago}/anular', [App\Http\Controllers\CobranzasController::class, 'anularPagoDeuda']);
 
 
     Route::get('/productos/{id}/historial-compras-ventas', [App\Http\Controllers\ProductoController::class, 'historialComprasVentas']);

@@ -64,7 +64,7 @@
     </q-card>
 
     <q-card flat bordered class="q-mb-xs">
-      <div ref="mapRef" class="map-container" />
+      <div :key="mapRenderKey" ref="mapRef" class="map-container" />
     </q-card>
 
     <q-card flat bordered>
@@ -294,6 +294,7 @@ const mapRef = ref(null)
 const map = ref(null)
 const markersLayer = ref(null)
 const polygonsLayer = ref(null)
+const mapRenderKey = ref(0)
 
 const fecha = ref(new Date().toISOString().slice(0, 10))
 const vendedorId = ref(null)
@@ -390,6 +391,74 @@ const rowsFiltradasTabla = computed(() => {
   })
 })
 
+function regroupRows (items) {
+  const grouped = new Map()
+
+  items.forEach((row) => {
+    const key = [
+      Number(row.cliente_id || 0),
+      Number(row.vendedor_id || 0),
+      Number(row.pedido_zona_id || 0),
+      Number(row.usuario_camion_id || 0),
+    ].join('|')
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        ...row,
+        pedido_ids: Array.isArray(row.pedido_ids) ? [...row.pedido_ids] : [],
+        cantidad_pedidos: Number(row.cantidad_pedidos || 0),
+        importe: Number(row.importe || 0),
+      })
+      return
+    }
+
+    const current = grouped.get(key)
+    current.pedido_ids = [...current.pedido_ids, ...(Array.isArray(row.pedido_ids) ? row.pedido_ids : [])]
+    current.cantidad_pedidos += Number(row.cantidad_pedidos || 0)
+    current.importe += Number(row.importe || 0)
+    current.contiene_normal = Boolean(current.contiene_normal || row.contiene_normal)
+    current.contiene_pollo = Boolean(current.contiene_pollo || row.contiene_pollo)
+    current.contiene_res = Boolean(current.contiene_res || row.contiene_res)
+    current.contiene_cerdo = Boolean(current.contiene_cerdo || row.contiene_cerdo)
+  })
+
+  return Array.from(grouped.values()).map((row, index) => ({
+    ...row,
+    num: index + 1,
+    pedido_ids: Array.from(new Set((row.pedido_ids || []).map(id => Number(id)))).sort((a, b) => a - b),
+  }))
+}
+
+function applyAsignacionLocal (pedidoIds) {
+  const selectedPedidoIds = new Set((pedidoIds || []).map(id => Number(id)))
+  const camion = camiones.value.find(c => Number(c.id) === Number(asignacion.value.usuario_camion_id)) || null
+  const zona = zonas.value.find(z => Number(z.id) === Number(asignacion.value.pedido_zona_id)) || null
+
+  rows.value = regroupRows(rows.value.map((row) => {
+    const rowPedidoIds = Array.isArray(row.pedido_ids) ? row.pedido_ids.map(id => Number(id)) : []
+    const affected = rowPedidoIds.some(id => selectedPedidoIds.has(id))
+
+    if (!affected) return row
+
+    return {
+      ...row,
+      usuario_camion_id: camion?.id ?? null,
+      usuario_camion: camion?.name ?? null,
+      placa_camion: camion?.placa ?? null,
+      pedido_zona_id: zona?.id ?? null,
+      zona: zona?.nombre ?? null,
+      zona_color: zona?.color ?? '#9e9e9e',
+    }
+  }))
+
+  stats.value = {
+    ...stats.value,
+    total_clientes: rows.value.length,
+  }
+  selectedRows.value = []
+  renderMarkers()
+}
+
 function textColor (bg) {
   const hex = String(bg || '').replace('#', '')
   if (hex.length !== 6) return '#ffffff'
@@ -404,9 +473,11 @@ function rowClass (row) {
   return row?.usuario_camion ? 'row-en-ruta' : 'row-sin-ruta'
 }
 
-function initMap () {
+function initMap (view = null) {
   if (!mapRef.value || map.value) return
-  map.value = L.map(mapRef.value, { center: [-17.969721, -67.114493], zoom: 11 })
+  const center = view?.center ?? [-17.969721, -67.114493]
+  const zoom = view?.zoom ?? 11
+  map.value = L.map(mapRef.value, { center, zoom })
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap contributors',
@@ -415,15 +486,49 @@ function initMap () {
   markersLayer.value = L.layerGroup().addTo(map.value)
 }
 
+function wait (ms) {
+  return new Promise(resolve => window.setTimeout(resolve, ms))
+}
+
 async function refreshMapLayout () {
   await nextTick()
   if (!map.value) return
 
-  map.value.invalidateSize(false)
-  window.setTimeout(() => {
-    if (!map.value) return
-    map.value.invalidateSize(false)
-  }, 180)
+  map.value.invalidateSize({ pan: false, debounceMoveend: true })
+  await wait(80)
+  if (!map.value) return
+
+  map.value.invalidateSize({ pan: false, debounceMoveend: true })
+  await wait(180)
+  if (!map.value) return
+
+  map.value.invalidateSize({ pan: false, debounceMoveend: true })
+}
+
+async function rebuildMap (preserveView = true) {
+  const fallbackView = { center: [-17.969721, -67.114493], zoom: 11 }
+  const currentView = preserveView && map.value
+    ? {
+        center: [map.value.getCenter().lat, map.value.getCenter().lng],
+        zoom: map.value.getZoom(),
+      }
+    : fallbackView
+
+  if (map.value) {
+    map.value.remove()
+    map.value = null
+  }
+
+  markersLayer.value = null
+  polygonsLayer.value = null
+  mapRef.value = null
+  mapRenderKey.value += 1
+
+  await nextTick()
+  initMap(currentView)
+  renderPolygons()
+  renderMarkers()
+  await refreshMapLayout()
 }
 function markerIcon (row) {
   const color = row.zona_color || '#607d8b'
@@ -576,8 +681,9 @@ async function asignarSeleccion () {
       pedido_zona_id: asignacion.value.pedido_zona_id,
     })
     dialogAsignar.value = false
+    applyAsignacionLocal(pedidoIds)
+    await rebuildMap()
     proxy.$alert.success('Asignacion aplicada')
-    await loadData()
   } catch (e) {
     proxy.$alert.error(e?.response?.data?.message || 'No se pudo asignar')
   } finally {

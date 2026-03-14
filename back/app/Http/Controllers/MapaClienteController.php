@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Pedido;
+use App\Models\MapaZonaPoligono;
 use App\Models\PedidoZona;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -127,6 +128,27 @@ class MapaClienteController extends Controller
             ->orderBy('nombre')
             ->get(['id', 'nombre', 'color', 'activo']);
 
+        $poligonos = MapaZonaPoligono::query()
+            ->with(['pedidoZona:id,nombre,color,orden,activo'])
+            ->where('activo', true)
+            ->orderBy('orden')
+            ->orderBy('nombre')
+            ->get()
+            ->map(function (MapaZonaPoligono $poligono) {
+                return [
+                    'id' => $poligono->id,
+                    'nombre' => $poligono->nombre,
+                    'tipo' => (int) $poligono->tipo,
+                    'coordenadas' => $poligono->coordenadas ?: [],
+                    'color' => $poligono->color ?: $poligono->pedidoZona?->color ?? '#607d8b',
+                    'pedido_zona' => $poligono->pedidoZona ? [
+                        'id' => $poligono->pedidoZona->id,
+                        'nombre' => $poligono->pedidoZona->nombre,
+                    ] : null,
+                ];
+            })
+            ->values();
+
         $statsCamiones = $rows->groupBy(fn ($r) => $r['usuario_camion'] ?: 'SIN ASIGNAR')
             ->map(fn ($g) => $g->count())
             ->sortKeys()
@@ -138,6 +160,7 @@ class MapaClienteController extends Controller
             'vendedores' => $vendedores,
             'camiones' => $camiones,
             'zonas' => $zonas,
+            'poligonos' => $poligonos,
             'stats' => [
                 'total_clientes' => $rows->count(),
                 'monto_total' => (float) $rows->sum('importe'),
@@ -194,4 +217,3 @@ class MapaClienteController extends Controller
         abort_unless($isAdmin || $canMapa, 403, 'No autorizado');
     }
 }
-

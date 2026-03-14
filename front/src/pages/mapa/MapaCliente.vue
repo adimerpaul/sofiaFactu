@@ -311,6 +311,7 @@ const { proxy } = getCurrentInstance()
 const mapRef = ref(null)
 const map = ref(null)
 const markersLayer = ref(null)
+const polygonsLayer = ref(null)
 
 const fecha = ref(new Date().toISOString().slice(0, 10))
 const vendedorId = ref(null)
@@ -331,6 +332,7 @@ const stats = ref({})
 const vendedores = ref([])
 const camiones = ref([])
 const zonas = ref([])
+const poligonos = ref([])
 
 const asignacion = ref({
   usuario_camion_id: null,
@@ -420,6 +422,7 @@ function initMap () {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap contributors',
   }).addTo(map.value)
+  polygonsLayer.value = L.layerGroup().addTo(map.value)
   markersLayer.value = L.layerGroup().addTo(map.value)
 }
 
@@ -484,6 +487,37 @@ function renderMarkers () {
   }
 }
 
+function renderPolygons () {
+  if (!polygonsLayer.value) return
+  polygonsLayer.value.clearLayers()
+
+  poligonos.value.forEach((poligono) => {
+    const latlngs = Array.isArray(poligono.coordenadas)
+      ? poligono.coordenadas
+          .map(point => [Number(point.lat), Number(point.lng)])
+          .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng))
+      : []
+
+    if (latlngs.length < 3) return
+
+    const color = poligono.color || '#607d8b'
+    const layer = L.polygon(latlngs, {
+      color,
+      fillColor: color,
+      fillOpacity: 0.14,
+      weight: 2,
+    }).addTo(polygonsLayer.value)
+
+    layer.bindTooltip(`
+      <div style="font-size:12px;line-height:1.25;">
+        <div style="font-weight:700;">${poligono.nombre || '-'}</div>
+        <div><b>Tipo:</b> ${poligono.tipo?.nombre || '-'}</div>
+        <div><b>Zona:</b> ${poligono.pedido_zona?.nombre || '-'}</div>
+      </div>
+    `, { sticky: true })
+  })
+}
+
 function focusRow (row) {
   const lat = Number(row.latitud)
   const lng = Number(row.longitud)
@@ -508,8 +542,10 @@ async function loadData () {
     vendedores.value = Array.isArray(res.data?.vendedores) ? res.data.vendedores : []
     camiones.value = Array.isArray(res.data?.camiones) ? res.data.camiones : []
     zonas.value = Array.isArray(res.data?.zonas) ? res.data.zonas : []
+    poligonos.value = Array.isArray(res.data?.poligonos) ? res.data.poligonos : []
     stats.value = res.data?.stats || {}
     selectedRows.value = []
+    renderPolygons()
     renderMarkers()
   } catch (e) {
     proxy.$alert.error(e?.response?.data?.message || 'No se pudo cargar mapa cliente')
@@ -664,3 +700,6 @@ onBeforeUnmount(() => {
   background: #fff;
 }
 </style>
+
+
+

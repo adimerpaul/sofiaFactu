@@ -51,6 +51,7 @@ class DatabaseSeeder extends Seeder
             'Mis pedidos totales',
             'Mapa cliente',
             'Mapa cliente zonas',
+            'Mapa zona',
             'Auxiliar de camara',
             'Digitador factura',
             'Rutas',

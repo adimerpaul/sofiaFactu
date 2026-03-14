@@ -170,6 +170,7 @@ onMounted(() => {
     { title: 'Mis pedidos', icon: 'playlist_add_check', link: '/mis-pedidos', perm: 'Pedidos'},
     { title: 'Mis pedidos totales', icon: 'summarize', link: '/mis-pedidos-totales', perm: 'Mis pedidos totales'},
     { title: 'Mapa cliente', icon: 'map', link: '/mapa-cliente', perm: 'Mapa cliente'},
+    { title: 'Mapa zona', icon: 'polyline', link: '/mapa-zona', perm: 'Mapa zona'},
     { title: 'Mapa zonas', icon: 'palette', link: '/mapa-zonas', perm: 'Mapa cliente zonas'},
     { title: 'Auxiliar de camara', icon: 'warehouse', link: '/auxiliar-camara', perm: 'Auxiliar de camara'},
     { title: 'Digitador factura', icon: 'receipt_long', link: '/digitador-factura', perm: 'Digitador factura'},

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained('users');
             $table->date('fecha')->nullable();
-            $table->time('hora')->nullable();
+            $table->string('hora')->nullable();
             $table->string('estado')->default('Pendiente'); // Pendiente, Enviado, Cancelado
             $table->decimal('total', 10, 2)->nullable();
             $table->string('observaciones')->nullable();

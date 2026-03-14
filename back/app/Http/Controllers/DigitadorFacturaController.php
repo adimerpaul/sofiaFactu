@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Cufd;
 use App\Models\Cui;
 use App\Models\Pedido;
+use App\Models\User;
 use App\Models\Venta;
 use App\Models\VentaDetalle;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -37,9 +38,10 @@ class DigitadorFacturaController extends Controller
 
         $ventas = Venta::query()
             ->with([
-                'pedido:id,user_id,cliente_id,fecha,hora,estado,tipo_pago,facturado,tipo_pedido,observaciones',
+                'pedido:id,user_id,cliente_id,usuario_camion_id,fecha,hora,estado,tipo_pago,facturado,tipo_pedido,observaciones',
                 'pedido.user:id,name',
                 'pedido.cliente:id,nombre,codcli,ci,telefono',
+                'pedido.usuarioCamion:id,name,placa',
                 'user:id,name',
                 'cliente:id,nombre,codcli,ci,telefono',
                 'ventaDetalles:id,venta_id,producto_id,cantidad,precio,nombre',
@@ -97,6 +99,9 @@ class DigitadorFacturaController extends Controller
                 'comanda' => $venta->pedido_id,
                 'vendedor' => $venta->pedido?->user?->name,
                 'cliente' => $venta->pedido?->cliente?->nombre ?: $venta->cliente?->nombre,
+                'camion' => $venta->pedido?->usuarioCamion?->name,
+                'camion_id' => (int) ($venta->pedido?->usuario_camion_id ?? 0),
+                'camion_placa' => (string) ($venta->pedido?->usuarioCamion?->placa ?? ''),
                 'telefono' => (string) ($venta->pedido?->cliente?->telefono ?: $venta->cliente?->telefono ?: ''),
                 'tipo' => $tipos,
                 'productos' => $productosVenta,
@@ -123,6 +128,17 @@ class DigitadorFacturaController extends Controller
                 ],
             ];
         })->values();
+
+        $camiones = User::query()
+            ->where('es_camion', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'placa'])
+            ->map(fn (User $camion) => [
+                'id' => $camion->id,
+                'name' => $camion->name,
+                'placa' => (string) ($camion->placa ?? ''),
+            ])
+            ->values();
 
         $pedidosSinVenta = Pedido::query()
             ->with(['user:id,name', 'cliente:id,nombre'])
@@ -158,6 +174,7 @@ class DigitadorFacturaController extends Controller
             'data' => $rows->values(),
             'pedidos_sin_venta' => $pedidosSinVenta,
             'stats' => $stats,
+            'camiones' => $camiones,
             'filtros' => [
                 'fecha_inicio' => $fechaInicio,
                 'fecha_fin' => $fechaFin,
@@ -367,19 +384,23 @@ class DigitadorFacturaController extends Controller
     public function imprimirFacturas(Request $request)
     {
         $this->authorizeDigitador($request);
-        [$fechaInicio, $fechaFin] = $this->extractRangoFechas($request);
+        [$fechaInicio, $fechaFin, $camionId] = $this->extractRangoFechas($request);
 
-        $ventas = $this->queryVentasDigitador($fechaInicio, $fechaFin)
+        $ventas = $this->queryVentasDigitador($fechaInicio, $fechaFin, $camionId)
             ->where('facturado', true)
             ->where('factura_estado', 'FACTURADO')
             ->whereNotNull('cuf')
             ->get();
 
         if ($ventas->isEmpty()) {
-            return response()->json(['message' => 'No hay facturas emitidas para imprimir en el rango seleccionado'], 422);
+            $message = $camionId
+                ? 'No hay facturas emitidas para imprimir para el camion seleccionado en el rango'
+                : 'No hay facturas emitidas para imprimir en el rango seleccionado';
+            return response()->json(['message' => $message], 422);
         }
 
         $items = $this->buildFacturaItems($ventas);
+        $suffix = $camionId ? "_camion_{$camionId}" : '';
 
         $pdf = Pdf::loadView('pdf.digitador_facturas_masivo', [
             'items' => $items,
@@ -389,25 +410,30 @@ class DigitadorFacturaController extends Controller
             'telefono' => (string) env('TELEFONO'),
         ])->setPaper('letter');
 
-        return $pdf->download("facturas_emitidas_{$fechaInicio}_{$fechaFin}.pdf");
+        return $pdf->download("facturas_emitidas_{$fechaInicio}_{$fechaFin}{$suffix}.pdf");
     }
 
     public function imprimirVouchers(Request $request)
     {
         $this->authorizeDigitador($request);
-        [$fechaInicio, $fechaFin] = $this->extractRangoFechas($request);
+        [$fechaInicio, $fechaFin, $camionId] = $this->extractRangoFechas($request);
 
-        $ventas = $this->queryVentasDigitador($fechaInicio, $fechaFin)->get();
+        $ventas = $this->queryVentasDigitador($fechaInicio, $fechaFin, $camionId)->get();
         if ($ventas->isEmpty()) {
-            return response()->json(['message' => 'No hay ventas para imprimir vouchers en el rango seleccionado'], 422);
+            $message = $camionId
+                ? 'No hay ventas para imprimir vouchers para el camion seleccionado en el rango'
+                : 'No hay ventas para imprimir vouchers en el rango seleccionado';
+            return response()->json(['message' => $message], 422);
         }
+
+        $suffix = $camionId ? "_camion_{$camionId}" : '';
 
         $pdf = Pdf::loadView('pdf.digitador_vouchers_masivo', [
             'ventas' => $ventas,
             'razon' => (string) env('RAZON'),
         ])->setPaper('letter');
 
-        return $pdf->download("vouchers_ventas_{$fechaInicio}_{$fechaFin}.pdf");
+        return $pdf->download("vouchers_ventas_{$fechaInicio}_{$fechaFin}{$suffix}.pdf");
     }
 
     public function imprimirFacturaVenta(Request $request, Venta $venta)
@@ -699,20 +725,30 @@ class DigitadorFacturaController extends Controller
         $data = $request->validate([
             'fecha_inicio' => 'nullable|date',
             'fecha_fin' => 'nullable|date',
+            'usuario_camion_id' => 'nullable|integer|exists:users,id',
         ]);
+        $camionId = !empty($data['usuario_camion_id']) ? (int) $data['usuario_camion_id'] : null;
+        if ($camionId) {
+            $camion = User::query()->find($camionId);
+            if (!$camion || !$camion->es_camion) {
+                abort(422, 'El usuario seleccionado no es tipo camion');
+            }
+        }
         return [
             $data['fecha_inicio'] ?? now()->toDateString(),
             $data['fecha_fin'] ?? now()->toDateString(),
+            $camionId,
         ];
     }
 
-    private function queryVentasDigitador(string $fechaInicio, string $fechaFin): Builder
+    private function queryVentasDigitador(string $fechaInicio, string $fechaFin, ?int $camionId = null): Builder
     {
         return Venta::query()
             ->with([
-                'pedido:id,user_id,cliente_id,fecha,hora,estado,tipo_pago,facturado,tipo_pedido,observaciones',
+                'pedido:id,user_id,cliente_id,usuario_camion_id,fecha,hora,estado,tipo_pago,facturado,tipo_pedido,observaciones',
                 'pedido.user:id,name',
                 'pedido.cliente:id,nombre,codcli,ci,telefono',
+                'pedido.usuarioCamion:id,name,placa',
                 'user:id,name',
                 'cliente:id,nombre,codcli,ci,telefono',
                 'ventaDetalles:id,venta_id,producto_id,cantidad,precio,nombre',
@@ -720,8 +756,11 @@ class DigitadorFacturaController extends Controller
             ])
             ->whereNotNull('pedido_id')
             ->whereBetween('fecha', [$fechaInicio, $fechaFin])
-            ->whereHas('pedido', function (Builder $q) {
+            ->whereHas('pedido', function (Builder $q) use ($camionId) {
                 $q->where('tipo_pedido', 'REALIZAR_PEDIDO');
+                if ($camionId) {
+                    $q->where('usuario_camion_id', $camionId);
+                }
             })
             ->orderBy('fecha', 'desc')
             ->orderBy('hora', 'desc')

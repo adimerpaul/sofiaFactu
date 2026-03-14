@@ -21,64 +21,46 @@
       </q-card-section>
 
       <q-separator />
-
-      <q-card-section class="row q-col-gutter-sm items-center">
-        <div class="col-6 col-md-2">
-          <q-chip square color="blue-8" text-color="white" class="full-width justify-center">Ventas: {{ stats.total_ventas || 0 }}</q-chip>
-        </div>
-        <div class="col-6 col-md-2">
-          <q-chip square color="indigo-8" text-color="white" class="full-width justify-center">Monto Bs: {{ Number(stats.monto_total_ventas || 0).toFixed(2) }}</q-chip>
-        </div>
-        <div class="col-6 col-md-2">
-          <q-chip square color="green-8" text-color="white" class="full-width justify-center">Facturadas: {{ stats.ventas_facturadas || 0 }}</q-chip>
-        </div>
-        <div class="col-6 col-md-2">
-          <q-chip square color="orange-8" text-color="white" class="full-width justify-center">No facturadas: {{ stats.ventas_no_facturadas || 0 }}</q-chip>
-        </div>
-        <div class="col-6 col-md-2">
-          <q-chip square color="deep-orange-9" text-color="white" class="full-width justify-center">Pendientes: {{ stats.pendientes_factura || 0 }}</q-chip>
-        </div>
-        <div class="col-6 col-md-2">
-          <q-chip square color="grey-8" text-color="white" class="full-width justify-center">Sin venta: {{ stats.pedidos_sin_venta || 0 }}</q-chip>
-        </div>
-      </q-card-section>
-      <q-card-section class="q-pt-none">
+      <q-card-section class="q-pt-sm">
         <div class="row q-col-gutter-sm">
-          <div class="col-12 col-md-4">
+          <div class="col-12 col-md-6">
             <q-btn
               color="deep-orange"
               icon="receipt_long"
               label="Generar factura de todos"
               no-caps
-              size="lg"
+              dense
               class="full-width text-weight-bold"
               :loading="loadingFacturar"
               @click="generarFacturaTodos"
             />
           </div>
-          <div class="col-12 col-md-4">
-            <q-btn
+          <div class="col-12 col-md-6">
+            <q-btn-dropdown
               color="primary"
               icon="print"
-              label="Imprimir todas facturas"
+              label="Imprimir"
               no-caps
-              size="lg"
+              dense
               class="full-width text-weight-bold"
-              :loading="loadingPrintFacturas"
-              @click="imprimirFacturasMasivo"
-            />
-          </div>
-          <div class="col-12 col-md-4">
-            <q-btn
-              color="teal"
-              icon="receipt"
-              label="Imprimir todos vouchers"
-              no-caps
-              size="lg"
-              class="full-width text-weight-bold"
-              :loading="loadingPrintVouchers"
-              @click="imprimirVouchersMasivo"
-            />
+              dropdown-icon="arrow_drop_down"
+            >
+              <q-list dense style="min-width: 260px">
+                <q-item clickable v-close-popup @click="imprimirFacturasMasivo" :disable="loadingPrintFacturas || loadingPrintVouchers">
+                  <q-item-section avatar><q-icon name="receipt_long" /></q-item-section>
+                  <q-item-section>Imprimir todas las facturas</q-item-section>
+                </q-item>
+                <q-item clickable v-close-popup @click="imprimirVouchersMasivo" :disable="loadingPrintFacturas || loadingPrintVouchers">
+                  <q-item-section avatar><q-icon name="receipt" /></q-item-section>
+                  <q-item-section>Imprimir todos los vouchers</q-item-section>
+                </q-item>
+                <q-separator />
+                <q-item clickable v-close-popup @click="abrirDialogoCamion" :disable="loadingPrintFacturas || loadingPrintVouchers">
+                  <q-item-section avatar><q-icon name="local_shipping" /></q-item-section>
+                  <q-item-section>Imprimir por camión</q-item-section>
+                </q-item>
+              </q-list>
+            </q-btn-dropdown>
           </div>
         </div>
       </q-card-section>
@@ -100,6 +82,7 @@
           <tr class="bg-grey-2">
             <th>Opciones</th>
             <th>Comanda</th>
+            <th>Camión</th>
             <th>Vendedor</th>
             <th>Cliente</th>
             <th>Tipo</th>
@@ -148,6 +131,7 @@
               </q-btn-dropdown>
             </td>
             <td>{{ venta.comanda || '-' }}</td>
+            <td>{{ venta.camion || 'SIN CAMIÓN' }}</td>
             <td>{{ venta.vendedor || '-' }}</td>
             <td>{{ venta.cliente || '-' }}</td>
             <td>
@@ -194,7 +178,7 @@
             </td>
           </tr>
           <tr v-if="ventasFiltradas.length === 0">
-            <td colspan="9" class="text-center text-grey-7">Sin datos disponibles</td>
+            <td colspan="10" class="text-center text-grey-7">Sin datos disponibles</td>
           </tr>
         </tbody>
       </q-markup-table>
@@ -286,6 +270,58 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="dialogPrintCamion">
+      <q-card style="width: 560px; max-width: 95vw;">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">Imprimir por camión</div>
+          <q-space />
+          <q-btn flat round dense icon="close" v-close-popup />
+        </q-card-section>
+        <q-card-section class="q-gutter-md">
+          <q-select
+            v-model="selectedCamionId"
+            :options="camionesOptions"
+            dense
+            outlined
+            emit-value
+            map-options
+            label="Seleccionar camión"
+            option-label="label"
+            option-value="value"
+          />
+          <q-banner v-if="selectedCamion" dense rounded class="bg-blue-1 text-dark">
+            Camión: <b>{{ selectedCamion.name }}</b>{{ selectedCamion.placa ? ` (${selectedCamion.placa})` : '' }}
+          </q-banner>
+          <div class="row q-col-gutter-sm">
+            <div class="col-12 col-md-6">
+              <q-btn
+                color="primary"
+                icon="receipt_long"
+                no-caps
+                class="full-width"
+                label="Imprimir facturas"
+                :disable="!selectedCamionId"
+                :loading="loadingPrintFacturas"
+                @click="imprimirFacturasPorCamion"
+              />
+            </div>
+            <div class="col-12 col-md-6">
+              <q-btn
+                color="teal"
+                icon="receipt"
+                no-caps
+                class="full-width"
+                label="Imprimir vouchers"
+                :disable="!selectedCamionId"
+                :loading="loadingPrintVouchers"
+                @click="imprimirVouchersPorCamion"
+              />
+            </div>
+          </div>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -304,6 +340,9 @@ export default {
       saving: false,
       search: '',
       soloFactura: false,
+      camiones: [],
+      dialogPrintCamion: false,
+      selectedCamionId: null,
       ventas: [],
       pedidosSinVenta: [],
       stats: {
@@ -343,9 +382,18 @@ export default {
       if (!term) return this.ventas
       return this.ventas.filter((v) => {
         const productos = (v.productos || []).map((x) => `${x.nombre} ${x.codigo}`).join(' ').toLowerCase()
-        const s = `${v.comanda || ''} ${v.vendedor || ''} ${v.cliente || ''} ${v.venta_id || ''} ${productos}`.toLowerCase()
+        const s = `${v.comanda || ''} ${v.camion || ''} ${v.vendedor || ''} ${v.cliente || ''} ${v.venta_id || ''} ${productos}`.toLowerCase()
         return s.includes(term)
       })
+    },
+    camionesOptions() {
+      return (this.camiones || []).map((camion) => ({
+        label: camion.placa ? `${camion.name} (${camion.placa})` : camion.name,
+        value: camion.id,
+      }))
+    },
+    selectedCamion() {
+      return (this.camiones || []).find((camion) => Number(camion.id) === Number(this.selectedCamionId)) || null
     },
     totalEdit() {
       return (this.editForm.productos || []).reduce((acc, d) => acc + (Number(d.cantidad || 0) * Number(d.precio || 0)), 0)
@@ -355,6 +403,9 @@ export default {
     this.cargarVentas()
   },
   methods: {
+    abrirDialogoCamion() {
+      this.dialogPrintCamion = true
+    },
     tipoColor(tipo) {
       const t = String(tipo || 'NORMAL').toUpperCase()
       if (t === 'POLLO') return 'orange'
@@ -381,6 +432,7 @@ export default {
         const data = res && res.data ? res.data : {}
         this.ventas = Array.isArray(data.data) ? data.data : []
         this.pedidosSinVenta = Array.isArray(data.pedidos_sin_venta) ? data.pedidos_sin_venta : []
+        this.camiones = Array.isArray(data.camiones) ? data.camiones : []
         this.stats = data.stats || this.stats
       } catch (e) {
         this.$alert.error((e && e.response && e.response.data && e.response.data.message) || 'No se pudo cargar ventas de digitador factura')
@@ -494,13 +546,14 @@ export default {
         this.loadingFacturar = false
       }
     },
-    async descargarPdf(url, loadingKey) {
+    async descargarPdf(url, loadingKey, extraParams = {}) {
       this[loadingKey] = true
       try {
         const res = await this.$axios.get(url, {
           params: {
             fecha_inicio: this.fechaInicio,
             fecha_fin: this.fechaFin,
+            ...extraParams,
           },
           responseType: 'blob',
         })
@@ -586,6 +639,24 @@ export default {
     async imprimirVouchersMasivo() {
       await this.descargarPdf('/digitador-factura/reportes/vouchers', 'loadingPrintVouchers')
     },
+    async imprimirFacturasPorCamion() {
+      if (!this.selectedCamionId) {
+        this.$alert.error('Seleccione un camión')
+        return
+      }
+      await this.descargarPdf('/digitador-factura/reportes/facturas', 'loadingPrintFacturas', {
+        usuario_camion_id: this.selectedCamionId,
+      })
+    },
+    async imprimirVouchersPorCamion() {
+      if (!this.selectedCamionId) {
+        this.$alert.error('Seleccione un camión')
+        return
+      }
+      await this.descargarPdf('/digitador-factura/reportes/vouchers', 'loadingPrintVouchers', {
+        usuario_camion_id: this.selectedCamionId,
+      })
+    },
   },
 }
 </script>
@@ -602,4 +673,13 @@ export default {
     #fff;
 }
 </style>
+
+
+
+
+
+
+
+
+
 

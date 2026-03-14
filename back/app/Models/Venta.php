@@ -22,6 +22,9 @@ class Venta extends Model{
         'tipo_pago',
         'considerar_en_cobranza',
         'facturado',
+        'verificado',
+        'verificado_user_id',
+        'verificado_at',
         'factura_estado',
         'factura_error',
         'agencia',
@@ -33,6 +36,9 @@ class Venta extends Model{
     ];
     protected $casts = [
         'facturado' => 'boolean',
+        'verificado' => 'boolean',
+        'verificado_user_id' => 'integer',
+        'verificado_at' => 'datetime',
         'online' => 'boolean',
         'considerar_en_cobranza' => 'boolean',
     ];
@@ -42,6 +48,9 @@ class Venta extends Model{
     }
     function cliente(){
         return $this->belongsTo(Cliente::class);
+    }
+    function verificador(){
+        return $this->belongsTo(User::class, 'verificado_user_id');
     }
     function pedido(){
         return $this->belongsTo(Pedido::class);

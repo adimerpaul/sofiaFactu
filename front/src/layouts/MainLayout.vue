@@ -173,6 +173,7 @@ onMounted(() => {
     { title: 'Mapa zona', icon: 'polyline', link: '/mapa-zona', perm: 'Mapa zona'},
     { title: 'Mapa zonas', icon: 'palette', link: '/mapa-zonas', perm: 'Mapa cliente zonas'},
     { title: 'Auxiliar de camara', icon: 'warehouse', link: '/auxiliar-camara', perm: 'Auxiliar de camara'},
+    { title: 'Verificacion', icon: 'fact_check', link: '/verificacion', perm: 'Verificacion'},
     { title: 'Digitador factura', icon: 'receipt_long', link: '/digitador-factura', perm: 'Digitador factura'},
     { title: 'Cobranzas deudas', icon: 'payments', link: '/cobranzas', perm: 'Cobranzas' },
     { title: 'Historial cobranzas', icon: 'history', link: '/historial-cobranzas', perm: 'Cobranzas' },

@@ -50,6 +50,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/digitador-factura/reportes/vouchers', [App\Http\Controllers\DigitadorFacturaController::class, 'imprimirVouchers']);
     Route::get('/digitador-factura/reportes/facturas/{venta}', [App\Http\Controllers\DigitadorFacturaController::class, 'imprimirFacturaVenta']);
     Route::get('/digitador-factura/reportes/vouchers/{venta}', [App\Http\Controllers\DigitadorFacturaController::class, 'imprimirVoucherVenta']);
+    Route::get('/verificacion/ventas', [App\Http\Controllers\VerificacionController::class, 'index']);
+    Route::put('/verificacion/ventas/{venta}', [App\Http\Controllers\VerificacionController::class, 'updateVenta']);
+    Route::get('/verificacion/reportes/ventas', [App\Http\Controllers\VerificacionController::class, 'imprimir']);
+    Route::get('/verificacion/reportes/ventas/{venta}', [App\Http\Controllers\VerificacionController::class, 'imprimirVenta']);
     Route::get('/despachador/rutas', [App\Http\Controllers\DespachadorController::class, 'rutas']);
     Route::post('/despachador/pagos', [App\Http\Controllers\DespachadorController::class, 'registrarPago']);
     Route::put('/despachador/pagos/{pago}', [App\Http\Controllers\DespachadorController::class, 'actualizarPago']);

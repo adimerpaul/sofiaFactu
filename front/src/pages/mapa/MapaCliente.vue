@@ -32,50 +32,32 @@
         <div class="col-12 col-md-3">
           <q-select v-model="vendedorId" :options="vendedoresOptions" dense outlined emit-value map-options label="Vendedor" />
         </div>
-        <div class="col-12 col-md-1">
-          <q-select v-model="tipo" :options="tipoOptions" dense outlined emit-value map-options label="Tipo" />
+        
+        <div class="col-12 col-md-2">
+          <q-btn-toggle
+            v-model="tipoMapa"
+            :options="tipoMapaOptions"
+            unelevated
+            spread
+            toggle-color="primary"
+            color="grey-3"
+            text-color="grey-9"
+            class="full-width"
+          />
         </div>
       </q-card-section>
 
       <q-separator />
 
       <q-card-section class="row q-col-gutter-xs q-pa-sm">
-        <div class="col-6 col-md-2">
+        <div class="col-6 col-md-3">
           <q-chip square color="blue-8" text-color="white" icon="groups" class="full-width justify-center">
             Clientes: {{ stats.total_clientes || 0 }}
           </q-chip>
         </div>
-        <div class="col-6 col-md-2">
-          <q-chip square color="indigo-8" text-color="white" icon="payments" class="full-width justify-center">
-            Bs: {{ Number(stats.monto_total || 0).toFixed(2) }}
-          </q-chip>
-        </div>
-        <div class="col-6 col-md-2">
-          <q-chip square color="orange-7" text-color="white" icon="egg" class="full-width justify-center">
-            Pollo: {{ stats.tipo_pollo || 0 }}
-          </q-chip>
-        </div>
-        <div class="col-6 col-md-2">
-          <q-chip square color="red-7" text-color="white" icon="set_meal" class="full-width justify-center">
-            Res: {{ stats.tipo_res || 0 }}
-          </q-chip>
-        </div>
-        <div class="col-6 col-md-2">
-          <q-chip square color="brown-7" text-color="white" icon="restaurant" class="full-width justify-center">
-            Cerdo: {{ stats.tipo_cerdo || 0 }}
-          </q-chip>
-        </div>
-        <div class="col-6 col-md-2">
-          <q-chip square color="blue-grey-7" text-color="white" icon="inventory_2" class="full-width justify-center">
-            Normal: {{ stats.tipo_normal || 0 }}
-          </q-chip>
-        </div>
-      </q-card-section>
-
-      <q-card-section class="row q-col-gutter-xs q-pa-sm">
-        <div class="col-12 col-md-2" v-for="cam in statsCamiones" :key="cam.nombre">
-          <q-chip square color="grey-8" text-color="white" class="full-width justify-center">
-            {{ cam.nombre }} : {{ cam.cantidad }}
+        <div class="col-6 col-md-3">
+          <q-chip square color="grey-8" text-color="white" icon="person_off" class="full-width justify-center">
+            Sin asignar: {{ statsSinAsignar }}
           </q-chip>
         </div>
       </q-card-section>
@@ -302,7 +284,7 @@
 </template>
 
 <script setup>
-import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -325,6 +307,7 @@ const dialogReporteZona = ref(false)
 const zonaFiltroTabla = ref('TODAS')
 const vendedorFiltroTabla = ref('TODOS')
 const reporteZonaCamionId = ref(null)
+const tipoMapa = ref(5)
 
 const rows = ref([])
 const selectedRows = ref([])
@@ -338,6 +321,12 @@ const asignacion = ref({
   usuario_camion_id: null,
   pedido_zona_id: null,
 })
+
+const tipoMapaOptions = [
+  { label: '5', value: 5 },
+  { label: '4', value: 4 },
+  { label: '3', value: 3 },
+]
 
 const tipoOptions = [
   { label: 'Todos', value: 'TODOS' },
@@ -376,7 +365,7 @@ const zonasOptions = computed(() => zonas.value.map(z => ({
   color: z.color,
 })))
 
-const statsCamiones = computed(() => Array.isArray(stats.value?.camiones) ? stats.value.camiones : [])
+const statsSinAsignar = computed(() => rows.value.filter(r => !r.usuario_camion).length)
 const zonaFiltroOptions = computed(() => {
   const set = new Set((rows.value || []).map(r => r.zona || 'SIN ZONA'))
   return [
@@ -417,7 +406,7 @@ function rowClass (row) {
 
 function initMap () {
   if (!mapRef.value || map.value) return
-  map.value = L.map(mapRef.value, { center: [-17.969721, -67.114493], zoom: 12 })
+  map.value = L.map(mapRef.value, { center: [-17.969721, -67.114493], zoom: 11 })
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap contributors',
@@ -426,6 +415,16 @@ function initMap () {
   markersLayer.value = L.layerGroup().addTo(map.value)
 }
 
+async function refreshMapLayout () {
+  await nextTick()
+  if (!map.value) return
+
+  map.value.invalidateSize(false)
+  window.setTimeout(() => {
+    if (!map.value) return
+    map.value.invalidateSize(false)
+  }, 180)
+}
 function markerIcon (row) {
   const color = row.zona_color || '#607d8b'
   return L.divIcon({
@@ -458,8 +457,9 @@ function tooltipHtml (row) {
   `
 }
 
-function renderMarkers () {
+function renderMarkers (options = {}) {
   if (!markersLayer.value || !map.value) return
+  const { adjustView = false } = options
   markersLayer.value.clearLayers()
   const bounds = []
 
@@ -482,7 +482,7 @@ function renderMarkers () {
     bounds.push([lat, lng])
   })
 
-  if (bounds.length > 0) {
+  if (adjustView && bounds.length > 0) {
     map.value.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 })
   }
 }
@@ -491,7 +491,7 @@ function renderPolygons () {
   if (!polygonsLayer.value) return
   polygonsLayer.value.clearLayers()
 
-  poligonos.value.forEach((poligono) => {
+  poligonos.value.filter(poligono => Number(poligono.tipo) === Number(tipoMapa.value)).forEach((poligono) => {
     const latlngs = Array.isArray(poligono.coordenadas)
       ? poligono.coordenadas
           .map(point => [Number(point.lat), Number(point.lng)])
@@ -547,6 +547,7 @@ async function loadData () {
     selectedRows.value = []
     renderPolygons()
     renderMarkers()
+    await refreshMapLayout()
   } catch (e) {
     proxy.$alert.error(e?.response?.data?.message || 'No se pudo cargar mapa cliente')
   } finally {
@@ -663,6 +664,17 @@ onMounted(() => {
   loadData()
 })
 
+watch(tipoMapa, () => {
+  renderPolygons()
+  refreshMapLayout()
+})
+
+watch(dialogAsignar, (open) => {
+  if (!open) {
+    refreshMapLayout()
+  }
+})
+
 watch([zonaFiltroTabla, vendedorFiltroTabla], () => {
   selectedRows.value = selectedRows.value.filter((s) => rowsFiltradasTabla.value.some((r) => r.id === s.id))
   renderMarkers()
@@ -700,6 +712,3 @@ onBeforeUnmount(() => {
   background: #fff;
 }
 </style>
-
-
-

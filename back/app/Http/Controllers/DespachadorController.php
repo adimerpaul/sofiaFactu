@@ -34,7 +34,7 @@ class DespachadorController extends Controller
                 'usuarioCamion:id,name,placa',
                 'zona:id,nombre,color,orden',
                 'venta:id,pedido_id,total,tipo_pago,facturado,factura_estado,estado',
-                'venta.pagos:id,venta_id,monto',
+                'venta.pagos:id,venta_id,monto,correcciones,estado',
                 'detalles:id,pedido_id,producto_id,cantidad',
                 'detalles.producto:id,codigo,nombre,tipo',
             ])
@@ -62,11 +62,12 @@ class DespachadorController extends Controller
         }
 
         $rows = $items->map(function (Pedido $pedido) {
-            $venta = $pedido->venta ?: Venta::query()->with('pagos:id,venta_id,monto')->where('pedido_id', $pedido->id)->first();
-            $pagos = collect($venta?->pagos ?: []);
-            $pagado = round((float) $pagos->sum('monto'), 2);
+            $venta = $pedido->venta ?: Venta::query()->with('pagos:id,venta_id,monto,correcciones,estado')->where('pedido_id', $pedido->id)->first();
+            $pagos = $this->pagosActivos($venta?->pagos);
+            $pagoInicial = $this->pagoInicialActivo($pagos);
+            $cobrado = round((float) ($pagoInicial?->monto ?? 0), 2);
             $total = round((float) ($venta?->total ?? $pedido->total ?? 0), 2);
-            $saldo = $this->saldoConTolerancia($total, $pagado);
+            $saldo = $this->saldoConTolerancia($total, $cobrado);
 
             return [
                 'pedido_id' => $pedido->id,
@@ -86,14 +87,16 @@ class DespachadorController extends Controller
                 'facturado' => (bool) ($venta?->facturado ?? $pedido->facturado),
                 'factura_estado' => (string) ($venta?->factura_estado ?? 'SIN_GESTION'),
                 'total' => $total,
-                'pagado' => $pagado,
+                'cobrado' => $cobrado,
+                'pagado' => $cobrado,
                 'saldo' => $saldo,
-                'ultimo_pago' => round((float) ($pagos->sortByDesc('id')->first()?->monto ?? 0), 2),
+                'ultimo_pago' => round((float) ($pagoInicial?->monto ?? 0), 2),
                 'despacho_estado' => $pedido->despacho_estado ?: 'PENDIENTE',
-                'pagos' => $pagos->map(function ($pg) {
+                'pagos' => collect($pagoInicial ? [$pagoInicial] : [])->map(function ($pg) {
                     return [
                         'id' => $pg->id,
                         'monto' => round((float) $pg->monto, 2),
+                        'correcciones' => (int) ($pg->correcciones ?? 0),
                     ];
                 })->values(),
                 'productos' => $pedido->detalles->map(function ($d) {
@@ -111,7 +114,7 @@ class DespachadorController extends Controller
             'stats' => [
                 'total_entregas' => $rows->count(),
                 'monto_total' => round((float) $rows->sum('total'), 2),
-                'monto_cobrado' => round((float) $rows->sum('pagado'), 2),
+                'monto_cobrado' => round((float) $rows->sum('cobrado'), 2),
                 'saldo_total' => round((float) $rows->sum('saldo'), 2),
             ],
         ]);
@@ -161,117 +164,46 @@ class DespachadorController extends Controller
         ]);
 
         return DB::transaction(function () use ($data, $user) {
-            $venta = Venta::query()->with(['pedido', 'pagos'])->lockForUpdate()->findOrFail((int) $data['venta_id']);
-            $pedido = $venta->pedido ?: Pedido::query()->where('venta_id', $venta->id)->first();
-
-            $total = round((float) ($venta->total ?? 0), 2);
-            $pagadoActual = round((float) $venta->pagos->sum('monto'), 2);
-            $saldo = round(max(0, $total - $pagadoActual), 2);
-            $monto = round((float) $data['monto'], 2);
-            $tipoPago = strtoupper((string) $data['tipo_pago']);
-            $metodoPago = strtoupper((string) $data['metodo_pago']);
-
-            $ultimoPago = $venta->pagos->sortByDesc('id')->first();
-            if ($ultimoPago) {
-                $otrosPagos = round(max(0, $pagadoActual - (float) $ultimoPago->monto), 2);
-                $maximoNuevo = round(max(0, $total - $otrosPagos), 2);
-                if ($monto - $maximoNuevo > 0.0001) {
-                    return response()->json([
-                        'message' => 'El monto supera el saldo pendiente',
-                        'meta' => [
-                            'total' => $total,
-                            'pagado_actual' => $pagadoActual,
-                            'saldo_actual' => $saldo,
-                            'maximo_permitido' => $maximoNuevo,
-                        ],
-                    ], 422);
-                }
-                if ($tipoPago === 'CONTADO' && ($maximoNuevo - $monto) > 0.99) {
-                    return response()->json(['message' => 'Para contado se permite diferencia maxima de 0.99'], 422);
-                }
-
-                $ultimoPago->update([
-                    'tipo_pago' => $tipoPago,
-                    'metodo_pago' => $metodoPago,
-                    'monto' => $monto,
-                    'fecha_hora' => now(),
-                    'observacion' => $data['observacion'] ?? $ultimoPago->observacion,
-                    'latitud' => $data['latitud'] ?? $ultimoPago->latitud,
-                    'longitud' => $data['longitud'] ?? $ultimoPago->longitud,
-                ]);
-
-                $pagadoNuevo = round($otrosPagos + $monto, 2);
-                $saldoNuevo = $this->saldoConTolerancia($total, $pagadoNuevo);
-
-                if ($pedido) {
-                    $pedido->despacho_estado = $saldoNuevo <= 0 ? 'ENTREGADO' : 'PARCIAL';
-                    $pedido->entrega_at = now();
-                    $pedido->despachador_user_id = $user->id;
-                    $pedido->save();
-                }
-
-                return response()->json([
-                    'message' => 'Cobro actualizado',
-                    'pago' => $ultimoPago->fresh(),
-                    'resumen' => [
-                        'total' => round($total, 2),
-                        'pagado' => round($pagadoNuevo, 2),
-                        'saldo' => round($saldoNuevo, 2),
-                        'cancelado' => $saldoNuevo <= 0,
-                    ],
-                ]);
-            }
-
-            if ($saldo <= 0) {
-                return response()->json(['message' => 'La venta ya fue cancelada'], 422);
-            }
-            if ($monto - $saldo > 0.0001) {
-                return response()->json([
-                    'message' => 'El monto supera el saldo pendiente',
-                    'meta' => [
-                        'total' => $total,
-                        'pagado_actual' => $pagadoActual,
-                        'saldo_actual' => $saldo,
-                    ],
-                ], 422);
-            }
-            if ($tipoPago === 'CONTADO' && ($saldo - $monto) > 0.99) {
-                return response()->json(['message' => 'Para contado se permite diferencia maxima de 0.99'], 422);
-            }
-
-            $pago = Pago::create([
-                'venta_id' => $venta->id,
-                'pedido_id' => $pedido?->id,
-                'cliente_id' => $venta->cliente_id,
-                'user_id' => $user->id,
-                'tipo_pago' => $tipoPago,
-                'metodo_pago' => $metodoPago,
-                'monto' => $monto,
-                'fecha_hora' => now(),
-                'observacion' => $data['observacion'] ?? null,
-                'latitud' => $data['latitud'] ?? null,
-                'longitud' => $data['longitud'] ?? null,
+            $result = $this->registrarCobroVenta($data, $user, false);
+            return response()->json([
+                'message' => 'Pago registrado',
+                'pago' => $result['pago'],
+                'resumen' => $result['resumen'],
             ]);
+        });
+    }
 
-            $pagadoNuevo = round($pagadoActual + $monto, 2);
-            $saldoNuevo = $this->saldoConTolerancia($total, $pagadoNuevo);
+    public function registrarPagosLote(Request $request)
+    {
+        $this->authorizeDespacho($request);
+        $user = $request->user();
 
-            if ($pedido) {
-                $pedido->despacho_estado = $saldoNuevo <= 0 ? 'ENTREGADO' : 'PARCIAL';
-                $pedido->entrega_at = now();
-                $pedido->despachador_user_id = $user->id;
-                $pedido->save();
+        $data = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.venta_id' => 'required|integer|exists:ventas,id',
+            'items.*.pedido_id' => 'nullable|integer|exists:pedidos,id',
+            'items.*.monto' => 'required|numeric|min:0',
+            'items.*.tipo_pago' => 'required|string|in:CONTADO,CREDITO',
+            'items.*.metodo_pago' => 'required|string|in:EFECTIVO,QR,TRANSFERENCIA,OTRO',
+            'items.*.observacion' => 'nullable|string|max:600',
+            'items.*.latitud' => 'nullable|numeric',
+            'items.*.longitud' => 'nullable|numeric',
+        ]);
+
+        return DB::transaction(function () use ($data, $user) {
+            $rows = [];
+            foreach ($data['items'] as $item) {
+                $rows[] = $this->registrarCobroVenta($item, $user, true);
             }
 
             return response()->json([
-                'message' => 'Pago registrado',
-                'pago' => $pago,
-                'resumen' => [
-                    'total' => round($total, 2),
-                    'pagado' => round($pagadoNuevo, 2),
-                    'saldo' => round($saldoNuevo, 2),
-                    'cancelado' => $saldoNuevo <= 0,
-                ],
+                'message' => 'Pagos registrados',
+                'data' => collect($rows)->map(fn ($row) => [
+                    'pedido_id' => $row['pedido_id'],
+                    'venta_id' => $row['venta_id'],
+                    'pago' => $row['pago'],
+                    'resumen' => $row['resumen'],
+                ])->values(),
             ]);
         });
     }
@@ -314,10 +246,11 @@ class DespachadorController extends Controller
 
         $rows = $pedidos->map(function (Pedido $pedido) {
             $venta = $pedido->venta ?: Venta::query()->with(['pagos.user:id,name'])->where('pedido_id', $pedido->id)->first();
-            $pagos = collect($venta?->pagos ?: []);
-            $pagado = round((float) $pagos->sum('monto'), 2);
+            $pagos = $this->pagosActivos($venta?->pagos);
+            $pagoInicial = $this->pagoInicialActivo($pagos);
+            $cobrado = round((float) ($pagoInicial?->monto ?? 0), 2);
             $total = round((float) ($venta?->total ?? $pedido->total ?? 0), 2);
-            $saldo = $this->saldoConTolerancia($total, $pagado);
+            $saldo = $this->saldoConTolerancia($total, $cobrado);
 
             return [
                 'pedido_id' => $pedido->id,
@@ -336,7 +269,8 @@ class DespachadorController extends Controller
                 'facturado' => (bool) ($venta?->facturado ?? false),
                 'factura_estado' => (string) ($venta?->factura_estado ?? 'SIN_GESTION'),
                 'total' => $total,
-                'pagado' => $pagado,
+                'cobrado' => $cobrado,
+                'pagado' => $cobrado,
                 'saldo' => $saldo,
                 'productos' => $pedido->detalles->map(function ($d) {
                     return [
@@ -346,11 +280,12 @@ class DespachadorController extends Controller
                         'cantidad' => (float) $d->cantidad,
                     ];
                 })->values(),
-                'pagos' => $pagos->map(function (Pago $p) {
+                'pagos' => collect($pagoInicial ? [$pagoInicial] : [])->map(function (Pago $p) {
                     return [
                         'id' => $p->id,
                         'fecha_hora' => optional($p->fecha_hora)->format('Y-m-d H:i:s'),
                         'monto' => round((float) $p->monto, 2),
+                        'correcciones' => (int) ($p->correcciones ?? 0),
                         'tipo_pago' => $p->tipo_pago,
                         'metodo_pago' => $p->metodo_pago,
                         'observacion' => $p->observacion,
@@ -375,7 +310,7 @@ class DespachadorController extends Controller
             'total_pagos' => $pagos->count(),
             'total_entregas' => $rows->count(),
             'monto_total' => round((float) $rows->sum('total'), 2),
-            'monto_cobrado' => round((float) $rows->sum('pagado'), 2),
+            'monto_cobrado' => round((float) $rows->sum('cobrado'), 2),
             'saldo_total' => round((float) $rows->sum('saldo'), 2),
             'contado' => round((float) $pagos->where('tipo_pago', 'CONTADO')->sum('monto'), 2),
             'credito' => round((float) $pagos->where('tipo_pago', 'CREDITO')->sum('monto'), 2),
@@ -509,22 +444,29 @@ class DespachadorController extends Controller
             $venta = Venta::query()->with(['pagos', 'pedido'])->lockForUpdate()->findOrFail((int) $pago->venta_id);
             $pedido = $venta->pedido ?: Pedido::query()->where('venta_id', $venta->id)->first();
             $camionId = $this->resolveCamionId($user, $request->integer('usuario_camion_id'));
+            $pagoInicial = $this->pagoInicialActivo($this->pagosActivos($venta->pagos));
 
             if ((int) ($pedido?->usuario_camion_id ?? 0) !== (int) $camionId) {
                 return response()->json(['message' => 'No autorizado para modificar este pago'], 422);
             }
+            if ((int) ($pagoInicial?->id ?? 0) !== (int) $pago->id) {
+                return response()->json(['message' => 'Solo puede corregirse el cobro inicial desde rutas camion'], 422);
+            }
+            if ((int) ($pago->correcciones ?? 0) >= 1) {
+                return response()->json(['message' => 'Este cobro solo puede corregirse una vez'], 422);
+            }
 
             $montoNuevo = round((float) $data['monto'], 2);
             $total = round((float) ($venta->total ?? 0), 2);
-            $otrosPagos = round((float) $venta->pagos->where('id', '!=', $pago->id)->sum('monto'), 2);
-            if (($otrosPagos + $montoNuevo) - $total > 0.0001) {
+            if (($montoNuevo - $total) > 0.0001) {
                 return response()->json(['message' => 'El monto supera el total de la venta'], 422);
             }
 
             $pago->monto = $montoNuevo;
+            $pago->correcciones = (int) ($pago->correcciones ?? 0) + 1;
             $pago->save();
 
-            $pagadoNuevo = round($otrosPagos + $montoNuevo, 2);
+            $pagadoNuevo = round($montoNuevo, 2);
             $saldoNuevo = $this->saldoConTolerancia($total, $pagadoNuevo);
 
             if ($pedido) {
@@ -539,12 +481,98 @@ class DespachadorController extends Controller
                 'pago' => $pago->fresh(),
                 'resumen' => [
                     'total' => $total,
+                    'cobrado' => $pagadoNuevo,
                     'pagado' => $pagadoNuevo,
                     'saldo' => $saldoNuevo,
                     'cancelado' => $saldoNuevo <= 0,
                 ],
             ]);
         });
+    }
+
+    private function pagosActivos($pagos)
+    {
+        return collect($pagos ?: [])->filter(function ($pago) {
+            return strtoupper((string) ($pago->estado ?? 'ACTIVO')) === 'ACTIVO';
+        })->values();
+    }
+
+    private function registrarCobroVenta(array $data, $user, bool $allowZero): array
+    {
+        $venta = Venta::query()->with(['pedido', 'pagos'])->lockForUpdate()->findOrFail((int) $data['venta_id']);
+        $pedido = $venta->pedido ?: Pedido::query()->where('venta_id', $venta->id)->first();
+
+        $total = round((float) ($venta->total ?? 0), 2);
+        $pagosActivos = $this->pagosActivos($venta->pagos);
+        $pagoInicial = $this->pagoInicialActivo($pagosActivos);
+        $pagadoActual = round((float) ($pagoInicial?->monto ?? 0), 2);
+        $saldo = round(max(0, $total - $pagadoActual), 2);
+        $monto = round((float) $data['monto'], 2);
+        $tipoPago = strtoupper((string) $data['tipo_pago']);
+        $metodoPago = strtoupper((string) $data['metodo_pago']);
+
+        if ($pagoInicial) {
+            abort(422, 'El cobro inicial ya fue registrado');
+        }
+        if (!$allowZero && $monto <= 0) {
+            abort(422, 'El monto debe ser mayor a 0');
+        }
+        if ($allowZero && $monto < 0) {
+            abort(422, 'El monto no puede ser negativo');
+        }
+        if ($monto - $saldo > 0.0001) {
+            abort(422, 'El monto supera el saldo pendiente');
+        }
+        if ($tipoPago === 'CONTADO' && ($saldo - $monto) > 0.99) {
+            abort(422, 'Para contado se permite diferencia maxima de 0.99');
+        }
+
+        $pago = null;
+        if ($monto > 0) {
+            $pago = Pago::create([
+                'venta_id' => $venta->id,
+                'pedido_id' => $pedido?->id,
+                'cliente_id' => $venta->cliente_id,
+                'user_id' => $user->id,
+                'tipo_pago' => $tipoPago,
+                'metodo_pago' => $metodoPago,
+                'monto' => $monto,
+                'correcciones' => 0,
+                'fecha_hora' => now(),
+                'observacion' => $data['observacion'] ?? null,
+                'latitud' => $data['latitud'] ?? null,
+                'longitud' => $data['longitud'] ?? null,
+            ]);
+        }
+
+        $pagadoNuevo = round($pagadoActual + $monto, 2);
+        $saldoNuevo = $this->saldoConTolerancia($total, $pagadoNuevo);
+
+        if ($pedido) {
+            $pedido->despacho_estado = $saldoNuevo <= 0 ? 'ENTREGADO' : 'PARCIAL';
+            $pedido->entrega_at = now();
+            $pedido->despachador_user_id = $user->id;
+            $pedido->save();
+        }
+
+        return [
+            'pedido_id' => $pedido?->id,
+            'venta_id' => $venta->id,
+            'pago' => $pago,
+            'resumen' => [
+                'total' => round($total, 2),
+                'cobrado' => round($monto, 2),
+                'pagado' => round($monto, 2),
+                'saldo' => round($saldoNuevo, 2),
+                'cancelado' => $saldoNuevo <= 0,
+            ],
+        ];
+    }
+
+    private function pagoInicialActivo($pagos): ?Pago
+    {
+        $items = collect($pagos ?: []);
+        return $items->sortBy('id')->first();
     }
 
     private function saldoConTolerancia(float $total, float $pagado): float

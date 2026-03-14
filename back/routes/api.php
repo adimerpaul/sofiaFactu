@@ -56,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/verificacion/reportes/ventas/{venta}', [App\Http\Controllers\VerificacionController::class, 'imprimirVenta']);
     Route::get('/despachador/rutas', [App\Http\Controllers\DespachadorController::class, 'rutas']);
     Route::post('/despachador/pagos', [App\Http\Controllers\DespachadorController::class, 'registrarPago']);
+    Route::post('/despachador/pagos/lote', [App\Http\Controllers\DespachadorController::class, 'registrarPagosLote']);
     Route::put('/despachador/pagos/{pago}', [App\Http\Controllers\DespachadorController::class, 'actualizarPago']);
     Route::put('/despachador/pedidos/{pedido}/estado', [App\Http\Controllers\DespachadorController::class, 'actualizarEstadoPedido']);
     Route::get('/despachador/despacho', [App\Http\Controllers\DespachadorController::class, 'despacho']);

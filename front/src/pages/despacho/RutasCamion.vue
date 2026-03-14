@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <q-page class="q-pa-sm rutas-page">
     <q-card flat bordered class="q-mb-sm">
       <q-card-section class="row q-col-gutter-sm items-center">
@@ -42,7 +42,7 @@
           </q-td>
         </template>
         <template #body-cell-total="props"><q-td :props="props">{{ money(props.row.total) }}</q-td></template>
-        <template #body-cell-pagado="props"><q-td :props="props">{{ money(props.row.pagado) }}</q-td></template>
+        <template #body-cell-pagado="props"><q-td :props="props">{{ money(props.row.cobrado) }}</q-td></template>
         <template #body-cell-saldo="props"><q-td :props="props">{{ money(props.row.saldo) }}</q-td></template>
       </q-table>
     </q-card>
@@ -58,91 +58,103 @@
         </q-card-section>
         <q-separator />
         <q-card-section>
-          <q-markup-table dense flat bordered wrap-cells>
+          <div class="row q-col-gutter-sm q-mb-sm">
+            <div class="col-12 col-md-3">
+              <q-chip color="blue-8" text-color="white" class="full-width justify-center">Seleccionadas: {{ selectedPedidosCount }}</q-chip>
+            </div>
+            <div class="col-12 col-md-3">
+              <q-chip color="indigo-8" text-color="white" class="full-width justify-center">Importe total: {{ money(totalSeleccionado) }}</q-chip>
+            </div>
+            <div class="col-12 col-md-3">
+              <q-chip color="green-8" text-color="white" class="full-width justify-center">Cobro a registrar: {{ money(cobroSeleccionado) }}</q-chip>
+            </div>
+            <div class="col-12 col-md-3">
+              <q-chip color="orange-8" text-color="white" class="full-width justify-center">Saldo: {{ money(saldoSeleccionado) }}</q-chip>
+            </div>
+          </div>
+
+          <q-markup-table dense flat bordered wrap-cells class="dialog-table">
             <thead>
               <tr>
-                <th>Acciones</th>
+                <th style="width: 52px;">
+                  <q-checkbox :model-value="allPedidosSelected" dense @update:model-value="toggleSelectAll" />
+                </th>
+                <th style="width: 70px;">Ver</th>
                 <th>Comanda</th>
                 <th>Importe</th>
-                <th>Pagado</th>
-                <th>Saldo</th>
                 <th>Tipo pago</th>
-                <th>Estado</th>
-                <th>Cobrado</th>
+                <th class="cobrado-col">Cobrado</th>
               </tr>
             </thead>
             <tbody>
               <template v-for="(p, idx) in dialogPedidos" :key="p.pedido_id">
                 <tr>
-                  <td style="white-space: nowrap;">
-                    <q-btn-dropdown
+                  <td class="text-center">
+                    <q-checkbox v-model="p.selected" dense />
+                  </td>
+                  <td class="text-center">
+                    <q-btn
                       dense
+                      round
+                      flat
                       color="primary"
-                      no-caps
-                      label="Opciones"
-                      size="sm"
-                      :loading="!!actionLoading[p.pedido_id]"
-                      :disable="loadingSaveAll || loadingEstado"
-                    >
-                      <q-list>
-                        <q-item clickable v-close-popup @click="toggleDetallePedido(p.pedido_id)">
-                          <q-item-section avatar><q-icon :name="expandedPedidos[p.pedido_id] ? 'visibility_off' : 'visibility'" /></q-item-section>
-                          <q-item-section>{{ expandedPedidos[p.pedido_id] ? 'Ocultar detalle' : 'Ver detalle' }}</q-item-section>
-                        </q-item>
-                        <q-item clickable v-close-popup @click="cobrarPedido(p)" :disable="!p.venta_id || Number(p.saldo || 0) <= 0 || loadingSaveAll || loadingEstado || !!actionLoading[p.pedido_id]">
-                          <q-item-section avatar><q-icon name="payments" /></q-item-section>
-                          <q-item-section>Cobrar</q-item-section>
-                        </q-item>
-                        <q-item clickable v-close-popup @click="guardarYSiguiente(p, idx)" :disable="!p.venta_id || Number(p.saldo || 0) <= 0 || loadingSaveAll || loadingEstado || !!actionLoading[p.pedido_id]">
-                          <q-item-section avatar><q-icon name="arrow_downward" /></q-item-section>
-                          <q-item-section>Siguiente</q-item-section>
-                        </q-item>
-                        <q-item clickable v-close-popup @click="modificarCobro(p)" :disable="!ultimoPagoId(p) || loadingSaveAll || loadingEstado || !!actionLoading[p.pedido_id]">
-                          <q-item-section avatar><q-icon name="edit" /></q-item-section>
-                          <q-item-section>Modificar cobro</q-item-section>
-                        </q-item>
-                        <q-item clickable v-close-popup @click="imprimirVoucherVenta(p)" :disable="!p.venta_id">
-                          <q-item-section avatar><q-icon name="description" /></q-item-section>
-                          <q-item-section>Voucher</q-item-section>
-                        </q-item>
-                        <q-item clickable v-close-popup @click="mandarWhatsappVoucher(p)" :disable="!p.venta_id">
-                          <q-item-section avatar><q-icon name="chat" /></q-item-section>
-                          <q-item-section>WhatsApp voucher</q-item-section>
-                        </q-item>
-                      </q-list>
-                    </q-btn-dropdown>
+                      :icon="expandedPedidos[p.pedido_id] ? 'visibility_off' : 'visibility'"
+                      @click="toggleDetallePedido(p.pedido_id)"
+                    />
                   </td>
                   <td>#{{ p.comanda }}</td>
                   <td>{{ money(p.total) }}</td>
-                  <td>{{ money(p.pagado) }}</td>
-                  <td>{{ money(p.saldo) }}</td>
-                  <td>{{ p.tipo_pago_venta || '-' }}</td>
-                  <td><q-chip dense :color="estadoColor(p.despacho_estado)" text-color="white">{{ p.despacho_estado }}</q-chip></td>
-                  <td style="width: 140px;">
+                  <td>
+                    <q-chip dense :color="String(p.tipo_pago_venta || '').toUpperCase().includes('CRED') ? 'orange-8' : 'red'" text-color="white">
+                      {{ p.tipo_pago_venta || '-' }}
+                    </q-chip>
+                  </td>
+                  <td class="cobrado-col">
                     <q-input
                       :ref="(el) => setPagoInputRef(el, idx)"
-                      v-model.number="p.pagoMonto"
+                      v-model.number="p.cobroMonto"
                       dense
                       outlined
                       type="number"
                       min="0"
                       step="0.01"
-                      :disable="loadingSaveAll || loadingEstado || !!actionLoading[p.pedido_id]"
-                      @keyup.enter="guardarYSiguiente(p, idx)"
+                      :disable="loadingRegister || !!actionLoading[p.pedido_id] || (p.bloqueado && !p.editando)"
+                      @focus="p.selected = true"
+                      @keyup.enter="registrarSeleccionados"
                     />
+                    <div class="q-mt-xs">
+                      <q-btn
+                        v-if="p.bloqueado && !p.editando && p.puedeCorregir"
+                        flat
+                        dense
+                        no-caps
+                        color="primary"
+                        label="Corregir"
+                        @click="habilitarCorreccion(p)"
+                      />
+                      <span v-else-if="p.bloqueado && !p.puedeCorregir" class="text-caption text-grey-7">Corrección usada</span>
+                    </div>
                   </td>
                 </tr>
                 <tr v-show="expandedPedidos[p.pedido_id]">
-                  <td colspan="8" class="bg-grey-1">
-                    <div v-for="(d, i) in (p.productos || [])" :key="`${p.pedido_id}-${i}`" class="q-py-xs">
-                      <b>Codigo:</b> {{ d.codigo || '-' }} <b>Producto:</b> {{ d.nombre || '-' }} <b>Cant.:</b> {{ Number(d.cantidad || 0).toFixed(2) }}
+                  <td colspan="6" class="bg-grey-1">
+                    <div class="detalle-head q-mb-xs">
+                      <span><b>Importe:</b> {{ money(p.total) }}</span>
+                      <span><b>Cobrado actual:</b> {{ money(p.cobrado) }}</span>
+                      <span><b>Saldo:</b> {{ money(p.saldo) }}</span>
+                      <span><b>Estado:</b> {{ p.despacho_estado }}</span>
                     </div>
-                    <div class="q-mt-xs">
-                      <div class="text-caption text-grey-7 text-weight-bold">Pagos registrados:</div>
-                      <div v-if="!(p.pagos || []).length" class="text-caption text-grey-7">Sin pagos</div>
-                      <div v-for="pg in (p.pagos || [])" :key="`pg-${p.pedido_id}-${pg.id}`" class="text-caption">
-                        - Pago #{{ pg.id }}: {{ money(pg.monto) }}
-                      </div>
+                    <div v-for="(d, i) in (p.productos || [])" :key="`${p.pedido_id}-${i}`" class="producto-row">
+                      <span class="prod-codigo">{{ d.codigo || '-' }}</span>
+                      <span class="prod-nombre">{{ d.nombre || '-' }}</span>
+                      <span class="prod-cantidad">Cant. {{ Number(d.cantidad || 0).toFixed(2) }}</span>
+                    </div>
+                    <div class="text-caption text-grey-7 q-mt-xs" v-if="!(p.productos || []).length">Sin productos</div>
+                    <div class="q-mt-sm text-caption text-grey-7" v-if="(p.pagos || []).length">
+                      Registros de cobro:
+                      <span v-for="pg in (p.pagos || [])" :key="`pg-${p.pedido_id}-${pg.id}`" class="q-mr-sm">
+                        #{{ pg.id }} {{ money(pg.monto) }}
+                      </span>
                     </div>
                   </td>
                 </tr>
@@ -152,10 +164,7 @@
         </q-card-section>
         <q-separator />
         <q-card-actions align="right">
-          <q-btn color="primary" no-caps label="Guardar todo y bloquear" :loading="loadingSaveAll" :disable="loadingEstado" @click="guardarTodoYBloquear" />
-          <q-btn v-if="mostrarAccionesEstado" color="positive" no-caps label="Entregado" :loading="loadingEstado" :disable="loadingSaveAll" @click="actualizarEstadosCliente('ENTREGADO')" />
-          <q-btn v-if="mostrarAccionesEstado" color="amber-8" no-caps label="Volver mas tarde" :loading="loadingEstado" :disable="loadingSaveAll" @click="actualizarEstadosCliente('NO ENTREGADO')" />
-          <q-btn v-if="mostrarAccionesEstado" color="negative" no-caps label="Rechazado" :loading="loadingEstado" :disable="loadingSaveAll" @click="actualizarEstadosCliente('RECHAZADO')" />
+          <q-btn color="positive" no-caps label="Registrar" :loading="loadingRegister" @click="registrarSeleccionados" />
           <q-btn flat no-caps color="grey-8" label="Cerrar" v-close-popup />
         </q-card-actions>
       </q-card>
@@ -180,8 +189,7 @@ const dialogPedidos = ref([])
 const expandedPedidos = ref({})
 const pagoInputRefs = ref({})
 const actionLoading = ref({})
-const loadingSaveAll = ref(false)
-const loadingEstado = ref(false)
+const loadingRegister = ref(false)
 
 const mapRef = ref(null)
 const map = ref(null)
@@ -194,62 +202,63 @@ const columns = [
   { name: 'tipo_pago_venta', label: 'Tipo pago', field: 'tipo_pago_venta', align: 'left' },
   { name: 'estado', label: 'Estado', field: 'despacho_estado', align: 'left' },
   { name: 'total', label: 'Total', field: 'total', align: 'right' },
-  { name: 'pagado', label: 'Cobrado', field: 'pagado', align: 'right' },
+  { name: 'pagado', label: 'Cobrado', field: 'cobrado', align: 'right' },
   { name: 'saldo', label: 'Saldo', field: 'saldo', align: 'right' },
 ]
 
-const estadosFinales = ['ENTREGADO', 'NO ENTREGADO', 'RECHAZADO']
-const mostrarAccionesEstado = computed(() => {
-  if (!Array.isArray(dialogPedidos.value) || dialogPedidos.value.length === 0) return true
-  return dialogPedidos.value.some((p) => !estadosFinales.includes(String(p.despacho_estado || '').toUpperCase()))
-})
-
 const rowsClientes = computed(() => {
-  const map = new Map()
-  rows.value.forEach((r) => {
-    const key = r?.cliente_id ? `cli-${r.cliente_id}` : `ped-${r.pedido_id}`
-    const base = map.get(key) || {
+  const grouped = new Map()
+  rows.value.forEach((row) => {
+    const key = row?.cliente_id ? `cli-${row.cliente_id}` : `ped-${row.pedido_id}`
+    const base = grouped.get(key) || {
       cliente_key: key,
-      cliente_id: r.cliente_id,
+      cliente_id: row.cliente_id,
       source_pedido_ids: [],
-      cliente: r.cliente,
-      telefono: r.telefono,
-      direccion: r.direccion,
-      latitud: r.latitud,
-      longitud: r.longitud,
+      cliente: row.cliente,
+      telefono: row.telefono,
+      direccion: row.direccion,
+      latitud: row.latitud,
+      longitud: row.longitud,
       pedidos_count: 0,
       total: 0,
-      pagado: 0,
+      cobrado: 0,
       saldo: 0,
-      tipo_pago_venta: r.tipo_pago_venta || '',
-      despacho_estado: r.despacho_estado || 'PENDIENTE',
+      tipo_pago_venta: row.tipo_pago_venta || '',
+      despacho_estado: row.despacho_estado || 'PENDIENTE',
     }
     base.pedidos_count += 1
-    base.source_pedido_ids.push(r.pedido_id)
-    base.total = Number(base.total) + Number(r.total || 0)
-    base.pagado = Number(base.pagado) + Number(r.pagado || 0)
-    base.saldo = Number(base.saldo) + Number(r.saldo || 0)
-    if (String(base.tipo_pago_venta || '').toUpperCase().includes('CRED') || String(r.tipo_pago_venta || '').toUpperCase().includes('CRED')) {
+    base.source_pedido_ids.push(row.pedido_id)
+    base.total += Number(row.total || 0)
+    base.cobrado += Number(row.cobrado || 0)
+    base.saldo += Number(row.saldo || 0)
+    if (String(base.tipo_pago_venta || '').toUpperCase().includes('CRED') || String(row.tipo_pago_venta || '').toUpperCase().includes('CRED')) {
       base.tipo_pago_venta = 'MIXTO/CREDITO'
     }
-    base.despacho_estado = mergeEstado(base.despacho_estado, r.despacho_estado)
-    map.set(key, base)
+    base.despacho_estado = mergeEstado(base.despacho_estado, row.despacho_estado)
+    grouped.set(key, base)
   })
-  return Array.from(map.values()).map((x) => ({
-    ...x,
-    total: Number(x.total.toFixed(2)),
-    pagado: Number(x.pagado.toFixed(2)),
-    saldo: Number(x.saldo.toFixed(2)),
+  return Array.from(grouped.values()).map((item) => ({
+    ...item,
+    total: Number(item.total.toFixed(2)),
+    cobrado: Number(item.cobrado.toFixed(2)),
+    saldo: Number(item.saldo.toFixed(2)),
   }))
 })
 
+const selectedPedidos = computed(() => dialogPedidos.value.filter((p) => !!p.selected))
+const selectedPedidosCount = computed(() => selectedPedidos.value.length)
+const allPedidosSelected = computed(() => dialogPedidos.value.length > 0 && dialogPedidos.value.every((p) => !!p.selected))
+const totalSeleccionado = computed(() => selectedPedidos.value.reduce((acc, p) => acc + Number(p.total || 0), 0))
+const cobroSeleccionado = computed(() => selectedPedidos.value.reduce((acc, p) => acc + Number(p.cobroMonto || 0), 0))
+const saldoSeleccionado = computed(() => selectedPedidos.value.reduce((acc, p) => acc + Number(p.saldo || 0), 0))
+
 function mergeEstado(a, b) {
   const rank = {
-    'PENDIENTE': 0,
-    'PARCIAL': 1,
+    PENDIENTE: 0,
+    PARCIAL: 1,
     'NO ENTREGADO': 2,
-    'RECHAZADO': 3,
-    'ENTREGADO': 4,
+    RECHAZADO: 3,
+    ENTREGADO: 4,
   }
   const ea = String(a || 'PENDIENTE').toUpperCase()
   const eb = String(b || 'PENDIENTE').toUpperCase()
@@ -259,6 +268,27 @@ function mergeEstado(a, b) {
 function money(v) {
   const n = Number(v || 0)
   return `Bs ${n.toFixed(2)}`
+}
+
+function lastPago(row) {
+  const pagos = Array.isArray(row?.pagos) ? row.pagos : []
+  return pagos.length ? pagos[pagos.length - 1] : null
+}
+
+function enrichPedido(row, selected = false) {
+  const cobrado = Number(row.cobrado ?? row.pagado ?? 0)
+  const last = lastPago(row)
+  const tieneCobro = cobrado > 0 || !!last
+  return {
+    ...row,
+    cobrado,
+    cobroMonto: tieneCobro ? cobrado : 0,
+    selected,
+    bloqueado: tieneCobro,
+    editando: false,
+    puedeCorregir: !!last && Number(last.correcciones || 0) < 1,
+    ultimoPagoId: last?.id || null,
+  }
 }
 
 function estadoColor(estado) {
@@ -286,16 +316,16 @@ function renderMap() {
   layer.value.clearLayers()
   const bounds = []
   const byClient = new Map()
-  rows.value.forEach((r) => {
-    if (!r.cliente_id || !Number.isFinite(Number(r.latitud)) || !Number.isFinite(Number(r.longitud))) return
-    if (!byClient.has(r.cliente_id)) byClient.set(r.cliente_id, r)
+  rows.value.forEach((row) => {
+    if (!row.cliente_id || !Number.isFinite(Number(row.latitud)) || !Number.isFinite(Number(row.longitud))) return
+    if (!byClient.has(row.cliente_id)) byClient.set(row.cliente_id, row)
   })
-  byClient.forEach((r) => {
-    const lat = Number(r.latitud)
-    const lng = Number(r.longitud)
+  byClient.forEach((row) => {
+    const lat = Number(row.latitud)
+    const lng = Number(row.longitud)
     const mk = L.marker([lat, lng]).addTo(layer.value)
-    mk.bindTooltip(`${r.cliente || ''}`, { sticky: true })
-    mk.on('click', () => openClienteDialog(r))
+    mk.bindTooltip(`${row.cliente || ''}`, { sticky: true })
+    mk.on('click', () => openClienteDialog(row))
     bounds.push([lat, lng])
   })
   if (bounds.length) map.value.fitBounds(bounds, { padding: [25, 25], maxZoom: 15 })
@@ -306,7 +336,7 @@ async function loadRutas() {
   try {
     const res = await proxy.$axios.get('/despachador/rutas', { params: { fecha: fecha.value, search: search.value || undefined } })
     rows.value = Array.isArray(res.data?.data)
-      ? res.data.data.map((r) => ({ ...r, pagoMonto: initialCobroMonto(r) }))
+      ? res.data.data.map((row) => enrichPedido(row, false))
       : []
     stats.value = res.data?.stats || {}
     renderMap()
@@ -321,11 +351,11 @@ function openClienteDialog(row) {
   selectedCliente.value = row
   const ids = Array.isArray(row?.source_pedido_ids) ? row.source_pedido_ids : []
   dialogPedidos.value = rows.value
-    .filter((x) => {
-      if (ids.length) return ids.includes(x.pedido_id)
-      return String(x.cliente_id) === String(row.cliente_id)
+    .filter((item) => {
+      if (ids.length) return ids.includes(item.pedido_id)
+      return String(item.cliente_id) === String(row.cliente_id)
     })
-    .map((x) => ({ ...x, pagoMonto: initialCobroMonto(x) }))
+    .map((item) => enrichPedido(item, true))
   expandedPedidos.value = {}
   pagoInputRefs.value = {}
   dialogCliente.value = true
@@ -333,6 +363,16 @@ function openClienteDialog(row) {
 
 function toggleDetallePedido(pedidoId) {
   expandedPedidos.value[pedidoId] = !expandedPedidos.value[pedidoId]
+}
+
+function toggleSelectAll(value) {
+  dialogPedidos.value = dialogPedidos.value.map((item) => ({ ...item, selected: !!value }))
+}
+
+function habilitarCorreccion(pedido) {
+  if (!pedido?.puedeCorregir) return
+  pedido.editando = true
+  pedido.selected = true
 }
 
 function openGoogleMaps(row) {
@@ -357,200 +397,61 @@ function getCurrentLocation() {
   })
 }
 
-async function cobrarPedido(p, reload = true) {
-  const pedidoKey = p?.pedido_id
-  actionLoading.value[pedidoKey] = true
-  try {
-    const monto = Number(Number(p.pagoMonto || 0).toFixed(2))
-    if (!Number.isFinite(monto) || monto <= 0) {
-      proxy.$alert.error('Monto invalido')
-      return false
-    }
-    const pagoId = ultimoPagoId(p)
-    if (pagoId) {
-      await proxy.$axios.put(`/despachador/pagos/${pagoId}`, { monto })
-    } else {
-      const geo = await getCurrentLocation()
-      const tipo = String((p.tipo_pago_venta || 'CONTADO')).toUpperCase().includes('CRED') ? 'CREDITO' : 'CONTADO'
-      await proxy.$axios.post('/despachador/pagos', {
-        venta_id: p.venta_id,
-        monto,
-        tipo_pago: tipo,
-        metodo_pago: 'EFECTIVO',
-        observacion: null,
-        latitud: geo?.latitud,
-        longitud: geo?.longitud,
-      })
-    }
-    if (reload) {
-      proxy.$alert.success('Cobro guardado')
-      await loadRutas()
-      if (selectedCliente.value) {
-        const pick = rows.value.find((x) => String(x.cliente_id) === String(selectedCliente.value.cliente_id))
-        if (pick) openClienteDialog(pick)
-      }
-    }
-    return true
-  } catch (e) {
-    proxy.$alert.error(e?.response?.data?.message || 'No se pudo registrar cobro')
-    return false
-  } finally {
-    actionLoading.value[pedidoKey] = false
-  }
-}
-
-function ultimoPagoId(p) {
-  const pagos = Array.isArray(p?.pagos) ? p.pagos : []
-  if (!pagos.length) return null
-  return pagos[pagos.length - 1]?.id || null
-}
-
-function ultimoPagoMonto(p) {
-  const pagos = Array.isArray(p?.pagos) ? p.pagos : []
-  if (!pagos.length) return 0
-  return Number(Number(pagos[pagos.length - 1]?.monto || 0).toFixed(2))
-}
-
-function initialCobroMonto(row) {
-  const ultimo = ultimoPagoMonto(row)
-  if (ultimo > 0) return ultimo
-  const pagado = Number(Number(row?.pagado || 0).toFixed(2))
-  if (pagado > 0) return pagado
-  return Number(Number(row?.saldo || 0).toFixed(2))
-}
-
-async function modificarCobro(p) {
-  const pagoId = ultimoPagoId(p)
-  if (!pagoId) {
-    proxy.$alert.error('No hay pago previo para modificar')
-    return
-  }
-  const montoActual = ultimoPagoMonto(p)
-  const result = await new Promise((resolve) => {
-    proxy.$q.dialog({
-      title: 'Modificar cobro',
-      message: `Comanda #${p.comanda}`,
-      prompt: {
-        model: String(montoActual),
-        type: 'number',
-      },
-      cancel: true,
-      persistent: true,
-    }).onOk((val) => resolve(val)).onCancel(() => resolve(null))
-  })
-
-  if (result === null) return
-  const monto = Number(result)
-  if (!Number.isFinite(monto) || monto <= 0) {
-    proxy.$alert.error('Monto invalido')
-    return
-  }
-
-  try {
-    await proxy.$axios.put(`/despachador/pagos/${pagoId}`, { monto: Number(monto.toFixed(2)) })
-    proxy.$alert.success('Cobro modificado')
-    await loadRutas()
-    if (selectedCliente.value) {
-      const pick = rows.value.find((x) => String(x.cliente_id) === String(selectedCliente.value.cliente_id))
-      if (pick) openClienteDialog(pick)
-    }
-  } catch (e) {
-    proxy.$alert.error(e?.response?.data?.message || 'No se pudo modificar el cobro')
-  }
-}
-
 function setPagoInputRef(el, idx) {
   if (!el) return
   pagoInputRefs.value[idx] = el
 }
 
-async function guardarYSiguiente(p, idx) {
-  const ok = await cobrarPedido(p, true)
-  if (!ok) return
-  const next = pagoInputRefs.value[idx + 1]
-  if (next && typeof next.focus === 'function') next.focus()
-}
+async function registrarSeleccionados() {
+  if (!selectedPedidos.value.length) {
+    proxy.$alert.error('Seleccione al menos una comanda')
+    return
+  }
 
-async function guardarTodoYBloquear() {
-  loadingSaveAll.value = true
+  loadingRegister.value = true
   try {
-    for (const p of dialogPedidos.value) {
-      const montoEscrito = Number(Number(p.pagoMonto || 0).toFixed(2))
-      const yaTienePago = !!ultimoPagoId(p)
-      if (montoEscrito <= 0 && yaTienePago) continue
-      if (montoEscrito <= 0 && !yaTienePago) continue
-      const ok = await cobrarPedido(p, false)
-      if (!ok) return
-    }
-    await loadRutas()
-    if (selectedCliente.value) {
-      const pick = rows.value.find((x) => String(x.cliente_id) === String(selectedCliente.value.cliente_id))
-      if (pick) {
-        openClienteDialog(pick)
-        for (const p of dialogPedidos.value) {
-          const saldo = Number(Number(p.saldo || 0).toFixed(2))
-          p.pagoMonto = saldo > 0 ? initialCobroMonto(p) : 0
-        }
+    const paraCorregir = selectedPedidos.value.filter((pedido) => pedido.editando && pedido.ultimoPagoId)
+    const paraRegistrar = selectedPedidos.value.filter((pedido) => !pedido.bloqueado)
+
+    for (const pedido of paraCorregir) {
+      const monto = Number(Number(pedido.cobroMonto || 0).toFixed(2))
+      if (!Number.isFinite(monto) || monto <= 0) {
+        proxy.$alert.error(`La comanda #${pedido.comanda} requiere un monto válido para corregir`)
+        return
       }
+      await proxy.$axios.put(`/despachador/pagos/${pedido.ultimoPagoId}`, { monto })
     }
-    await actualizarEstadosCliente('ENTREGADO')
-  } finally {
-    loadingSaveAll.value = false
-  }
-}
 
-async function actualizarEstadosCliente(estado) {
-  loadingEstado.value = true
-  try {
-    await Promise.all(dialogPedidos.value.map((p) => proxy.$axios.put(`/despachador/pedidos/${p.pedido_id}/estado`, { estado })))
-    proxy.$alert.success('Estado actualizado')
-    await loadRutas()
-    dialogCliente.value = false
-  } catch (e) {
-    proxy.$alert.error(e?.response?.data?.message || 'No se pudo actualizar estado')
-  } finally {
-    loadingEstado.value = false
-  }
-}
+    if (paraRegistrar.length) {
+      const geo = await getCurrentLocation()
+      const items = paraRegistrar.map((pedido) => ({
+        venta_id: pedido.venta_id,
+        pedido_id: pedido.pedido_id,
+        monto: Number(Number(pedido.cobroMonto || 0).toFixed(2)),
+        tipo_pago: String(pedido.tipo_pago_venta || '').toUpperCase().includes('CRED') ? 'CREDITO' : 'CONTADO',
+        metodo_pago: 'EFECTIVO',
+        observacion: null,
+        latitud: geo?.latitud,
+        longitud: geo?.longitud,
+      }))
+      await proxy.$axios.post('/despachador/pagos/lote', { items })
+    }
 
-async function imprimirVoucherVenta(p) {
-  try {
-    const res = await proxy.$axios.get(`/despachador/reportes/vouchers/${p.venta_id}`, { responseType: 'blob' })
-    const blob = new Blob([res.data], { type: 'application/pdf' })
-    const link = document.createElement('a')
-    const fileUrl = window.URL.createObjectURL(blob)
-    link.href = fileUrl
-    link.download = `voucher_venta_${p.venta_id}.pdf`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    window.URL.revokeObjectURL(fileUrl)
-  } catch (e) {
-    proxy.$alert.error(e?.response?.data?.message || 'No se pudo generar el voucher')
-  }
-}
-
-async function mandarWhatsappVoucher(p) {
-  try {
-    const res = await proxy.$axios.get(`/despachador/reportes/vouchers/${p.venta_id}`, { responseType: 'blob' })
-    const blob = new Blob([res.data], { type: 'application/pdf' })
-    const fileName = `voucher_venta_${p.venta_id}.pdf`
-    const file = new File([blob], fileName, { type: 'application/pdf' })
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: fileName })
+    if (!paraRegistrar.length && !paraCorregir.length) {
+      proxy.$alert.error('No hay cambios para registrar')
       return
     }
-    const link = document.createElement('a')
-    const fileUrl = window.URL.createObjectURL(blob)
-    link.href = fileUrl
-    link.download = fileName
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    window.URL.revokeObjectURL(fileUrl)
-    proxy.$alert.error('Tu navegador no permite compartir PDF directo. Se descargo el voucher.')
+
+    proxy.$alert.success('Comandas registradas')
+    await loadRutas()
+    if (selectedCliente.value) {
+      const pick = rowsClientes.value.find((item) => String(item.cliente_key) === String(selectedCliente.value.cliente_key))
+      if (pick) openClienteDialog(pick)
+    }
   } catch (e) {
-    proxy.$alert.error(e?.response?.data?.message || 'No se pudo preparar el voucher')
+    proxy.$alert.error(e?.response?.data?.message || 'No se pudo registrar cobro')
+  } finally {
+    loadingRegister.value = false
   }
 }
 
@@ -570,6 +471,57 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.rutas-page { background: #f4f7fc; }
-.map-container { height: 46vh; min-height: 360px; }
+.rutas-page {
+  background: #f4f7fc;
+}
+
+.map-container {
+  height: 46vh;
+  min-height: 360px;
+}
+
+.dialog-table :deep(td),
+.dialog-table :deep(th) {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.cobrado-col {
+  min-width: 190px;
+}
+
+.detalle-head {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.producto-row {
+  display: flex;
+  gap: 10px;
+  padding: 3px 0;
+  border-bottom: 1px dotted #d6dce7;
+  font-size: 12px;
+}
+
+.producto-row:last-child {
+  border-bottom: 0;
+}
+
+.prod-codigo {
+  min-width: 64px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.prod-nombre {
+  flex: 1;
+}
+
+.prod-cantidad {
+  white-space: nowrap;
+  font-weight: 700;
+}
 </style>
+

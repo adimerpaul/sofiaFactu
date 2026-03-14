@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Pago extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'venta_id',
         'pedido_id',
@@ -15,6 +18,7 @@ class Pago extends Model
         'tipo_pago',
         'metodo_pago',
         'monto',
+        'correcciones',
         'estado',
         'fecha_hora',
         'anulado_at',
@@ -28,9 +32,11 @@ class Pago extends Model
 
     protected $casts = [
         'monto' => 'float',
+        'correcciones' => 'integer',
         'estado' => 'string',
         'fecha_hora' => 'datetime',
         'anulado_at' => 'datetime',
+        'deleted_at' => 'datetime',
         'considerar_en_cobranza' => 'boolean',
         'latitud' => 'float',
         'longitud' => 'float',

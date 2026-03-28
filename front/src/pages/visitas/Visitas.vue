@@ -26,6 +26,19 @@
       <div class="map-toolbar-right">
         <q-btn color="negative" icon="my_location" @click="locateMe" round dense />
       </div>
+
+
+      <div class="map-debug-summary">
+        <div class="map-debug-row">
+          <q-chip dense square color="positive" text-color="white">P: {{ resumenVisitas.pedidos }}</q-chip>
+          <q-chip dense square color="negative" text-color="white">NP: {{ resumenVisitas.noPedidos }}</q-chip>
+          <q-chip dense square color="warning" text-color="black">R: {{ resumenVisitas.retornar }}</q-chip>
+          <q-chip dense square color="red" text-color="white">Total: {{ resumenVisitas.total }}</q-chip>
+          <q-chip dense square :color="resumenVisitas.efectividad === 100 ? 'teal' : 'deep-orange'" text-color="white">
+            Efec: {{ resumenVisitas.efectividad }}%
+          </q-chip>
+        </div>
+      </div>
     </q-card>
 
     <q-card flat bordered class="q-mt-xs">
@@ -431,6 +444,30 @@ export default {
     totalPedido () {
       return this.pedidoItems.reduce((acc, p) => acc + (Number(p.cantidad) * Number(p.precio)), 0)
     },
+    resumenVisitas () {
+      const total = this.clientes.length
+      let pedidos = 0
+      let noPedidos = 0
+      let retornar = 0
+
+      this.clientes.forEach((cliente) => {
+        const status = this.clienteStatus(cliente?.id)
+        if (status === 'REALIZAR_PEDIDO') pedidos += 1
+        else if (status === 'NO_PEDIDO') noPedidos += 1
+        else if (status === 'RETORNAR') retornar += 1
+      })
+
+      const gestionados = pedidos + noPedidos + retornar
+      const efectividad = total > 0 ? Math.round((gestionados / total) * 100) : 0
+
+      return {
+        pedidos,
+        noPedidos,
+        retornar,
+        total,
+        efectividad
+      }
+    },
     clientesOrdenados () {
       const prioridad = {
         ACTIVO: 1,
@@ -596,7 +633,7 @@ export default {
     },
     initMap () {
       if (!this.$refs.mapRef || !this.isAlive) return
-      this.map = L.map(this.$refs.mapRef, { center: ORURO_CENTER, zoom: 13 })
+      this.map = L.map(this.$refs.mapRef, { center: ORURO_CENTER, zoom: 13, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false })
 
       const googleRoad = L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', { maxZoom: 21, attribution: 'Map data © Google' })
       const googleSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 21, attribution: 'Map data © Google' })
@@ -609,7 +646,7 @@ export default {
         'Google Satelite': googleSat,
         'Google Hibrido': googleHybrid,
         OpenStreetMap: osm
-      }).addTo(this.map)
+      }, {}, { position: 'topleft' }).addTo(this.map)
 
       this.markersLayer = L.layerGroup().addTo(this.map)
     },
@@ -661,7 +698,7 @@ export default {
 
       if (bounds.length > 0 && this.mapReady()) {
         try {
-          this.map.fitBounds(bounds, { padding: [35, 35], maxZoom: 16 })
+          this.map.fitBounds(bounds, { padding: [35, 35], maxZoom: 16, animate: false })
         } catch (_) {}
       }
     },
@@ -711,7 +748,7 @@ export default {
         }).addTo(this.map)
         this.meMarker.bindPopup('Aqui estoy yo').openPopup()
         try {
-          this.map.flyTo([lat, lng], 16)
+          this.map.setView([lat, lng], 16, { animate: false })
         } catch (_) {}
       }, () => this.$alert.error('No se pudo obtener tu ubicacion'))
     },
@@ -952,5 +989,36 @@ export default {
 }
 :deep(.cliente-id-tooltip:before) {
   border-top-color: #22b8cf;
+}
+.map-debug-summary {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: auto;
+  z-index: 600;
+  padding: 4px 4px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
+}
+.map-debug-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+:deep(.map-debug-summary .q-chip) {
+  min-height: 22px;
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+@media (max-width: 700px) {
+  .map-debug-summary {
+    top: 8px;
+    right: 12px;
+    left: auto;
+    max-width: calc(100% - 88px);
+  }
 }
 </style>

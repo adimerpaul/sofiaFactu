@@ -13,6 +13,7 @@ use Illuminate\Validation\Rule;
 
 class PedidoController extends Controller {
     private array $estadosEditables = ['Creado', 'Pendiente'];
+    private array $clientesRequierenClienteBaja = [1520, 1179];
 
     function recuperarPedido(Request $request) {
         $pedido = Pedido::with('detalles.producto')
@@ -27,7 +28,7 @@ class PedidoController extends Controller {
         $fecha = $request->input('fecha', now()->toDateString());
 
         $items = Pedido::query()
-            ->with(['detalles.producto', 'cliente:id,nombre,codcli,ci', 'user:id,name,role'])
+            ->with(['detalles.producto', 'cliente:id,nombre,codcli,ci', 'clienteBaja:id,nombre,codcli,ci', 'user:id,name,role'])
             ->where('tipo_pedido', 'REALIZAR_PEDIDO')
             ->where('user_id', $user->id)
             ->whereDate('fecha', $fecha)
@@ -57,7 +58,7 @@ class PedidoController extends Controller {
         $pedido->estado = 'Enviado';
         $pedido->save();
 
-        return response()->json($pedido->load(['detalles.producto', 'cliente', 'user']));
+        return response()->json($pedido->load(['detalles.producto', 'cliente', 'clienteBaja', 'user']));
     }
 
     public function enviarMisPedidos(Request $request)
@@ -111,6 +112,7 @@ class PedidoController extends Controller {
             'hora' => 'sometimes|nullable|string|max:50',
             'observaciones' => 'sometimes|nullable|string|max:600',
             'comentario_visita' => 'sometimes|nullable|string|max:600',
+            'cliente_baja_id' => 'sometimes|nullable|integer|exists:clientes,id',
             'productos' => 'sometimes|array',
             'productos.*.producto_id' => 'required_with:productos|integer|exists:productos,id',
             'productos.*.cantidad' => 'required_with:productos|numeric|min:0.01',
@@ -120,7 +122,7 @@ class PedidoController extends Controller {
         ]);
 
         $estadoDestino = $data['estado'] ?? null;
-        $camposEdicion = ['tipo_pago', 'facturado', 'fecha', 'hora', 'observaciones', 'comentario_visita', 'productos'];
+        $camposEdicion = ['tipo_pago', 'facturado', 'fecha', 'hora', 'observaciones', 'comentario_visita', 'cliente_baja_id', 'productos'];
         $intentandoEditar = collect($camposEdicion)->contains(fn ($k) => array_key_exists($k, $data));
 
         if ($estadoDestino !== null) {
@@ -140,7 +142,16 @@ class PedidoController extends Controller {
         DB::beginTransaction();
         try {
             if ($intentandoEditar) {
-                $updatePayload = array_intersect_key($data, array_flip(['tipo_pago', 'facturado', 'fecha', 'hora', 'observaciones', 'comentario_visita']));
+                if (
+                    isset($pedido->cliente_id) &&
+                    in_array((int) $pedido->cliente_id, $this->clientesRequierenClienteBaja, true) &&
+                    array_key_exists('cliente_baja_id', $data) &&
+                    empty($data['cliente_baja_id'])
+                ) {
+                    return response()->json(['message' => 'Debe seleccionar el cliente asociado para bajas o bonificacion'], 422);
+                }
+
+                $updatePayload = array_intersect_key($data, array_flip(['tipo_pago', 'facturado', 'fecha', 'hora', 'observaciones', 'comentario_visita', 'cliente_baja_id']));
                 if (!empty($updatePayload)) {
                     $pedido->update($updatePayload);
                 }
@@ -163,7 +174,7 @@ class PedidoController extends Controller {
             }
 
             DB::commit();
-            return response()->json($pedido->load(['detalles.producto', 'cliente', 'user']));
+            return response()->json($pedido->load(['detalles.producto', 'cliente', 'clienteBaja', 'user']));
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['error' => $e->getMessage()], 500);
@@ -174,7 +185,7 @@ class PedidoController extends Controller {
         $fechaFin = $request->fechaFin;
         $user = $request->user();
 
-        return Pedido::with(['detalles.producto', 'user', 'cliente'])
+        return Pedido::with(['detalles.producto', 'user', 'cliente', 'clienteBaja'])
             ->when($fechaInicio && $fechaFin, function ($q) use ($fechaInicio, $fechaFin) {
                 $q->where('fecha', '>=', $fechaInicio)
                     ->where('fecha', '<=', $fechaFin);
@@ -210,6 +221,7 @@ class PedidoController extends Controller {
                 'fecha' => 'nullable|date',
                 'hora' => 'nullable|string|max:50',
                 'cliente_id' => 'nullable|integer|exists:clientes,id',
+                'cliente_baja_id' => 'nullable|integer|exists:clientes,id',
                 'observaciones' => 'nullable|string|max:600',
                 'comentario_visita' => 'nullable|string|max:600',
                 'productos' => 'nullable|array',
@@ -225,10 +237,17 @@ class PedidoController extends Controller {
                 return response()->json(['message' => 'Debe agregar al menos un producto para realizar pedido'], 422);
             }
 
+            $clienteId = isset($data['cliente_id']) ? (int) $data['cliente_id'] : null;
+            $clienteBajaId = isset($data['cliente_baja_id']) ? (int) $data['cliente_baja_id'] : null;
+
+            if ($isPedido && $clienteId && in_array($clienteId, $this->clientesRequierenClienteBaja, true) && !$clienteBajaId) {
+                return response()->json(['message' => 'Debe seleccionar el cliente asociado para bajas o bonificacion'], 422);
+            }
+
             if (!$isPedido) {
                 $visita = $this->registrarVisita(
                     userId: (int) $user->id,
-                    clienteId: isset($data['cliente_id']) ? (int) $data['cliente_id'] : null,
+                    clienteId: $clienteId,
                     tipoVisita: $tipoPedido,
                     comentario: $data['comentario_visita'] ?? ($data['observaciones'] ?? null)
                 );
@@ -261,7 +280,8 @@ class PedidoController extends Controller {
 
             $pedido = Pedido::create([
                 'user_id' => $user->id,
-                'cliente_id' => $data['cliente_id'] ?? null,
+                'cliente_id' => $clienteId,
+                'cliente_baja_id' => $clienteBajaId,
                 'fecha' => $data['fecha'] ?? now()->format('Y-m-d'),
                 'hora' => $data['hora'] ?? null,
                 'estado' => $isPedido ? 'Creado' : 'Pendiente',
@@ -298,13 +318,13 @@ class PedidoController extends Controller {
             $pedido->update(['total' => $total]);
             $this->registrarVisita(
                 userId: (int) $user->id,
-                clienteId: isset($data['cliente_id']) ? (int) $data['cliente_id'] : null,
+                clienteId: $clienteId,
                 tipoVisita: $tipoPedido,
                 comentario: $data['comentario_visita'] ?? ($data['observaciones'] ?? null)
             );
 
             DB::commit();
-            return response()->json($pedido->load(['detalles.producto', 'cliente', 'user']), 201);
+            return response()->json($pedido->load(['detalles.producto', 'cliente', 'clienteBaja', 'user']), 201);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['error' => $e->getMessage()], 500);

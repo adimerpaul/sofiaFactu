@@ -11,6 +11,7 @@ class Pedido extends Model {
     protected $fillable = [
         'user_id',
         'cliente_id',
+        'cliente_baja_id',
         'pedido_zona_id',
         'usuario_camion_id',
         'auxiliar_user_id',
@@ -45,6 +46,7 @@ class Pedido extends Model {
         'contiene_cerdo' => 'boolean',
         'contiene_pollo' => 'boolean',
         'pedido_zona_id' => 'integer',
+        'cliente_baja_id' => 'integer',
         'usuario_camion_id' => 'integer',
         'auxiliar_user_id' => 'integer',
         'despachador_user_id' => 'integer',
@@ -77,6 +79,10 @@ class Pedido extends Model {
 
     public function cliente() {
         return $this->belongsTo(Cliente::class);
+    }
+
+    public function clienteBaja() {
+        return $this->belongsTo(Cliente::class, 'cliente_baja_id');
     }
 
     public function zona() {

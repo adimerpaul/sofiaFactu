@@ -127,6 +127,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/pedidos/{pedido}/enviar', [App\Http\Controllers\PedidoController::class, 'enviar']);
     Route::put('/pedidos/{pedido}', [App\Http\Controllers\PedidoController::class, 'update']);
     Route::post('/pedidos', [App\Http\Controllers\PedidoController::class, 'store']);
+    Route::get('/visitas/clientes', [App\Http\Controllers\VisitaController::class, 'clientes']);
     Route::get('/visitas', [App\Http\Controllers\VisitaController::class, 'index']);
 
     Route::get('/recuperarPedido', [App\Http\Controllers\PedidoController::class, 'recuperarPedido']);

@@ -49,7 +49,7 @@
           </q-input>
         </div>
         <div class="col-12 col-md-auto">
-          <q-chip color="teal" text-color="white">Clientes: {{ clientes.length }}</q-chip>
+          <q-chip color="teal" text-color="white">Clientes: {{ clientesContables.length }}</q-chip>
         </div>
         <div class="col-12 col-md-auto">
           <q-chip color="primary" text-color="white">Dia: {{ dayLabel }}</q-chip>
@@ -166,6 +166,18 @@
             </div>
             <div class="col-12 col-md-12">
               <q-input v-model="comentario" label="Comentario" dense outlined />
+            </div>
+            <div v-if="requiereClienteBaja" class="col-12 col-md-6">
+              <q-select
+                v-model="selectedClienteBajaId"
+                :options="clientesBajaOptions"
+                label="Cliente asociado"
+                dense
+                outlined
+                emit-value
+                map-options
+                clearable
+              />
             </div>
             <div class="col-12 col-md-10">
               <q-select
@@ -383,6 +395,7 @@ L.Icon.Default.mergeOptions({
 const ORURO_CENTER = [-17.967, -67.106]
 const DAY_MAP = ['do', 'lu', 'ma', 'mi', 'ju', 'vi', 'sa']
 const TIPOS_OBLIGATORIOS = ['POLLO', 'RES', 'CERDO']
+const CLIENTES_EXTRA_VISITAS = [1520, 1179]
 
 export default {
   name: 'VisitasPage',
@@ -397,8 +410,10 @@ export default {
       search: '',
       showAllDays: false,
       clientes: [],
+      clientesBajaSource: [],
       visitasByCliente: {},
       selectedCliente: null,
+      selectedClienteBajaId: null,
       comentario: '',
       dialogAcciones: false,
       dialogPedido: false,
@@ -444,13 +459,28 @@ export default {
     totalPedido () {
       return this.pedidoItems.reduce((acc, p) => acc + (Number(p.cantidad) * Number(p.precio)), 0)
     },
+    clientesContables () {
+      return this.clientes.filter(cliente => !CLIENTES_EXTRA_VISITAS.includes(Number(cliente?.id)))
+    },
+    requiereClienteBaja () {
+      return CLIENTES_EXTRA_VISITAS.includes(Number(this.selectedCliente?.id))
+    },
+    clientesBajaOptions () {
+      return this.clientesBajaSource
+        .filter(cliente => Number(cliente?.id) !== Number(this.selectedCliente?.id))
+        .map(cliente => ({
+          label: `${cliente.codcli || cliente.id} - ${cliente.nombre}`,
+          value: cliente.id
+        }))
+        .sort((a, b) => String(a.label).localeCompare(String(b.label), 'es'))
+    },
     resumenVisitas () {
-      const total = this.clientes.length
+      const total = this.clientesContables.length
       let pedidos = 0
       let noPedidos = 0
       let retornar = 0
 
-      this.clientes.forEach((cliente) => {
+      this.clientesContables.forEach((cliente) => {
         const status = this.clienteStatus(cliente?.id)
         if (status === 'REALIZAR_PEDIDO') pedidos += 1
         else if (status === 'NO_PEDIDO') noPedidos += 1
@@ -499,6 +529,7 @@ export default {
   mounted () {
     this.initMap()
     this.cargarClientes()
+    this.cargarClientesBaja()
     this.cargarProductos()
   },
   beforeUnmount () {
@@ -653,7 +684,7 @@ export default {
     async cargarClientes () {
       this.loading = true
       try {
-        const res = await this.$axios.get('clientes', {
+        const res = await this.$axios.get('visitas/clientes', {
           params: {
             search: this.search,
             per_page: 500,
@@ -670,6 +701,23 @@ export default {
         this.$alert.error(e.response?.data?.message || 'No se pudo cargar clientes de visitas')
       } finally {
         if (this.isAlive) this.loading = false
+      }
+    },
+    async cargarClientesBaja () {
+      try {
+        const res = await this.$axios.get('clientes', {
+          params: {
+            per_page: 5000,
+            solo_mios: 1,
+            solo_dia: 0
+          }
+        })
+        if (!this.isAlive) return
+        const data = res.data?.data || []
+        this.clientesBajaSource = data
+          .filter(cliente => !CLIENTES_EXTRA_VISITAS.includes(Number(cliente?.id)))
+      } catch (_) {
+        this.clientesBajaSource = []
       }
     },
     renderMarkers () {
@@ -754,6 +802,7 @@ export default {
     },
     openAcciones (cliente) {
       this.selectedCliente = cliente
+      this.selectedClienteBajaId = null
       this.loadingAccion = ''
       this.dialogAcciones = true
     },
@@ -763,6 +812,7 @@ export default {
         this.dialogAcciones = false
         this.loadingPedido = false
         this.pedidoItems = []
+        this.selectedClienteBajaId = null
         this.facturadoPedido = false
         this.fechaPedido = new Date().toISOString().slice(0, 10)
         this.horaPedido = null
@@ -894,6 +944,10 @@ export default {
     },
     async guardarPedido () {
       if (!this.selectedCliente) return
+      if (this.requiereClienteBaja && !this.selectedClienteBajaId) {
+        this.$alert.error('Debe seleccionar el cliente asociado')
+        return
+      }
       if (this.pedidoItems.length === 0) {
         this.$alert.error('Debe agregar al menos un producto')
         return
@@ -922,6 +976,7 @@ export default {
           fecha: this.fechaPedido,
           hora: this.horaPedido,
           cliente_id: this.selectedCliente.id,
+          cliente_baja_id: this.requiereClienteBaja ? this.selectedClienteBajaId : null,
           comentario_visita: this.comentario || '',
           observaciones: this.comentario || '',
           productos
@@ -929,6 +984,7 @@ export default {
         this.$alert.success('Pedido registrado')
         this.dialogPedido = false
         this.comentario = ''
+        this.selectedClienteBajaId = null
         this.pedidoItems = []
         await this.cargarVisitas()
         this.renderMarkers()

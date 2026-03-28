@@ -2,18 +2,16 @@
   <q-page class="q-pa-sm">
     <q-card flat bordered>
       <q-card-section class="row items-center q-pb-none">
-        <div class="text-h6">Nuevo cliente</div>
+        <div class="text-h6">Registro de cliente</div>
         <q-space />
       </q-card-section>
 
       <q-card-section>
-        <q-form @submit="guardarCliente">
+        <q-form @submit.prevent="handlePrimaryAction">
           <q-tabs v-model="tab" dense active-color="primary" align="left" class="text-grey-8">
-            <q-tab name="basico" label="Basico" />
-            <!--<q-tab name="comercial" label="Comercial" />
-            <q-tab name="visita" label="Visita" />-->
-            <q-tab name="ubicacion" label="Ubicacion" />
-            <q-tab name="fotos" label="Fotos" />
+            <q-tab name="basico" icon="badge" label="Basico" />
+            <q-tab name="ubicacion" icon="place" label="Ubicacion" />
+            <q-tab name="fotos" icon="photo_camera" label="Fotos" />
           </q-tabs>
           <q-separator class="q-my-sm" />
 
@@ -37,110 +35,6 @@
                 <div class="col-12 col-md-2"><q-input v-model="cliente.cod_ciudad" label="Cod ciudad" dense outlined /></div>
                 <div class="col-12 col-md-2"><q-input v-model="cliente.cod_nacio" label="Cod nacio" dense outlined /></div>
                 <div class="col-12 col-md-2"><q-input v-model.number="cliente.tipodocu" label="Tipo documento" dense outlined type="number" /></div>
-              </div>
-            </q-tab-panel>
-
-            <q-tab-panel name="comercial">
-              <div class="row q-col-gutter-sm">
-                <div class="col-12 col-md-2"><q-input v-model.number="cliente.cod_car" label="Cod car" dense outlined type="number" /></div>
-                <div class="col-12 col-md-2"><q-input v-model.number="cliente.categoria" label="Categoria" dense outlined type="number" /></div>
-                <div class="col-12 col-md-2"><q-input v-model.number="cliente.codcli" label="Cod cliente" dense outlined type="number" /></div>
-                <div class="col-12 col-md-2"><q-input v-model="cliente.clinew" label="Cli new" dense outlined /></div>
-                <div class="col-12 col-md-6">
-                  <q-select
-                    v-model="cliente.ci_vend"
-                    :options="vendedores"
-                    option-label="label"
-                    option-value="username"
-                    emit-value
-                    map-options
-                    clearable
-                    dense
-                    outlined
-                    label="CVENT vendedor (Usuario)"
-                  >
-                    <template #option="scope">
-                      <q-item v-bind="scope.itemProps">
-                        <q-item-section avatar>
-                          <q-avatar size="28px">
-                            <q-img :src="vendedorAvatarUrl(scope.opt)" />
-                          </q-avatar>
-                        </q-item-section>
-                        <q-item-section>
-                          <q-item-label>{{ scope.opt?.name || 'Sin nombre' }}</q-item-label>
-                          <q-item-label caption>@{{ scope.opt?.username || '' }}</q-item-label>
-                        </q-item-section>
-                      </q-item>
-                    </template>
-                    <template #selected-item="scope">
-                      <div class="row items-center no-wrap q-gutter-sm">
-                        <q-avatar size="24px">
-                          <q-img :src="vendedorAvatarUrl(scope.opt)" />
-                        </q-avatar>
-                        <div class="ellipsis">
-                          {{ scope.opt?.name || cliente.ci_vend }} <span class="text-grey-7">@{{ scope.opt?.username || cliente.ci_vend }}</span>
-                        </div>
-                      </div>
-                    </template>
-                  </q-select>
-                </div>
-                <div class="col-12 col-md-6" v-if="cliente.ci_vend">
-                  <q-card flat bordered class="seller-card">
-                    <q-card-section class="row items-center q-pa-sm">
-                      <q-avatar size="42px">
-                        <q-img :src="vendedorAvatarUrl(vendedores.find(v => v.username === cliente.ci_vend))" />
-                      </q-avatar>
-                      <div class="q-ml-sm">
-                        <div class="text-weight-medium">
-                          {{ vendedores.find(v => v.username === cliente.ci_vend)?.name || cliente.ci_vend }}
-                        </div>
-                        <div class="text-caption text-grey-7">@{{ cliente.ci_vend }}</div>
-                      </div>
-                    </q-card-section>
-                  </q-card>
-                </div>
-                <div class="col-12 col-md-2"><q-input v-model.number="cliente.imp_pieza" label="Imp pieza" dense outlined type="number" step="0.01" /></div>
-                <div class="col-12 col-md-3"><q-input v-model="cliente.supra_canal" label="Supra canal" dense outlined /></div>
-                <div class="col-12 col-md-3"><q-input v-model="cliente.canal" label="Canal" dense outlined /></div>
-                <div class="col-12 col-md-3"><q-input v-model="cliente.subcanal" label="Subcanal" dense outlined /></div>
-                <div class="col-12 col-md-3"><q-input v-model="cliente.zona" label="Zona" dense outlined /></div>
-                <div class="col-12 col-md-3"><q-input v-model="cliente.territorio" label="Territorio" dense outlined /></div>
-                <div class="col-12 col-md-3"><q-input v-model="cliente.transporte" label="Transporte" dense outlined /></div>
-                <div class="col-12 col-md-3"><q-input v-model="cliente.venta_estado" label="Estado venta" dense outlined /></div>
-                <div class="col-12 col-md-3"><q-input v-model="cliente.complto" label="Completo" dense outlined /></div>
-                <div class="col-12 col-md-3"><q-input v-model="cliente.tarjeta" label="Tarjeta" dense outlined /></div>
-                <div class="col-12 col-md-3"><q-input v-model="cliente.tipo_paciente" label="Tipo paciente" dense outlined /></div>
-              </div>
-            </q-tab-panel>
-
-            <q-tab-panel name="visita">
-              <div class="row q-col-gutter-sm">
-                <div class="col-12 col-md-3"><q-input v-model="cliente.correcli" label="Correo alterno" dense outlined /></div>
-                <div class="col-12 col-md-3"><q-input v-model.number="cliente.ctas_mont" label="Monto ctas" dense outlined type="number" step="0.01" /></div>
-                <div class="col-12 col-md-3"><q-input v-model.number="cliente.ctas_dias" label="Dias ctas" dense outlined type="number" /></div>
-                <div class="col-12 col-md-3"><q-input v-model="cliente.motivo_list_black" label="Motivo lista negra" dense outlined /></div>
-
-                <div class="col-12 q-mt-sm text-subtitle2">Dias de visita</div>
-                <div class="col-12 row q-col-gutter-sm">
-                  <div class="col-auto"><q-toggle v-model="cliente.lu" label="Lun" /></div>
-                  <div class="col-auto"><q-toggle v-model="cliente.ma" label="Mar" /></div>
-                  <div class="col-auto"><q-toggle v-model="cliente.mi" label="Mie" /></div>
-                  <div class="col-auto"><q-toggle v-model="cliente.ju" label="Jue" /></div>
-                  <div class="col-auto"><q-toggle v-model="cliente.vi" label="Vie" /></div>
-                  <div class="col-auto"><q-toggle v-model="cliente.sa" label="Sab" /></div>
-                  <div class="col-auto"><q-toggle v-model="cliente.do" label="Dom" /></div>
-                </div>
-
-                <div class="col-12 q-mt-sm text-subtitle2">Estados / Flags</div>
-                <div class="col-12 row q-col-gutter-sm">
-                  <div class="col-auto"><q-toggle v-model="cliente.list_black" label="Lista negra" /></div>
-                  <div class="col-auto"><q-toggle v-model="cliente.list_blanck" label="Lista blanca" /></div>
-                  <div class="col-auto"><q-toggle v-model="cliente.canmayni" label="Can mayni" /></div>
-                  <div class="col-auto"><q-toggle v-model="cliente.baja" label="Baja" /></div>
-                  <div class="col-auto"><q-toggle v-model="cliente.waths" label="WhatsApp" /></div>
-                  <div class="col-auto"><q-toggle v-model="cliente.ctas_activo" label="Ctas activo" /></div>
-                  <div class="col-auto"><q-toggle v-model="cliente.noesempre" label="No es empresa" /></div>
-                </div>
               </div>
             </q-tab-panel>
 
@@ -193,9 +87,32 @@
             </q-tab-panel>
           </q-tab-panels>
 
-          <div class="text-right q-mt-md">
+          <div class="row items-center justify-between q-mt-md">
+            <div class="text-caption text-grey-7">
+              Paso {{ currentStepIndex + 1 }} de {{ tabsOrder.length }}
+            </div>
+            <div class="text-right">
+              <q-btn
+                v-if="currentStepIndex > 0"
+                flat
+                no-caps
+                label="Anterior"
+                color="primary"
+                class="q-mr-sm"
+                @click="goPrev"
+                :loading="loading"
+              />
             <q-btn flat no-caps label="Cancelar" color="grey-8" @click="$router.back()" :loading="loading" />
-            <q-btn color="primary" no-caps label="Guardar" type="submit" class="q-ml-sm" :loading="loading" />
+              <q-btn
+                color="primary"
+                no-caps
+                :label="isLastStep ? 'Guardar' : 'Siguiente'"
+                type="submit"
+                class="q-ml-sm"
+                :loading="loading"
+                :icon-right="isLastStep ? 'save' : 'arrow_forward'"
+              />
+            </div>
           </div>
         </q-form>
       </q-card-section>
@@ -230,13 +147,24 @@ const emptyCliente = () => ({
   id_externo: '', cod_ciudad: '', cod_nacio: '', cod_car: null, est_civ: '', edad: '', empresa: '', categoria: null,
   imp_pieza: null, ci_vend: '', list_blanck: false, motivo_list_black: '', list_black: false, tipo_paciente: '', supra_canal: '',
   canal: '', subcanal: '', zona: '', latitud: ORURO_CENTER[0], longitud: ORURO_CENTER[1], transporte: '', territorio: '', codcli: null, clinew: '',
-  venta_estado: 'ACTIVO', complto: '', tipodocu: null, lu: false, ma: false, mi: false, ju: false, vi: false, sa: false, do: false,
+  venta_estado: 'INACTIVO', complto: '', tipodocu: null, lu: false, ma: false, mi: false, ju: false, vi: false, sa: false, do: false,
   correcli: '', canmayni: false, baja: false, profecion: '', waths: false, ctas_activo: false, ctas_mont: null, ctas_dias: null,
   sexo: '', noesempre: false, tarjeta: '', fotos: []
 })
 
 export default {
   name: 'AltaClientePage',
+  computed: {
+    tabsOrder () {
+      return ['basico', 'ubicacion', 'fotos']
+    },
+    currentStepIndex () {
+      return this.tabsOrder.indexOf(this.tab)
+    },
+    isLastStep () {
+      return this.currentStepIndex === this.tabsOrder.length - 1
+    }
+  },
   data () {
     return {
       loading: false,
@@ -267,6 +195,30 @@ export default {
     }
   },
   methods: {
+    getAuthUser () {
+      const storeUser = this.$store?.getters?.['auth/user'] || this.$store?.state?.auth?.user
+      if (storeUser) return storeUser
+      try {
+        return JSON.parse(localStorage.getItem('user') || 'null') || {}
+      } catch {
+        return {}
+      }
+    },
+    goNext () {
+      const nextTab = this.tabsOrder[this.currentStepIndex + 1]
+      if (nextTab) this.tab = nextTab
+    },
+    goPrev () {
+      const prevTab = this.tabsOrder[this.currentStepIndex - 1]
+      if (prevTab) this.tab = prevTab
+    },
+    handlePrimaryAction () {
+      if (this.isLastStep) {
+        this.guardarCliente()
+        return
+      }
+      this.goNext()
+    },
     vendedorAvatarUrl (vendedor) {
       const avatar = vendedor?.avatar || 'default.png'
       return `${this.$url}../images/${avatar}`
@@ -433,8 +385,10 @@ export default {
     },
     async guardarCliente () {
       this.loading = true
-      // recuperar el ci del user  y poner en campo de cliente.ci_vend para relacionar cliente con vendedor
-      this.cliente.ci_vend = this.$store.getters['auth/user'].ci || ''
+      const authUser = this.getAuthUser()
+      // La relacion vendedor usa username; como respaldo mantenemos ci si ese dato viene en sesiones antiguas.
+      this.cliente.ci_vend = this.cliente.ci_vend || authUser.username || authUser.ci || ''
+      this.cliente.venta_estado = 'INACTIVO'
       try {
         const fd = new FormData()
         const c = this.cliente
@@ -460,11 +414,11 @@ export default {
         ;(c.fotos_files || []).forEach((f, i) => fd.append(`fotos[${i}]`, f))
 
         await this.$axios.post('clientes', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-        this.$alert.success('Cliente creado')
+        this.$alert.success('Cliente inactivo creado')
 
         this.$router.back()
       } catch (e) {
-        this.$alert.error(e.response?.data?.message || 'No se pudo guardar cliente')
+        this.$alert.error(e.response?.data?.message || e.response?.data?.error || 'No se pudo guardar cliente')
       } finally {
         this.loading = false
       }

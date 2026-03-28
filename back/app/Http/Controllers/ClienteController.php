@@ -89,7 +89,7 @@ class ClienteController extends Controller
                 })
                 ->exists();
             if ($exists) {
-                return response()->json(['error' => 'Ya existe un cliente con el mismo CI y complemento'], 422);
+                return response()->json(['message' => 'Ya existe un cliente con el mismo CI y complemento'], 422);
             }
         }
         //si el campo nit no esta vacio verificar si sxiste alguno con el mismo nit para evitar duplicados
@@ -99,17 +99,11 @@ class ClienteController extends Controller
                 ->where('nit', $nit)
                 ->exists();
             if ($exists) {
-                return response()->json(['error' => 'Ya existe un cliente con el mismo NIT'], 422);
+                return response()->json(['message' => 'Ya existe un cliente con el mismo NIT'], 422);
             }
         }
         $data = $this->validateData($request);
         $payload = $this->preparePayload($request, $data, null);
-
-        // Solo al crear, asignar el CI del usuario que registra
-        $user = $request->user();
-        if ($user && isset($user->ci)) {
-            $payload['username'] = $user->ci;
-        }
 
         $cliente = Cliente::create($payload);
 
@@ -139,7 +133,7 @@ class ClienteController extends Controller
                 })
                 ->exists();
             if ($exists) {
-                return response()->json(['error' => 'Ya existe otro cliente con el mismo CI y complemento'], 422);
+                return response()->json(['message' => 'Ya existe otro cliente con el mismo CI y complemento'], 422);
             }
         }
         //si el campo nit no esta vacio verificar si sxiste alguno con el mismo nit para evitar duplicados sin considerar el cliente actual
@@ -150,7 +144,7 @@ class ClienteController extends Controller
                 ->where('nit', $nit)
                 ->exists();
             if ($exists) {
-                return response()->json(['error' => 'Ya existe otro cliente con el mismo NIT'], 422);
+                return response()->json(['message' => 'Ya existe otro cliente con el mismo NIT'], 422);
             }
         }
         $data = $this->validateData($request, true);

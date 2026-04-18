@@ -63,6 +63,7 @@ class Cliente extends Model{
         'sexo',
         'noesempre',
         'tarjeta',
+        'puede_credito',
         'fotos',
     ];
     protected $hidden = ['created_at', 'updated_at', 'deleted_at'];
@@ -87,6 +88,7 @@ class Cliente extends Model{
             'waths' => 'boolean',
             'ctas_activo' => 'boolean',
             'noesempre' => 'boolean',
+            'puede_credito' => 'boolean',
         ];
     }
 

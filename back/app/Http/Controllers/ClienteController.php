@@ -273,6 +273,7 @@ class ClienteController extends Controller
             'sexo' => $optionalString(20),
             'noesempre' => $optionalBool,
             'tarjeta' => $optionalString(20),
+            'puede_credito' => $optionalBool,
 
             'fotos' => [$presence, 'array', 'max:3'],
             'fotos.*' => ['image', 'max:5120'],

@@ -152,6 +152,13 @@ class PedidoController extends Controller {
                     return response()->json(['message' => 'Debe seleccionar el cliente asociado para bajas o bonificacion'], 422);
                 }
 
+                if (($data['tipo_pago'] ?? null) === 'Credito' && $pedido->cliente_id) {
+                    $cliente = Cliente::query()->select('id', 'puede_credito')->find($pedido->cliente_id);
+                    if ($cliente && $cliente->puede_credito === false) {
+                        return response()->json(['message' => 'Este cliente no puede tener credito'], 422);
+                    }
+                }
+
                 $updatePayload = array_intersect_key($data, array_flip(['tipo_pago', 'facturado', 'fecha', 'hora', 'observaciones', 'comentario_visita', 'cliente_baja_id']));
                 if (!empty($updatePayload)) {
                     $pedido->update($updatePayload);
@@ -247,6 +254,13 @@ class PedidoController extends Controller {
 
             if ($isPedido && $clienteId && in_array($clienteId, $this->clientesRequierenClienteBaja, true) && !$clienteBajaId) {
                 return response()->json(['message' => 'Debe seleccionar el cliente asociado para bajas o bonificacion'], 422);
+            }
+
+            if ($isPedido && $clienteId && ($data['tipo_pago'] ?? null) === 'Credito') {
+                $cliente = Cliente::query()->select('id', 'puede_credito')->find($clienteId);
+                if ($cliente && $cliente->puede_credito === false) {
+                    return response()->json(['message' => 'Este cliente no puede tener credito'], 422);
+                }
             }
 
             if (!$isPedido) {

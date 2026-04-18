@@ -56,29 +56,28 @@
               <div class="row">
                 <template v-for="producto in productos">
                   <div class="col-6 col-md-2">
-                    <q-card flat bordered class="cursor-pointer" @click="addProducto(producto)">
+                    <q-card flat bordered class="cursor-pointer compra-product-card" @click="addProducto(producto)">
                       <q-img
                         :src="imageUrl(producto.imagen)"
-                        class="q-mb-xs"
-                        style="height: 120px;"
+                        class="q-mb-xs compra-product-image"
                       >
-                        <div class="absolute-bottom text-center" style="padding: 0;margin: 0;">
-                          <div style="max-width: 190px;line-height: 0.9;" class="text-caption">
+                        <div class="absolute-bottom text-center compra-product-overlay">
+                          <div class="text-caption compra-product-name">
                             {{ $filters.textUpper( producto.nombre ) }}
                           </div>
-                          <div class="row items-center justify-center q-gutter-xs q-px-xs q-pb-xs">
-                            <q-chip dense square size="sm" :color="tipoProductoColor(producto.tipo)" text-color="white">
+                          <div class="row items-center justify-center q-gutter-xs q-px-xs q-pb-xs compra-chip-row">
+                            <q-chip dense square size="sm" class="compra-mini-chip" :color="tipoProductoColor(producto.tipo)" text-color="white">
                               {{ tipoProductoLabel(producto.tipo) }}
                             </q-chip>
-                            <q-chip dense square size="sm" :color="unidadProductoColor(producto.codigo_unidad)" text-color="white">
+                            <q-chip dense square size="sm" class="compra-mini-chip" :color="unidadProductoColor(producto.codigo_unidad)" text-color="white">
                               {{ unidadProductoLabel(producto.codigo_unidad) }}
                             </q-chip>
                           </div>
-                          <div style="display: flex;justify-content: space-between;">
+                          <div class="compra-product-meta">
                             <span class="text-caption">{{ producto.precio1 }}</span>
-                            <span class="text-bold bg-orange text-black border">{{ producto.codigo }}</span>
+                            <span class="text-bold bg-orange text-black border compra-product-code">{{ producto.codigo }}</span>
                           </div>
-                          <div class="text-caption text-right text-bold">
+                          <div class="text-caption text-right text-bold compra-product-stock">
                             {{ Number(producto.stock || 0).toFixed(3) }}
                           </div>
                         </div>
@@ -118,20 +117,20 @@
                 </thead>
                 <tbody>
                 <tr v-for="(producto, index) in productosCompras" :key="index">
-                  <td class="pm-none" style="display: flex;align-items: center;">
-                    <q-img :src="imageUrl(producto.producto?.imagen)" class="q-mb-xs" style="height: 35px;width: 35px;" />
-                    <div style="max-width: 120px; wrap-option: warp;line-height: 0.9;">
+                  <td class="pm-none compra-selected-cell">
+                    <q-img :src="imageUrl(producto.producto?.imagen)" class="q-mb-xs compra-selected-thumb" />
+                    <div class="compra-selected-copy">
                       <q-icon name="delete" color="red" class="cursor-pointer" @click="productosCompras.splice(index, 1)" />
 <!--                      {{ producto.producto?.nombre }}-->
                         {{ $filters.textUpper( producto.producto?.nombre ) }}
-                      <div class="row items-center q-gutter-xs q-mt-xs">
-                        <q-chip dense square size="sm" :color="tipoProductoColor(producto.producto?.tipo)" text-color="white">
-                          {{ tipoProductoLabel(producto.producto?.tipo) }}
-                        </q-chip>
-                        <q-chip dense square size="sm" :color="unidadProductoColor(producto.producto?.codigo_unidad)" text-color="white">
-                          {{ unidadProductoLabel(producto.producto?.codigo_unidad) }}
-                        </q-chip>
-                      </div>
+<!--                      <div class="row items-center q-gutter-xs q-mt-xs">-->
+<!--                        <q-chip dense square size="sm" class="compra-mini-chip" :color="tipoProductoColor(producto.producto?.tipo)" text-color="white">-->
+<!--                          {{ tipoProductoLabel(producto.producto?.tipo) }}-->
+<!--                        </q-chip>-->
+<!--                        <q-chip dense square size="sm" class="compra-mini-chip" :color="unidadProductoColor(producto.producto?.codigo_unidad)" text-color="white">-->
+<!--                          {{ unidadProductoLabel(producto.producto?.codigo_unidad) }}-->
+<!--                        </q-chip>-->
+<!--                      </div>-->
                     </div>
                   </td>
 <!--                  <td class="pm-none">-->
@@ -151,7 +150,7 @@
                       v-model.number="producto.cantidad"
                       type="number"
                       min="0"
-                      style="width: 60px;"
+                      class="compra-mini-input compra-mini-input--xs"
                       @input="onCantidadChange(producto)"
                     />
                   </td>
@@ -162,7 +161,7 @@
                       type="number"
                       min="0"
                       step="0.001"
-                      style="width: 70px;"
+                      class="compra-mini-input"
                       @input="onPrecioChange(producto)"
                     />
                   </td>
@@ -173,7 +172,7 @@
                       type="number"
                       min="0"
                       step="0.001"
-                      style="width: 70px;"
+                      class="compra-mini-input"
                       @input="onTotalChange(producto)"
                     />
                   </td>
@@ -184,7 +183,7 @@
                       type="number"
                       min="0"
                       step="0.001"
-                      style="width: 60px;"
+                      class="compra-mini-input compra-mini-input--xs"
                       @input="onFactorChange(producto)"
                     />
                   </td>
@@ -195,14 +194,14 @@
                     {{ parseFloat(producto.cantidad * producto.precio * producto.factor).toFixed(2) }}
                   </td>
                   <td class="pm-none">
-                    <input v-model="producto.precio_venta" type="number" style="width: 55px;color: red;font-weight: bold"
+                    <input v-model="producto.precio_venta" type="number" class="compra-mini-input compra-mini-input--price"
                            step="0.01"/>
                   </td>
                   <td class="pm-none">
-                    <input v-model="producto.lote" type="text" style="width: 70px;" />
+                    <input v-model="producto.lote" type="text" class="compra-mini-input" />
                   </td>
                   <td class="pm-none">
-                    <input v-model="producto.fecha_vencimiento" type="date" style="width: 100px;" />
+                    <input v-model="producto.fecha_vencimiento" type="date" class="compra-mini-input compra-mini-input--date" />
                   </td>
                   <td class="pm-none text-right">
                     <span :class="`text-bold ${(new Date(producto.fecha_vencimiento) - new Date()) < 0 ? 'text-red' : (Math.ceil((new Date(producto.fecha_vencimiento) - new Date()) / (1000 * 60 * 60 * 24)) < 30 ? 'text-red' : (Math.ceil((new Date(producto.fecha_vencimiento) - new Date()) / (1000 * 60 * 60 * 24)) < 60 ? 'text-orange' : 'text-green'))}`">
@@ -227,7 +226,7 @@
 
     <!-- Diálogo de confirmación de compra -->
     <q-dialog v-model="compraDialog">
-      <q-card style="width: 600px;">
+      <q-card style="width: 800px;max-width: 95vw;">
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">Confirmar compra</div>
           <q-space />
@@ -308,14 +307,14 @@
                       <q-img :src="imageUrl(producto.producto?.imagen)" class="q-mb-xs" style="height: 35px;width: 35px;" />
                       <div style="max-width: 120px; wrap-option: warp;line-height: 0.9;">
                         {{ $filters.textUpper( producto.producto?.nombre ) }}
-                        <div class="row items-center q-gutter-xs q-mt-xs">
-                          <q-chip dense square size="sm" :color="tipoProductoColor(producto.producto?.tipo)" text-color="white">
-                            {{ tipoProductoLabel(producto.producto?.tipo) }}
-                          </q-chip>
-                          <q-chip dense square size="sm" :color="unidadProductoColor(producto.producto?.codigo_unidad)" text-color="white">
-                            {{ unidadProductoLabel(producto.producto?.codigo_unidad) }}
-                          </q-chip>
-                        </div>
+<!--                        <div class="row items-center q-gutter-xs q-mt-xs">-->
+<!--                          <q-chip dense square size="sm" :color="tipoProductoColor(producto.producto?.tipo)" text-color="white">-->
+<!--                            {{ tipoProductoLabel(producto.producto?.tipo) }}-->
+<!--                          </q-chip>-->
+<!--                          <q-chip dense square size="sm" :color="unidadProductoColor(producto.producto?.codigo_unidad)" text-color="white">-->
+<!--                            {{ unidadProductoLabel(producto.producto?.codigo_unidad) }}-->
+<!--                          </q-chip>-->
+<!--                        </div>-->
                       </div>
                     </td>
                     <td class="pm-none">
@@ -805,3 +804,137 @@ export default {
   }
 };
 </script>
+
+<style scoped>
+.compra-product-card {
+  overflow: hidden;
+}
+
+.compra-product-image {
+  height: 120px;
+}
+
+.compra-product-overlay {
+  padding: 0;
+  margin: 0;
+}
+
+.compra-product-name {
+  max-width: 190px;
+  line-height: 0.9;
+  margin: 0 auto;
+}
+
+.compra-chip-row {
+  margin-top: 2px;
+}
+
+.compra-mini-chip {
+  min-height: 16px;
+  font-size: 9px;
+  padding: 0 4px;
+}
+
+.compra-product-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px 2px;
+}
+
+.compra-product-code {
+  font-size: 10px;
+  padding: 0 3px;
+}
+
+.compra-product-stock {
+  padding: 0 4px 2px;
+  font-size: 10px;
+}
+
+.compra-selected-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.compra-selected-thumb {
+  height: 30px;
+  width: 30px;
+  flex: 0 0 30px;
+}
+
+.compra-selected-copy {
+  max-width: 108px;
+  line-height: 0.85;
+  font-size: 11px;
+}
+
+.compra-mini-input {
+  width: 62px;
+  font-size: 11px;
+}
+
+.compra-mini-input--xs {
+  width: 50px;
+}
+
+.compra-mini-input--price {
+  width: 52px;
+  color: red;
+  font-weight: 700;
+}
+
+.compra-mini-input--date {
+  width: 92px;
+}
+
+@media (max-width: 768px) {
+  .compra-product-image {
+    height: 98px;
+  }
+
+  .compra-product-name {
+    max-width: 100px;
+    font-size: 10px;
+  }
+
+  .compra-mini-chip {
+    min-height: 14px;
+    font-size: 8px;
+    padding: 0 3px;
+  }
+
+  .compra-product-code,
+  .compra-product-stock {
+    font-size: 9px;
+  }
+
+  :deep(.q-markup-table) {
+    font-size: 11px;
+  }
+
+  .compra-selected-copy {
+    max-width: 92px;
+    font-size: 10px;
+  }
+
+  .compra-mini-input {
+    width: 54px;
+    font-size: 10px;
+  }
+
+  .compra-mini-input--xs {
+    width: 44px;
+  }
+
+  .compra-mini-input--price {
+    width: 48px;
+  }
+
+  .compra-mini-input--date {
+    width: 86px;
+  }
+}
+</style>

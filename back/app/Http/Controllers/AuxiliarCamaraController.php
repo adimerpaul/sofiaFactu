@@ -46,7 +46,7 @@ class AuxiliarCamaraController extends Controller
                 'zona:id,nombre,color,orden',
                 'venta:id,total,estado',
                 'detalles:id,pedido_id,producto_id,cantidad,precio,total,observacion_detalle,detalle_extra',
-                'detalles.producto:id,codigo,nombre,tipo,imagen',
+                'detalles.producto:id,codigo,nombre,tipo,imagen,codigo_unidad',
             ])
             ->where('tipo_pedido', 'REALIZAR_PEDIDO')
             ->where('estado', 'Enviado')
@@ -147,6 +147,7 @@ class AuxiliarCamaraController extends Controller
                         'codigo' => $detalle->producto?->codigo ?: ('#' . $detalle->producto_id),
                         'producto' => $detalle->producto?->nombre,
                         'tipo' => strtoupper((string) ($detalle->producto?->tipo ?? 'NORMAL')),
+                        'codigo_unidad' => strtoupper((string) ($detalle->producto?->codigo_unidad ?? '')),
                         'observacion_detalle' => $detalle->observacion_detalle,
                         'detalle_extra' => $detalle->detalle_extra,
                         'imagen' => $detalle->producto?->imagen,

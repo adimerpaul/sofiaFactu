@@ -138,6 +138,32 @@
                   </q-avatar>
                 </q-td>
               </template>
+              <template #body-cell-producto="props">
+                <q-td :props="props">
+                  <div class="detalle-producto-wrap">
+                    <div class="row items-center q-gutter-xs q-mb-xs">
+                      <q-chip dense square size="sm" :color="unidadColor(props.row.codigo_unidad)" text-color="white">
+                        {{ unidadLabel(props.row.codigo_unidad) }}
+                      </q-chip>
+                      <q-chip dense square size="sm" color="primary" text-color="white">
+                        Cant {{ Number(getEditCantidad(pedido.id, props.row) || 0).toFixed(2) }}
+                      </q-chip>
+                      <q-chip dense square size="sm" color="indigo" text-color="white">
+                        Bs {{ Number(getEditPrecio(pedido.id, props.row) || 0).toFixed(2) }}
+                      </q-chip>
+                    </div>
+                    <div class="row items-center q-gutter-xs">
+                      <span class="text-weight-medium">{{ props.row.producto || '-' }}</span>
+                      <q-chip dense square size="sm" :color="tipoColor(props.row.tipo)" text-color="white">
+                        {{ tipoLabel(props.row.tipo) }}
+                      </q-chip>
+                    </div>
+                    <div v-if="props.row.observacion_detalle" class="text-caption text-grey-7 q-mt-xs">
+                      Comentario: {{ props.row.observacion_detalle }}
+                    </div>
+                  </div>
+                </q-td>
+              </template>
               <template #body-cell-cantidad="props">
                 <q-td :props="props">
                   <q-input
@@ -265,7 +291,6 @@ const detalleColumns = [
   { name: 'imagen', label: 'Img', field: 'imagen', align: 'left' },
   { name: 'codigo', label: 'Codigo', field: 'codigo', align: 'left' },
   { name: 'producto', label: 'Producto', field: 'producto', align: 'left' },
-  { name: 'tipo', label: 'Tipo', field: 'tipo', align: 'left' },
   { name: 'cantidad', label: 'Cantidad', field: 'cantidad', align: 'left' },
   { name: 'precio', label: 'Precio', field: row => Number(row.precio || 0).toFixed(2), align: 'right' },
   { name: 'total', label: 'Subtotal', field: row => Number(row.total || 0).toFixed(2), align: 'right' },
@@ -316,6 +341,36 @@ function chipEstadoColor (estado) {
   if (estado === 'HECHO') return 'green'
   if (estado === 'MODIFICADO') return 'purple'
   return 'orange'
+}
+
+function tipoColor (tipo) {
+  const value = String(tipo || 'NORMAL').trim().toUpperCase()
+  if (value === 'POLLO') return 'orange'
+  if (value === 'RES') return 'red'
+  if (value === 'CERDO') return 'brown'
+  return 'blue-grey'
+}
+
+function tipoLabel (tipo) {
+  const value = String(tipo || 'NORMAL').trim().toUpperCase()
+  if (value === 'POLLO') return 'Pollo'
+  if (value === 'RES') return 'Res'
+  if (value === 'CERDO') return 'Cerdo'
+  return 'Normal'
+}
+
+function unidadLabel (codigoUnidad) {
+  const value = String(codigoUnidad || '').trim().toUpperCase()
+  if (value === 'KG') return 'Kilogramo'
+  if (value === 'U' || value === 'UNIDA') return 'Unidad'
+  return value || 'Unidad'
+}
+
+function unidadColor (codigoUnidad) {
+  const value = String(codigoUnidad || '').trim().toUpperCase()
+  if (value === 'KG') return 'teal'
+  if (value === 'U' || value === 'UNIDA') return 'deep-orange'
+  return 'grey-7'
 }
 
 function syncEditMaps () {
@@ -493,6 +548,11 @@ importarPedidos()
   width: 110px;
 }
 
+.detalle-producto-wrap {
+  min-width: 200px;
+  line-height: 1.1;
+}
+
 @media (max-width: 768px) {
   :deep(.q-btn-dropdown) {
     width: 100%;
@@ -500,6 +560,10 @@ importarPedidos()
 
   .edit-input {
     width: 130px;
+  }
+
+  .detalle-producto-wrap {
+    min-width: 170px;
   }
 }
 </style>

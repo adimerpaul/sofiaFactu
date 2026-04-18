@@ -69,7 +69,7 @@
         <tbody>
         <tr v-for="c in clientesOrdenados" :key="c.id" :class="[selectedCliente?.id === c.id ? 'row-selected' : '', rowClassByCliente(c)]" @click="openAcciones(c)">
           <td>
-            <q-btn color="purple" icon="visibility" dense round @click="openAcciones(c)" />
+            <q-btn color="purple" icon="visibility" dense round @click.stop="verClienteEnMapa(c)" />
           </td>
           <td>
             {{ c.codcli }} -{{ c.nombre }}
@@ -95,7 +95,7 @@
         </q-card-section>
         <q-card-section>
           <div class="row q-col-gutter-sm">
-            <div class="col-12 col-md-6">
+            <div class="col-12 col-md-5">
               <div><b>Cel:</b> {{ selectedCliente?.telefono || '-' }}</div>
               <div><b>Direccion:</b> {{ selectedCliente?.direccion || '-' }}</div>
               <div class="q-mt-sm">
@@ -105,8 +105,19 @@
                 </q-chip>
               </div>
             </div>
-            <div class="col-12 col-md-6">
+            <div class="col-12 col-md-7">
               <q-input v-model="comentario" label="Comentario" outlined dense type="textarea" autogrow />
+            </div>
+            <div class="col-12">
+              <div class="text-subtitle2 q-mb-sm">Fotos del cliente</div>
+              <div v-if="clienteFotosSeleccionado.length" class="row q-col-gutter-sm">
+                <div v-for="(foto, index) in clienteFotosSeleccionado" :key="`${foto}-${index}`" class="col-6 col-md-4">
+                  <q-card flat bordered class="cliente-foto-card">
+                    <q-img :src="clienteFotoUrl(foto)" style="height: 170px" fit="cover" />
+                  </q-card>
+                </div>
+              </div>
+              <div v-else class="text-grey-7">Este cliente no tiene fotos registradas.</div>
             </div>
           </div>
         </q-card-section>
@@ -524,6 +535,9 @@ export default {
       if (this.detalleTipo === 'CERDO') return 'Cerdo'
       if (this.detalleTipo === 'POLLO') return 'Pollo'
       return 'Normal'
+    },
+    clienteFotosSeleccionado () {
+      return Array.isArray(this.selectedCliente?.fotos) ? this.selectedCliente.fotos : []
     }
   },
   mounted () {
@@ -842,6 +856,27 @@ export default {
         } catch (_) {}
       }, () => this.$alert.error('No se pudo obtener tu ubicacion'))
     },
+    verClienteEnMapa (cliente) {
+      if (!cliente) return
+      const lat = Number(cliente.latitud)
+      const lng = Number(cliente.longitud)
+
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        this.$alert.error('El cliente no tiene coordenadas registradas')
+        return
+      }
+
+      this.selectedCliente = cliente
+
+      if (!this.mapReady()) {
+        this.$alert.error('El mapa aun no esta listo')
+        return
+      }
+
+      try {
+        this.map.setView([lat, lng], 18, { animate: true })
+      } catch (_) {}
+    },
     openAcciones (cliente) {
       this.selectedCliente = cliente
       this.selectedClienteBajaId = null
@@ -915,6 +950,10 @@ export default {
       }
     },
     productImageUrl (path) {
+      const safe = path || 'uploads/default.png'
+      return `${this.$url}../${safe}`
+    },
+    clienteFotoUrl (path) {
       const safe = path || 'uploads/default.png'
       return `${this.$url}../${safe}`
     },
@@ -1086,6 +1125,11 @@ export default {
 }
 .cliente-no-pedido {
   background: #ffd6d6;
+}
+.cliente-foto-card {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
 }
 :deep(.cliente-id-tooltip) {
   background: #22b8cf;

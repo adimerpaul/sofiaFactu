@@ -47,6 +47,31 @@
             </q-menu>
           </q-btn>
         </div>
+
+        <q-btn
+          flat
+          no-caps
+          dense
+          class="user-summary"
+          @click="toggleLeftDrawer"
+        >
+
+          <q-avatar rounded size="34px" class="user-trigger__avatar">
+            <q-img :src="$url + '../images/' + $store.user.avatar" v-if="$store.user.avatar" />
+            <q-icon v-else name="person" color="grey-7" />
+          </q-avatar>
+          <div class="user-summary__copy">
+            <div class="user-summary__name">{{ formatCompactText(userDisplayName) }}</div>
+            <div class="user-summary__name">
+<!--              {{ userDisplayRole }}-->
+              <q-chip size="xs" color="primary" text-color="white" :label="userDisplayRole" />
+            </div>
+          </div>
+
+          <q-tooltip anchor="bottom middle" self="top middle">
+            {{ userDisplayName }} - {{ userDisplayRole }}
+          </q-tooltip>
+        </q-btn>
       </q-toolbar>
     </q-header>
 
@@ -156,6 +181,15 @@ const groupedLinks = computed(() => {
   return groups
 })
 
+const currentUser = computed(() => proxy.$store?.user || {})
+const userDisplayName = computed(() => {
+  const user = currentUser.value
+  return user.name || user.username || 'Usuario'
+})
+const userDisplayRole = computed(() => {
+  const user = currentUser.value
+  return user.role || 'Sin rol'
+})
 onMounted(() => {
   const baseLinks = [
     { title: 'Principal', icon: 'home', link: '/', always: true },
@@ -291,6 +325,60 @@ function formatCompactText(value) {
   color: #6c7a89;
 }
 
+.user-summary {
+  min-height: 48px;
+  padding: 4px 10px 4px 6px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ffffff 0%, #eef4fb 100%);
+  box-shadow: inset 0 0 0 1px rgba(33, 67, 108, 0.08), 0 10px 24px rgba(24, 48, 79, 0.08);
+  gap: 10px;
+}
+
+.user-summary:hover {
+  background: linear-gradient(135deg, #ffffff 0%, #e8f1fb 100%);
+}
+
+.user-summary__avatar {
+  background: linear-gradient(135deg, #163a63 0%, #2f6cb0 100%);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  box-shadow: 0 8px 18px rgba(35, 82, 136, 0.26);
+}
+
+.user-summary__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  text-align: left;
+  line-height: 1.08;
+}
+
+.user-summary__name {
+  max-width: 168px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 800;
+  color: #142436;
+}
+
+.user-summary__role {
+  max-width: 168px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6d7e91;
+}
+
 .app-drawer {
   background: linear-gradient(180deg, #f7fafc 0%, #f0f4f8 100%);
   color: #223142;
@@ -400,8 +488,17 @@ function formatCompactText(value) {
     padding: 0 10px;
   }
 
+  .user-summary {
+    padding-right: 6px;
+  }
+
+  .user-summary__copy {
+    display: none;
+  }
+
   .drawer-brand__subtitle {
     display: none;
   }
 }
 </style>
+

@@ -223,6 +223,16 @@
                     >
                       ({{ tipoProductoLabel(scope?.opt?.tipo) }})
                     </q-chip>
+                    <q-chip
+                      v-if="scope?.opt?.codigo_unidad"
+                      dense
+                      square
+                      size="sm"
+                      :color="unidadProductoColor(scope?.opt?.codigo_unidad)"
+                      text-color="white"
+                    >
+                      ({{ unidadProductoLabel(scope?.opt?.codigo_unidad) }})
+                    </q-chip>
                   </div>
                 </template>
                 <template #option="scope">
@@ -243,6 +253,16 @@
                           text-color="white"
                         >
                           ({{ tipoProductoLabel(scope.opt.tipo) }})
+                        </q-chip>
+                        <q-chip
+                          v-if="scope.opt.codigo_unidad"
+                          dense
+                          square
+                          size="sm"
+                          :color="unidadProductoColor(scope.opt.codigo_unidad)"
+                          text-color="white"
+                        >
+                          ({{ unidadProductoLabel(scope.opt.codigo_unidad) }})
                         </q-chip>
                       </q-item-label>
                     </q-item-section>
@@ -311,6 +331,16 @@
                       text-color="white"
                     >
                       ({{ tipoProductoLabel(p.tipo) }})
+                    </q-chip>
+                    <q-chip
+                      v-if="p.codigo_unidad"
+                      dense
+                      square
+                      size="sm"
+                      :color="unidadProductoColor(p.codigo_unidad)"
+                      text-color="white"
+                    >
+                      ({{ unidadProductoLabel(p.codigo_unidad) }})
                     </q-chip>
                   </div>
                 </div>
@@ -636,6 +666,18 @@ export default {
       if (t === 'CERDO') return 'brown'
       if (t === 'POLLO') return 'orange'
       return 'blue-grey'
+    },
+    unidadProductoLabel (codigoUnidad) {
+      const unidad = String(codigoUnidad || '').trim().toUpperCase()
+      if (unidad === 'KG') return 'Kilogramo'
+      if (unidad === 'U' || unidad === 'UNIDA') return 'Unidad'
+      return unidad
+    },
+    unidadProductoColor (codigoUnidad) {
+      const unidad = String(codigoUnidad || '').trim().toUpperCase()
+      if (unidad === 'KG') return 'teal'
+      if (unidad === 'U' || unidad === 'UNIDA') return 'deep-orange'
+      return 'grey-7'
     },
     getPedidoTipos () {
       return [...new Set(this.pedidoItems.map(item => this.normalizeTipoProducto(item?.tipo)))]
@@ -1002,6 +1044,7 @@ export default {
         precio: Number(p.precio1 || 0),
         stock: Number(p.stock || 0),
         tipo: this.normalizeTipoProducto(p.tipo),
+        codigo_unidad: p.codigo_unidad || '',
       }
     },
     productImageUrl (path) {
@@ -1075,6 +1118,7 @@ export default {
           precio: Number(p.precio || 0),
           observacion: '',
           tipo: tipoProducto,
+          codigo_unidad: p.codigo_unidad || '',
           detalle_extra: this.detalleDefaultsByTipo(tipoProducto),
         })
       }

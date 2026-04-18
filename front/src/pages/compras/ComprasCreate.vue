@@ -10,7 +10,7 @@
         <q-form @submit="clickDialogCompra">
           <div class="row">
             <!-- Buscar productos -->
-            <div class="col-12 col-md-5 q-pa-xs">
+            <div class="col-12 col-md-6 q-pa-xs">
               <q-input v-model="productosSearch" outlined clearable label="Buscar producto" dense debounce="300" @update:modelValue="productosGet">
                 <template v-slot:append>
                   <q-btn flat round dense icon="search" />
@@ -66,6 +66,14 @@
                           <div style="max-width: 190px;line-height: 0.9;" class="text-caption">
                             {{ $filters.textUpper( producto.nombre ) }}
                           </div>
+                          <div class="row items-center justify-center q-gutter-xs q-px-xs q-pb-xs">
+                            <q-chip dense square size="sm" :color="tipoProductoColor(producto.tipo)" text-color="white">
+                              {{ tipoProductoLabel(producto.tipo) }}
+                            </q-chip>
+                            <q-chip dense square size="sm" :color="unidadProductoColor(producto.codigo_unidad)" text-color="white">
+                              {{ unidadProductoLabel(producto.codigo_unidad) }}
+                            </q-chip>
+                          </div>
                           <div style="display: flex;justify-content: space-between;">
                             <span class="text-caption">{{ producto.precio1 }}</span>
                             <span class="text-bold bg-orange text-black border">{{ producto.codigo }}</span>
@@ -82,7 +90,7 @@
             </div>
 
             <!-- Lista de productos agregados -->
-            <div class="col-12 col-md-7 q-pa-xs">
+            <div class="col-12 col-md-6 q-pa-xs">
               <div style="display: flex;align-items: center;justify-content: space-between;">
                 <span>
                   <q-btn size="xs" flat round dense icon="delete" color="red" @click="productosCompras = []" class="q-mb-sm" />
@@ -116,6 +124,14 @@
                       <q-icon name="delete" color="red" class="cursor-pointer" @click="productosCompras.splice(index, 1)" />
 <!--                      {{ producto.producto?.nombre }}-->
                         {{ $filters.textUpper( producto.producto?.nombre ) }}
+                      <div class="row items-center q-gutter-xs q-mt-xs">
+                        <q-chip dense square size="sm" :color="tipoProductoColor(producto.producto?.tipo)" text-color="white">
+                          {{ tipoProductoLabel(producto.producto?.tipo) }}
+                        </q-chip>
+                        <q-chip dense square size="sm" :color="unidadProductoColor(producto.producto?.codigo_unidad)" text-color="white">
+                          {{ unidadProductoLabel(producto.producto?.codigo_unidad) }}
+                        </q-chip>
+                      </div>
                     </div>
                   </td>
 <!--                  <td class="pm-none">-->
@@ -292,6 +308,14 @@
                       <q-img :src="imageUrl(producto.producto?.imagen)" class="q-mb-xs" style="height: 35px;width: 35px;" />
                       <div style="max-width: 120px; wrap-option: warp;line-height: 0.9;">
                         {{ $filters.textUpper( producto.producto?.nombre ) }}
+                        <div class="row items-center q-gutter-xs q-mt-xs">
+                          <q-chip dense square size="sm" :color="tipoProductoColor(producto.producto?.tipo)" text-color="white">
+                            {{ tipoProductoLabel(producto.producto?.tipo) }}
+                          </q-chip>
+                          <q-chip dense square size="sm" :color="unidadProductoColor(producto.producto?.codigo_unidad)" text-color="white">
+                            {{ unidadProductoLabel(producto.producto?.codigo_unidad) }}
+                          </q-chip>
+                        </div>
                       </div>
                     </td>
                     <td class="pm-none">
@@ -444,6 +468,32 @@ export default {
     imageUrl(path) {
       const safe = path || 'uploads/default.png'
       return `${this.$url}../${safe}`
+    },
+    tipoProductoLabel(tipo) {
+      const value = String(tipo || 'NORMAL').trim().toUpperCase()
+      if (value === 'POLLO') return 'Pollo'
+      if (value === 'RES') return 'Res'
+      if (value === 'CERDO') return 'Cerdo'
+      return 'Normal'
+    },
+    tipoProductoColor(tipo) {
+      const value = String(tipo || 'NORMAL').trim().toUpperCase()
+      if (value === 'POLLO') return 'orange'
+      if (value === 'RES') return 'red'
+      if (value === 'CERDO') return 'brown'
+      return 'blue-grey'
+    },
+    unidadProductoLabel(codigoUnidad) {
+      const value = String(codigoUnidad || '').trim().toUpperCase()
+      if (value === 'KG') return 'Kilogramo'
+      if (value === 'U' || value === 'UNIDA') return 'Unidad'
+      return value || 'Unidad'
+    },
+    unidadProductoColor(codigoUnidad) {
+      const value = String(codigoUnidad || '').trim().toUpperCase()
+      if (value === 'KG') return 'teal'
+      if (value === 'U' || value === 'UNIDA') return 'deep-orange'
+      return 'grey-7'
     },
     openProveedorDialog() {
       this.resetProveedorForm()

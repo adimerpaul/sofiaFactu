@@ -47,34 +47,6 @@
             </q-menu>
           </q-btn>
         </div>
-
-        <q-btn-dropdown flat unelevated no-caps dropdown-icon="expand_more" content-class="user-menu">
-          <template #label>
-            <div class="user-trigger">
-              <q-avatar rounded size="34px" class="user-trigger__avatar">
-                <q-img :src="$url + '../images/' + $store.user.avatar" v-if="$store.user.avatar" />
-                <q-icon v-else name="person" color="grey-7" />
-              </q-avatar>
-              <div class="user-trigger__text">
-                <div class="user-trigger__name">{{ $store.user.name }}</div>
-                <div class="user-trigger__chips">
-                  <q-chip color="red" dense size="sm" class="text-white">{{ $store.user.role }}</q-chip>
-                  <q-chip :color="$store.user.es_camion ? 'teal' : 'grey'" dense size="sm" class="text-white">
-                    Camion: {{ $store.user.es_camion ? 'Si' : 'No' }}
-                  </q-chip>
-                </div>
-              </div>
-            </div>
-          </template>
-          <q-item clickable v-ripple v-close-popup @click="logout">
-            <q-item-section avatar>
-              <q-icon name="logout" />
-            </q-item-section>
-            <q-item-section>
-              <q-item-label>Salir</q-item-label>
-            </q-item-section>
-          </q-item>
-        </q-btn-dropdown>
       </q-toolbar>
     </q-header>
 
@@ -279,6 +251,12 @@ function loadFallas(showError = false) {
       }
     })
 }
+
+function formatCompactText(value) {
+  const text = String(value || '').trim().toLowerCase()
+  if (!text) return ''
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
 </script>
 
 <style scoped>
@@ -311,43 +289,6 @@ function loadFallas(showError = false) {
 .header-brand__meta {
   font-size: 11px;
   color: #6c7a89;
-}
-
-.user-trigger {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 260px;
-}
-
-.user-trigger__avatar {
-  background: #eef3f8;
-  border: 1px solid #d7e0ea;
-}
-
-.user-trigger__text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  min-width: 0;
-}
-
-.user-trigger__name {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  font-weight: 600;
-  color: #1f2d3d;
-}
-
-.user-trigger__chips {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
 }
 
 .app-drawer {
@@ -459,13 +400,8 @@ function loadFallas(showError = false) {
     padding: 0 10px;
   }
 
-  .user-trigger__chips,
   .drawer-brand__subtitle {
     display: none;
-  }
-
-  .user-trigger__name {
-    max-width: 90px;
   }
 }
 </style>

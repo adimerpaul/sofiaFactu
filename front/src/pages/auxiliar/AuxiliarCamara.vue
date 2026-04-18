@@ -288,12 +288,12 @@ const auxEstadoOptions = [
 ]
 
 const detalleColumns = [
-  { name: 'imagen', label: 'Img', field: 'imagen', align: 'left' },
-  { name: 'codigo', label: 'Codigo', field: 'codigo', align: 'left' },
-  { name: 'producto', label: 'Producto', field: 'producto', align: 'left' },
   { name: 'cantidad', label: 'Cantidad', field: 'cantidad', align: 'left' },
   { name: 'precio', label: 'Precio', field: row => Number(row.precio || 0).toFixed(2), align: 'right' },
   { name: 'total', label: 'Subtotal', field: row => Number(row.total || 0).toFixed(2), align: 'right' },
+  { name: 'imagen', label: 'Img', field: 'imagen', align: 'left' },
+  { name: 'codigo', label: 'Codigo', field: 'codigo', align: 'left' },
+  { name: 'producto', label: 'Producto', field: 'producto', align: 'left' },
 ]
 
 const clienteOptions = computed(() => {

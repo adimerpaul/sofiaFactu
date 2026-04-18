@@ -18,16 +18,16 @@
           <q-btn color="deep-orange" icon="inventory_2" label="PDF productos totales" no-caps class="full-width" :loading="loadingReport" @click="reporteProductosTotales" />
         </div>
       </q-card-section>
-      <q-card-section class="q-pt-none text-caption text-grey-7">
-        Ultima actualizacion: {{ lastSync || 'sin datos' }}
-      </q-card-section>
-      <q-card-section class="row q-col-gutter-sm q-pt-none">
-        <div class="col-6 col-md-2"><q-chip color="blue-8" text-color="white">Pedidos: {{ stats.total_pedidos || 0 }}</q-chip></div>
-        <div class="col-6 col-md-2"><q-chip color="teal-7" text-color="white">Bs: {{ Number(stats.total_bs || 0).toFixed(2) }}</q-chip></div>
-        <div class="col-6 col-md-2"><q-chip color="orange-8" text-color="white">Pendientes: {{ stats.pendientes || 0 }}</q-chip></div>
-        <div class="col-6 col-md-2"><q-chip color="green-8" text-color="white">Hechos: {{ stats.hechos || 0 }}</q-chip></div>
-        <div class="col-6 col-md-2"><q-chip color="purple-7" text-color="white">Modificados: {{ stats.modificados || 0 }}</q-chip></div>
-      </q-card-section>
+<!--      <q-card-section class="q-pt-none text-caption text-grey-7">-->
+<!--        Ultima actualizacion: {{ lastSync || 'sin datos' }}-->
+<!--      </q-card-section>-->
+<!--      <q-card-section class="row q-col-gutter-sm q-pt-none">-->
+<!--        <div class="col-6 col-md-2"><q-chip color="blue-8" text-color="white">Pedidos: {{ stats.total_pedidos || 0 }}</q-chip></div>-->
+<!--        <div class="col-6 col-md-2"><q-chip color="teal-7" text-color="white">Bs: {{ Number(stats.total_bs || 0).toFixed(2) }}</q-chip></div>-->
+<!--        <div class="col-6 col-md-2"><q-chip color="orange-8" text-color="white">Pendientes: {{ stats.pendientes || 0 }}</q-chip></div>-->
+<!--        <div class="col-6 col-md-2"><q-chip color="green-8" text-color="white">Hechos: {{ stats.hechos || 0 }}</q-chip></div>-->
+<!--        <div class="col-6 col-md-2"><q-chip color="purple-7" text-color="white">Modificados: {{ stats.modificados || 0 }}</q-chip></div>-->
+<!--      </q-card-section>-->
     </q-card>
 
     <q-card flat bordered class="q-mb-sm">

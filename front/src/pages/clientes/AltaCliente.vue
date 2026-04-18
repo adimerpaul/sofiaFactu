@@ -24,6 +24,7 @@
                 <div class="col-12 col-md-2"><q-input v-model="cliente.complemento" label="Complemento" dense outlined /></div>
                 <div class="col-12 col-md-2"><q-input v-model="cliente.codigoTipoDocumentoIdentidad" label="Tipo doc" dense outlined /></div>
                 <div class="col-12 col-md-2"><q-input v-model="cliente.id_externo" label="ID externo" dense outlined /></div>
+                <div class="col-12 col-md-3"><q-toggle v-model="cliente.puede_credito" color="positive" checked-icon="verified" unchecked-icon="block" label="Puede tener credito" /></div>
                 <div class="col-12 col-md-3"><q-input v-model="cliente.telefono" label="Telefono" dense outlined /></div>
                 <div class="col-12 col-md-3"><q-input v-model="cliente.email" label="Email" dense outlined type="email" /></div>
                 <div class="col-12 col-md-6"><q-input v-model="cliente.direccion" label="Direccion" dense outlined /></div>
@@ -149,7 +150,7 @@ const emptyCliente = () => ({
   canal: '', subcanal: '', zona: '', latitud: ORURO_CENTER[0], longitud: ORURO_CENTER[1], transporte: '', territorio: '', codcli: null, clinew: '',
   venta_estado: 'INACTIVO', complto: '', tipodocu: null, lu: false, ma: false, mi: false, ju: false, vi: false, sa: false, do: false,
   correcli: '', canmayni: false, baja: false, profecion: '', waths: false, ctas_activo: false, ctas_mont: null, ctas_dias: null,
-  sexo: '', noesempre: false, tarjeta: '', fotos: []
+  sexo: '', noesempre: false, tarjeta: '', puede_credito: true, fotos: []
 })
 
 export default {
@@ -400,7 +401,7 @@ export default {
           'supra_canal', 'canal', 'subcanal', 'zona', 'latitud', 'longitud', 'transporte', 'territorio',
           'codcli', 'clinew', 'venta_estado', 'complto', 'tipodocu', 'lu', 'ma', 'mi', 'ju', 'vi', 'sa', 'do',
           'correcli', 'canmayni', 'baja', 'profecion', 'waths', 'ctas_activo', 'ctas_mont', 'ctas_dias',
-          'sexo', 'noesempre', 'tarjeta'
+          'sexo', 'noesempre', 'tarjeta', 'puede_credito'
         ]
 
         fields.forEach(k => {

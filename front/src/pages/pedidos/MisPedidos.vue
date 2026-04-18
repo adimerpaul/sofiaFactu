@@ -17,19 +17,19 @@
         </div>
       </q-card-section>
 
-      <q-separator />
+<!--      <q-separator />-->
 
-      <q-card-section class="row q-col-gutter-sm">
-        <div class="col-6 col-md-4">
-          <q-chip square color="blue-8" text-color="white" class="full-width justify-center">Total: {{ stats.total }}</q-chip>
-        </div>
-        <div class="col-6 col-md-4">
-          <q-chip square color="orange-8" text-color="white" class="full-width justify-center">Creado: {{ stats.creado }}</q-chip>
-        </div>
-        <div class="col-6 col-md-4">
-          <q-chip square color="green-8" text-color="white" class="full-width justify-center">Enviado: {{ stats.enviado }}</q-chip>
-        </div>
-      </q-card-section>
+<!--      <q-card-section class="row q-col-gutter-sm">-->
+<!--        <div class="col-6 col-md-4">-->
+<!--          <q-chip square color="blue-8" text-color="white" class="full-width justify-center">Total: {{ stats.total }}</q-chip>-->
+<!--        </div>-->
+<!--        <div class="col-6 col-md-4">-->
+<!--          <q-chip square color="orange-8" text-color="white" class="full-width justify-center">Creado: {{ stats.creado }}</q-chip>-->
+<!--        </div>-->
+<!--        <div class="col-6 col-md-4">-->
+<!--          <q-chip square color="green-8" text-color="white" class="full-width justify-center">Enviado: {{ stats.enviado }}</q-chip>-->
+<!--        </div>-->
+<!--      </q-card-section>-->
     </q-card>
 
     <q-card flat bordered>

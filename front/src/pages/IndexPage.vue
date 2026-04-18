@@ -1,5 +1,6 @@
 <template>
   <q-page class="q-pa-md bg-grey-2">
+    <div v-if="isAdmin">
     <q-card flat bordered class="q-mb-md">
       <q-card-section class="row q-col-gutter-sm items-end">
         <div class="col-12 col-md-4">
@@ -171,6 +172,15 @@
         </q-card>
       </div>
     </div>
+    </div>
+    <div v-else class="dashboard-logo-wrap">
+      <q-card flat class="dashboard-logo-card">
+        <q-card-section class="column items-center justify-center q-pa-xl">
+          <q-img src="/logo.png" fit="contain" class="dashboard-logo-image" />
+          <div class="text-h5 text-weight-bold text-primary q-mt-lg">Sofia Factu</div>
+        </q-card-section>
+      </q-card>
+    </div>
   </q-page>
 </template>
 
@@ -210,13 +220,14 @@ export default {
   },
   computed: {
     isAdmin () {
-      return ['Admin', 'Administrador'].includes(this.$store?.user?.role)
+      return ['ADMIN', 'ADMINISTRADOR'].includes(String(this.$store?.user?.role || '').trim().toUpperCase())
     },
     userOptions () {
       return [{ label: 'Todos', value: null }, ...this.users.map(u => ({ label: u.name, value: u.id }))]
     }
   },
   mounted () {
+    if (!this.isAdmin) return
     this.usersGet()
     this.fetchDashboard()
   },
@@ -381,6 +392,22 @@ export default {
 </script>
 
 <style scoped>
+.dashboard-logo-wrap {
+  min-height: calc(100vh - 120px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dashboard-logo-card {
+  width: min(680px, 92vw);
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(244, 248, 255, 0.96) 100%);
+  box-shadow: 0 24px 50px rgba(15, 23, 42, 0.08);
+}
+.dashboard-logo-image {
+  width: min(360px, 70vw);
+  max-width: 100%;
+}
 .kpi-card {
   border-radius: 14px;
 }

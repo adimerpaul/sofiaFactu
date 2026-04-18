@@ -48,37 +48,37 @@
         </div>
       </q-card-section>
 
-      <q-separator />
+<!--      <q-separator />-->
 
-      <q-card-section class="row q-col-gutter-sm items-center">
-        <div class="col-6 col-md-2">
-          <q-chip square color="blue-8" text-color="white" class="full-width justify-center" icon="receipt_long">Total: {{ stats.total }}</q-chip>
-        </div>
-        <div class="col-6 col-md-2">
-          <q-chip square color="orange-8" text-color="white" class="full-width justify-center" icon="edit_note">Creado: {{ stats.creado }}</q-chip>
-        </div>
-        <div class="col-6 col-md-2">
-          <q-chip square color="green-8" text-color="white" class="full-width justify-center" icon="send">Enviado: {{ stats.enviado }}</q-chip>
-        </div>
-        <div class="col-6 col-md-2">
-          <q-chip square color="grey-8" text-color="white" class="full-width justify-center" icon="outbox">No enviado: {{ stats.no_enviado }}</q-chip>
-        </div>
-        <div class="col-6 col-md-2">
-          <q-chip square color="indigo-8" text-color="white" class="full-width justify-center" icon="payments">Total Bs: {{ Number(stats.monto_total || 0).toFixed(2) }}</q-chip>
-        </div>
-        <div class="col-6 col-md-3">
-          <q-chip square color="blue-grey-7" text-color="white" class="full-width justify-center" icon="inventory_2">Normal: {{ stats.tipo_normal }}</q-chip>
-        </div>
-        <div class="col-6 col-md-3">
-          <q-chip square color="orange-7" text-color="white" class="full-width justify-center" icon="egg">Pollo: {{ stats.tipo_pollo }}</q-chip>
-        </div>
-        <div class="col-6 col-md-3">
-          <q-chip square color="red-7" text-color="white" class="full-width justify-center" icon="set_meal">Res: {{ stats.tipo_res }}</q-chip>
-        </div>
-        <div class="col-6 col-md-3">
-          <q-chip square color="brown-7" text-color="white" class="full-width justify-center" icon="restaurant">Cerdo: {{ stats.tipo_cerdo }}</q-chip>
-        </div>
-      </q-card-section>
+<!--      <q-card-section class="row q-col-gutter-sm items-center">-->
+<!--        <div class="col-6 col-md-2">-->
+<!--          <q-chip square color="blue-8" text-color="white" class="full-width justify-center" icon="receipt_long">Total: {{ stats.total }}</q-chip>-->
+<!--        </div>-->
+<!--        <div class="col-6 col-md-2">-->
+<!--          <q-chip square color="orange-8" text-color="white" class="full-width justify-center" icon="edit_note">Creado: {{ stats.creado }}</q-chip>-->
+<!--        </div>-->
+<!--        <div class="col-6 col-md-2">-->
+<!--          <q-chip square color="green-8" text-color="white" class="full-width justify-center" icon="send">Enviado: {{ stats.enviado }}</q-chip>-->
+<!--        </div>-->
+<!--        <div class="col-6 col-md-2">-->
+<!--          <q-chip square color="grey-8" text-color="white" class="full-width justify-center" icon="outbox">No enviado: {{ stats.no_enviado }}</q-chip>-->
+<!--        </div>-->
+<!--        <div class="col-6 col-md-2">-->
+<!--          <q-chip square color="indigo-8" text-color="white" class="full-width justify-center" icon="payments">Total Bs: {{ Number(stats.monto_total || 0).toFixed(2) }}</q-chip>-->
+<!--        </div>-->
+<!--        <div class="col-6 col-md-3">-->
+<!--          <q-chip square color="blue-grey-7" text-color="white" class="full-width justify-center" icon="inventory_2">Normal: {{ stats.tipo_normal }}</q-chip>-->
+<!--        </div>-->
+<!--        <div class="col-6 col-md-3">-->
+<!--          <q-chip square color="orange-7" text-color="white" class="full-width justify-center" icon="egg">Pollo: {{ stats.tipo_pollo }}</q-chip>-->
+<!--        </div>-->
+<!--        <div class="col-6 col-md-3">-->
+<!--          <q-chip square color="red-7" text-color="white" class="full-width justify-center" icon="set_meal">Res: {{ stats.tipo_res }}</q-chip>-->
+<!--        </div>-->
+<!--        <div class="col-6 col-md-3">-->
+<!--          <q-chip square color="brown-7" text-color="white" class="full-width justify-center" icon="restaurant">Cerdo: {{ stats.tipo_cerdo }}</q-chip>-->
+<!--        </div>-->
+<!--      </q-card-section>-->
     </q-card>
 
     <q-card flat bordered>

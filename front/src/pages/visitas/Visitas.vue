@@ -151,11 +151,14 @@
             <div class="col-12 col-md-4">
               <q-option-group
                 v-model="tipoPago"
-                :options="tiposPago"
+                :options="tiposPagoPedido"
                 type="radio"
                 color="primary"
                 inline
               />
+              <div v-if="!clientePuedeCredito" class="text-caption text-negative q-mt-xs">
+                Este cliente no puede tener credito.
+              </div>
             </div>
             <div class="col-12 col-md-2">
               <q-toggle v-model="facturadoPedido" label="Facturado" />
@@ -211,6 +214,15 @@
                       <q-img :src="productImageUrl(scope?.opt?.imagen)" />
                     </q-avatar>
                     <span class="ellipsis">{{ scope?.opt?.label || '' }}</span>
+                    <q-chip
+                      dense
+                      square
+                      size="sm"
+                      :color="tipoProductoColor(scope?.opt?.tipo)"
+                      text-color="white"
+                    >
+                      ({{ tipoProductoLabel(scope?.opt?.tipo) }})
+                    </q-chip>
                   </div>
                 </template>
                 <template #option="scope">
@@ -221,7 +233,18 @@
                       </q-avatar>
                     </q-item-section>
                     <q-item-section>
-                      <q-item-label>{{ scope.opt.label }}</q-item-label>
+                      <q-item-label class="row items-center q-gutter-xs">
+                        <span>{{ scope.opt.label }}</span>
+                        <q-chip
+                          dense
+                          square
+                          size="sm"
+                          :color="tipoProductoColor(scope.opt.tipo)"
+                          text-color="white"
+                        >
+                          ({{ tipoProductoLabel(scope.opt.tipo) }})
+                        </q-chip>
+                      </q-item-label>
                     </q-item-section>
                   </q-item>
                 </template>
@@ -278,7 +301,18 @@
                   <q-avatar rounded size="30px">
                     <q-img :src="productImageUrl(p.imagen)" />
                   </q-avatar>
-                  <div>{{ p.nombre }}</div>
+                  <div class="row items-center q-gutter-xs">
+                    <span>{{ p.nombre }}</span>
+                    <q-chip
+                      dense
+                      square
+                      size="sm"
+                      :color="tipoProductoColor(p.tipo)"
+                      text-color="white"
+                    >
+                      ({{ tipoProductoLabel(p.tipo) }})
+                    </q-chip>
+                  </div>
                 </div>
               </td>
               <td>{{ p.observacion || '-' }}</td>
@@ -470,6 +504,12 @@ export default {
     totalPedido () {
       return this.pedidoItems.reduce((acc, p) => acc + (Number(p.cantidad) * Number(p.precio)), 0)
     },
+    clientePuedeCredito () {
+      return this.selectedCliente?.puede_credito !== false
+    },
+    tiposPagoPedido () {
+      return this.tiposPago.filter(option => option.value !== 'Credito' || this.clientePuedeCredito)
+    },
     clientesContables () {
       return this.clientes.filter(cliente => !CLIENTES_EXTRA_VISITAS.includes(Number(cliente?.id)))
     },
@@ -582,6 +622,20 @@ export default {
       const t = String(tipo || 'NORMAL').trim().toUpperCase()
       if (t === 'NORMAL' || t === 'RES' || t === 'CERDO' || t === 'POLLO') return t
       return 'NORMAL'
+    },
+    tipoProductoLabel (tipo) {
+      const t = this.normalizeTipoProducto(tipo)
+      if (t === 'RES') return 'Res'
+      if (t === 'CERDO') return 'Cerdo'
+      if (t === 'POLLO') return 'Pollo'
+      return 'Normal'
+    },
+    tipoProductoColor (tipo) {
+      const t = this.normalizeTipoProducto(tipo)
+      if (t === 'RES') return 'red'
+      if (t === 'CERDO') return 'brown'
+      if (t === 'POLLO') return 'orange'
+      return 'blue-grey'
     },
     getPedidoTipos () {
       return [...new Set(this.pedidoItems.map(item => this.normalizeTipoProducto(item?.tipo)))]
@@ -890,6 +944,7 @@ export default {
         this.loadingPedido = false
         this.pedidoItems = []
         this.selectedClienteBajaId = null
+        this.tipoPago = this.clientePuedeCredito ? 'Contado' : 'Contado'
         this.facturadoPedido = false
         this.fechaPedido = new Date().toISOString().slice(0, 10)
         this.horaPedido = null
@@ -1034,6 +1089,11 @@ export default {
       }
       if (this.pedidoItems.length === 0) {
         this.$alert.error('Debe agregar al menos un producto')
+        return
+      }
+      if (this.tipoPago === 'Credito' && !this.clientePuedeCredito) {
+        this.$alert.error('Este cliente no puede tener credito')
+        this.tipoPago = 'Contado'
         return
       }
 

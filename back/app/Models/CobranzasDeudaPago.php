@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use OwenIt\Auditing\Auditable as AuditableTrait;
+use OwenIt\Auditing\Contracts\Auditable;
 
-class CobranzasDeudaPago extends Model
+class CobranzasDeudaPago extends Model implements Auditable
 {
+    use AuditableTrait;
     protected $table = 'cobranzas_deuda_pagos';
 
     protected $fillable = [

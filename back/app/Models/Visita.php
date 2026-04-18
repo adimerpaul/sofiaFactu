@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use OwenIt\Auditing\Auditable as AuditableTrait;
+use OwenIt\Auditing\Contracts\Auditable;
 
-class Visita extends Model
+class Visita extends Model implements Auditable
 {
+    use AuditableTrait;
     protected $fillable = [
         'user_id',
         'cliente_id',

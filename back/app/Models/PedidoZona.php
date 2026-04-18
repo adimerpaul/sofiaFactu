@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use OwenIt\Auditing\Auditable as AuditableTrait;
+use OwenIt\Auditing\Contracts\Auditable;
 
-class PedidoZona extends Model
+class PedidoZona extends Model implements Auditable
 {
+    use AuditableTrait;
     protected $fillable = [
         'nombre',
         'color',
@@ -18,4 +21,3 @@ class PedidoZona extends Model
         'orden' => 'integer',
     ];
 }
-

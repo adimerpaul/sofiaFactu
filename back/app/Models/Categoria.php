@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use OwenIt\Auditing\Auditable as AuditableTrait;
+use OwenIt\Auditing\Contracts\Auditable;
 
-class Categoria extends Model
+class Categoria extends Model implements Auditable
 {
-    use SoftDeletes;
+    use SoftDeletes, AuditableTrait;
     protected $fillable = [
         'nombre',
         'descripcion',

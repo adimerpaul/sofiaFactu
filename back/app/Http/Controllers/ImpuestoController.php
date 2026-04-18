@@ -388,7 +388,9 @@ class ImpuestoController extends Controller{
     }
     function generarCUFD(){
         try {
+            error_log("generarCUFD");
             $result = app(CufdService::class)->generateCufdDaily();
+            error_log("result: ".json_encode($result));
             if (($result['status'] ?? null) === 'skipped') {
                 ImpuestoFalla::query()->create([
                     'tipo' => 'CUFD',

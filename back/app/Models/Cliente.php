@@ -5,9 +5,11 @@ namespace App\Models;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use OwenIt\Auditing\Auditable as AuditableTrait;
+use OwenIt\Auditing\Contracts\Auditable;
 
-class Cliente extends Model{
-    use SoftDeletes;
+class Cliente extends Model implements Auditable{
+    use SoftDeletes, AuditableTrait;
     protected $fillable = [
         'nombre',
         'nit',

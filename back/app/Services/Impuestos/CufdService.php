@@ -86,6 +86,7 @@ class CufdService
                 'nit' => env('NIT'),
             ],
         ]);
+        error_log(json_encode($result));
 
         if (!isset($result->RespuestaCufd->codigo) || !isset($result->RespuestaCufd->codigoControl)) {
             throw new \RuntimeException('SIAT no devolvio un CUFD valido');

@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use OwenIt\Auditing\Auditable as AuditableTrait;
+use OwenIt\Auditing\Contracts\Auditable;
 
-class Proveedor extends Model{
-    use SoftDeletes;
+class Proveedor extends Model implements Auditable{
+    use SoftDeletes, AuditableTrait;
     protected $table = 'proveedores';
     protected $fillable = [
         'nombre',

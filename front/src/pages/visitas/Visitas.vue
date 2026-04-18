@@ -821,8 +821,10 @@ export default {
       }
       if (accion === 'GENERAR_RUTA') {
         this.generarRuta()
+      }else {
+        this.guardarAccion(accion)
       }
-      this.guardarAccion(accion)
+
     },
     async guardarAccion (accion) {
       if (!this.selectedCliente) return

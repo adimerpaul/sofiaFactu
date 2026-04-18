@@ -169,7 +169,7 @@
 
         <q-card-section>
           <q-form @submit="guardarCliente">
-            <q-tabs v-model="tab" dense active-color="primary" align="left" class="text-grey-8">
+            <q-tabs v-model="tab" dense active-color="primary" align="left" class="text-grey-8" no-caps>
               <q-tab name="basico" label="Basico" />
               <q-tab name="comercial" label="Comercial" />
               <q-tab name="visita" label="Visita" />

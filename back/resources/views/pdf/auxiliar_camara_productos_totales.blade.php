@@ -31,7 +31,9 @@
         <th>Producto</th>
         <th style="width: 10%;">Tipo</th>
         <th style="width: 14%;" class="right">Cantidad total</th>
-        <th style="width: 25%;">Clientes</th>
+        @if($includeClientes)
+            <th style="width: 25%;">Clientes</th>
+        @endif
         <th style="width: 15%;" class="right">Importe total</th>
     </tr>
     </thead>
@@ -52,14 +54,18 @@
             <td>{{ $p['nombre'] }}</td>
             <td>{{ $p['tipo'] }}</td>
             <td class="right">{{ rtrim(rtrim(number_format((float) $p['cantidad_total'], 2, '.', ''), '0'), '.') }}</td>
-            <td>{{ $p['clientes'] }}</td>
+            @if($includeClientes)
+                <td>{{ $p['clientes'] }}</td>
+            @endif
             <td class="right">{{ number_format((float) $p['importe_total'], 2) }}</td>
         </tr>
     @endforeach
     <tr class="total">
-        <td colspan="4">TOTAL GENERAL</td>
+        <td colspan="{{ $includeClientes ? 4 : 4 }}">TOTAL GENERAL</td>
         <td class="right">{{ rtrim(rtrim(number_format((float) $cantidadTotal, 2, '.', ''), '0'), '.') }}</td>
-        <td></td>
+        @if($includeClientes)
+            <td></td>
+        @endif
         <td class="right">{{ number_format((float) $importeTotal, 2) }}</td>
     </tr>
     </tbody>

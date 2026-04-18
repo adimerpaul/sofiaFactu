@@ -2,20 +2,33 @@
   <q-page class="q-pa-sm auxiliar-page">
     <q-card flat bordered class="q-mb-sm">
       <q-card-section class="row q-col-gutter-sm items-center">
-        <div class="col-12 col-md-2">
+        <div class="col-12 col-sm-6 col-md-2">
           <q-input v-model="fecha" dense outlined type="date" label="Fecha" />
         </div>
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-sm-6 col-md-4">
           <q-btn color="primary" icon="search" label="Consultar pedidos" no-caps class="full-width" :loading="loading" @click="importarPedidos" />
         </div>
-        <div class="col-12 col-md-2">
-          <q-btn color="indigo" icon="print" label="PDF pedidos" no-caps class="full-width" :loading="loadingReport" @click="reportePedidos" />
-        </div>
-        <div class="col-12 col-md-2">
-          <q-btn color="secondary" icon="receipt_long" label="Ventas generadas" no-caps class="full-width" :loading="loadingReport" @click="reporteVentasGeneradas" />
-        </div>
-        <div class="col-12 col-md-3">
-          <q-btn color="deep-orange" icon="inventory_2" label="PDF productos totales" no-caps class="full-width" :loading="loadingReport" @click="reporteProductosTotales" />
+        <div class="col-12 col-sm-12 col-md-4">
+          <q-btn-dropdown color="deep-orange" icon="print" label="Reporte" no-caps class="full-width" :loading="loadingReport">
+            <q-list style="min-width: 260px">
+              <q-item clickable v-close-popup @click="reportePedidos">
+                <q-item-section avatar><q-icon name="description" color="indigo" /></q-item-section>
+                <q-item-section>Pedidos</q-item-section>
+              </q-item>
+              <q-item clickable v-close-popup @click="reporteVentasGeneradas">
+                <q-item-section avatar><q-icon name="receipt_long" color="secondary" /></q-item-section>
+                <q-item-section>Ventas generales</q-item-section>
+              </q-item>
+              <q-item clickable v-close-popup @click="reporteProductosTotalesConClientes">
+                <q-item-section avatar><q-icon name="groups" color="deep-orange" /></q-item-section>
+                <q-item-section>Productos totales con clientes</q-item-section>
+              </q-item>
+              <q-item clickable v-close-popup @click="reporteProductosTotalesSinClientes">
+                <q-item-section avatar><q-icon name="inventory_2" color="brown" /></q-item-section>
+                <q-item-section>Productos totales sin clientes</q-item-section>
+              </q-item>
+            </q-list>
+          </q-btn-dropdown>
         </div>
       </q-card-section>
 <!--      <q-card-section class="q-pt-none text-caption text-grey-7">-->
@@ -35,21 +48,21 @@
         <div class="col-12 col-md-2">
           <q-select v-model="tipo" :options="tipoOptions" dense outlined emit-value map-options label="Tipo" />
         </div>
-        <div class="col-12 col-md-2">
-          <q-select v-model="auxiliarEstado" :options="auxEstadoOptions" dense outlined emit-value map-options label="Estado auxiliar" />
-        </div>
-        <div class="col-12 col-md-2">
-          <q-select v-model="clienteId" :options="clienteOptions" dense outlined emit-value map-options label="Cliente" />
-        </div>
-        <div class="col-12 col-md-2">
-          <q-select v-model="vendedorId" :options="vendedorOptions" dense outlined emit-value map-options label="Vendedor" />
-        </div>
-        <div class="col-12 col-md-2">
-          <q-select v-model="camionId" :options="camionOptions" dense outlined emit-value map-options label="Camion" />
-        </div>
-        <div class="col-12 col-md-2">
-          <q-select v-model="zonaId" :options="zonaOptions" dense outlined emit-value map-options label="Zona" />
-        </div>
+<!--        <div class="col-12 col-md-2">-->
+<!--          <q-select v-model="auxiliarEstado" :options="auxEstadoOptions" dense outlined emit-value map-options label="Estado auxiliar" />-->
+<!--        </div>-->
+<!--        <div class="col-12 col-md-2">-->
+<!--          <q-select v-model="clienteId" :options="clienteOptions" dense outlined emit-value map-options label="Cliente" />-->
+<!--        </div>-->
+<!--        <div class="col-12 col-md-2">-->
+<!--          <q-select v-model="vendedorId" :options="vendedorOptions" dense outlined emit-value map-options label="Vendedor" />-->
+<!--        </div>-->
+<!--        <div class="col-12 col-md-2">-->
+<!--          <q-select v-model="camionId" :options="camionOptions" dense outlined emit-value map-options label="Camion" />-->
+<!--        </div>-->
+<!--        <div class="col-12 col-md-2">-->
+<!--          <q-select v-model="zonaId" :options="zonaOptions" dense outlined emit-value map-options label="Zona" />-->
+<!--        </div>-->
         <div class="col-12 col-md-4">
           <q-input v-model="search" dense outlined debounce="300" label="Buscar cliente / direccion / pedido">
             <template #append><q-icon name="search" /></template>
@@ -296,7 +309,7 @@ const zonaOptions = computed(() => {
 function imgUrl (path) {
   if (!path) return ''
   const base = String(proxy.$url || '').replace(/\/+$/, '')
-  return `${base}/${String(path).replace(/^\/+/, '')}`
+  return `${base}/../${String(path).replace(/^\/+/, '')}`
 }
 
 function chipEstadoColor (estado) {
@@ -412,11 +425,11 @@ async function guardarCambios (pedido) {
   await procesarPedido(pedido, false)
 }
 
-async function descargarPdf (url, fileName) {
+async function descargarPdf (url, fileName, extraParams = {}) {
   loadingReport.value = true
   try {
     const res = await proxy.$axios.get(url, {
-      params: getRequestFilters(),
+      params: { ...getRequestFilters(), ...extraParams },
       responseType: 'blob',
     })
     const blob = new Blob([res.data], { type: 'application/pdf' })
@@ -442,8 +455,18 @@ async function reportePedidos () {
   await descargarPdf('/auxiliar-camara/reportes/pedidos', `auxiliar_pedidos_${fecha.value}.pdf`)
 }
 
-async function reporteProductosTotales () {
-  await descargarPdf('/auxiliar-camara/reportes/productos-totales', `auxiliar_productos_${fecha.value}.pdf`)
+async function reporteProductosTotales (incluirClientes = true) {
+  await descargarPdf('/auxiliar-camara/reportes/productos-totales', `auxiliar_productos_${incluirClientes ? 'con_clientes' : 'sin_clientes'}_${fecha.value}.pdf`, {
+    incluir_clientes: incluirClientes ? 1 : 0,
+  })
+}
+
+async function reporteProductosTotalesConClientes () {
+  await reporteProductosTotales(true)
+}
+
+async function reporteProductosTotalesSinClientes () {
+  await reporteProductosTotales(false)
 }
 
 async function reporteVentasGeneradas () {
@@ -471,6 +494,10 @@ importarPedidos()
 }
 
 @media (max-width: 768px) {
+  :deep(.q-btn-dropdown) {
+    width: 100%;
+  }
+
   .edit-input {
     width: 130px;
   }

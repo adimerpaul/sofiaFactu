@@ -706,7 +706,6 @@ async function enviarTodos () {
       cancel: true,
       persistent: true,
       ok: { label: 'Si, enviar', color: 'warning', textColor: 'black' },
-      cancel: { label: 'Cancelar', flat: true, color: 'grey-8' },
     }).onOk(() => resolve(true)).onCancel(() => resolve(false))
   })
   if (!confirmado) return

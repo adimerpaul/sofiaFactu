@@ -299,6 +299,7 @@ class AuxiliarCamaraController extends Controller
 
     public function reporteProductosTotales(Request $request)
     {
+        $includeClientes = $request->boolean('incluir_clientes', true);
         $pedidos = $this->queryForReports($request)->with([
             'cliente:id,nombre',
             'detalles:id,pedido_id,producto_id,cantidad,total',
@@ -353,9 +354,11 @@ class AuxiliarCamaraController extends Controller
             'productos' => $productos,
             'cantidadTotal' => (float) $productos->sum('cantidad_total'),
             'importeTotal' => (float) $productos->sum('importe_total'),
+            'includeClientes' => $includeClientes,
         ])->setPaper('letter');
 
-        return $pdf->download('auxiliar_productos_' . str_replace('-', '', $fecha) . '.pdf');
+        $suffix = $includeClientes ? 'con_clientes' : 'sin_clientes';
+        return $pdf->download('auxiliar_productos_' . $suffix . '_' . str_replace('-', '', $fecha) . '.pdf');
     }
 
     public function reporteVentasGeneradas(Request $request)
@@ -396,6 +399,7 @@ class AuxiliarCamaraController extends Controller
             'cliente_id' => 'nullable|integer|exists:clientes,id',
             'usuario_camion_id' => 'nullable|integer|exists:users,id',
             'pedido_zona_id' => 'nullable|integer|exists:pedido_zonas,id',
+            'incluir_clientes' => 'nullable|boolean',
         ]);
 
         $fecha = $data['fecha'] ?? now()->toDateString();

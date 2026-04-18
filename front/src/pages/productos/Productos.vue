@@ -27,14 +27,14 @@
               @update:model-value="onTipoFilterChange"
             />
           </div>
-          <div class="col-12 col-md-auto">
-            <q-btn color="primary" label="Actualizar" no-caps icon="refresh" :loading="loading" @click="productosGet" />
+          <div class="col-6 col-md-auto">
+            <q-btn color="primary" label="Actualizar" no-caps icon="refresh" class="full-width" :loading="loading" @click="productosGet" />
           </div>
-          <div class="col-12 col-md-auto">
-            <q-btn color="primary" label="Descargar" no-caps icon="fa-solid fa-file-excel" :loading="loading" @click="exportExcel" />
+          <div class="col-6 col-md-auto">
+            <q-btn color="primary" label="Descargar" no-caps icon="fa-solid fa-file-excel" class="full-width" :loading="loading" @click="exportExcel" />
           </div>
-          <div class="col-12 col-md-auto">
-            <q-btn color="green" label="Nuevo" no-caps icon="add_circle_outline" :loading="loading" @click="productoNew" />
+          <div class="col-6 col-md-auto">
+            <q-btn color="green" label="Nuevo" no-caps icon="add_circle_outline" class="full-width" :loading="loading" @click="productoNew" />
           </div>
         </div>
 
@@ -56,6 +56,8 @@
               <th>Imagen</th>
               <th>Codigo</th>
               <th>Nombre</th>
+              <th>Tipo</th>
+              <th>Unidad</th>
               <th>Tipo producto</th>
               <th>Grupo padre</th>
               <th>Grupo</th>
@@ -95,6 +97,16 @@
               </td>
               <td>{{ producto.codigo }}</td>
               <td style="min-width: 220px">{{ producto.nombre }}</td>
+              <td>
+                <q-chip dense square :color="tipoColor(producto.tipo)" text-color="white">
+                  {{ tipoLabel(producto.tipo) }}
+                </q-chip>
+              </td>
+              <td>
+                <q-chip dense square :color="unidadColor(producto.codigo_unidad)" text-color="white">
+                  {{ unidadLabel(producto.codigo_unidad) }}
+                </q-chip>
+              </td>
               <td>{{ producto.tipo_producto }}</td>
               <td>{{ producto.producto_grupo_padre?.nombre || '-' }}</td>
               <td>{{ producto.producto_grupo?.nombre || '-' }}</td>
@@ -418,6 +430,34 @@ export default {
     this.bootstrap()
   },
   methods: {
+    tipoLabel (tipo) {
+      const value = String(tipo || 'NORMAL').trim().toUpperCase()
+      if (value === 'POLLO') return 'Pollo'
+      if (value === 'RES') return 'Res'
+      if (value === 'CERDO') return 'Cerdo'
+      return 'Normal'
+    },
+    tipoColor (tipo) {
+      const value = String(tipo || 'NORMAL').trim().toUpperCase()
+      if (value === 'POLLO') return 'orange'
+      if (value === 'RES') return 'red'
+      if (value === 'CERDO') return 'brown'
+      return 'blue-grey'
+    },
+    unidadLabel (codigoUnidad) {
+      const value = String(codigoUnidad || '').trim().toUpperCase()
+      if (value === 'KG') return 'Kilogramo'
+      if (value === 'U') return 'Unidad'
+      if (value === 'UNIDA') return 'Unidad'
+      return value || '-'
+    },
+    unidadColor (codigoUnidad) {
+      const value = String(codigoUnidad || '').trim().toUpperCase()
+      if (value === 'KG') return 'teal'
+      if (value === 'U') return 'deep-orange'
+      if (value === 'UNIDA') return 'indigo'
+      return 'grey-7'
+    },
     async bootstrap () {
       await Promise.all([this.loadGrupoPadres(), this.loadGrupos()])
       this.productosGet()
@@ -636,3 +676,16 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+@media (max-width: 768px) {
+  :deep(.q-pagination) {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  :deep(.q-markup-table) {
+    font-size: 12px;
+  }
+}
+</style>

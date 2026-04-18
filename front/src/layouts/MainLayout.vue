@@ -1,23 +1,26 @@
 <template>
-  <q-layout view="lHh Lpr lFf">
-    <q-header class="bg-white text-black" bordered >
-      <q-toolbar>
-        <!--        keyboard_double_arrow_left-->
+  <q-layout view="lHh Lpr lFf" class="main-shell">
+    <q-header class="app-header" bordered>
+      <q-toolbar class="header-toolbar">
         <q-btn
           dense
-          rounded
+          round
+          flat
           color="primary"
-          :icon="leftDrawerOpen ? 'keyboard_double_arrow_left' : 'keyboard_double_arrow_right'"
+          :icon="leftDrawerOpen ? 'menu_open' : 'menu'"
           aria-label="Menu"
-          size="10px"
           @click="toggleLeftDrawer"
-          unelevated
         />
-        <span class="q-pa-xs text-bold">{{version}}</span>
-        <q-toolbar-title>
-        </q-toolbar-title>
+
+        <div class="header-brand">
+          <div class="header-brand__title">Sofia Factu</div>
+          <div class="header-brand__meta">v{{ version }}</div>
+        </div>
+
+        <q-space />
+
         <div class="q-mr-sm">
-          <q-btn flat round dense icon="notifications" @click="loadFallas">
+          <q-btn flat round dense icon="notifications" color="grey-8" @click="loadFallas">
             <q-badge v-if="fallasPendientes > 0" color="negative" floating>{{ fallasPendientes }}</q-badge>
             <q-tooltip>Fallas CUFD</q-tooltip>
             <q-menu>
@@ -30,7 +33,7 @@
                 </q-item>
                 <q-item v-for="falla in fallas.slice(0, 5)" :key="falla.id">
                   <q-item-section>
-                    <q-item-label class="text-negative text-weight-bold">Fallo generación CUFD</q-item-label>
+                    <q-item-label class="text-negative text-weight-bold">Fallo generacion CUFD</q-item-label>
                     <q-item-label caption>{{ falla.mensaje }}</q-item-label>
                     <q-item-label caption>{{ falla.detalle?.error || '' }}</q-item-label>
                   </q-item-section>
@@ -44,33 +47,34 @@
             </q-menu>
           </q-btn>
         </div>
-        <div>
-          <q-btn-dropdown flat unelevated  no-caps dropdownIcon="expand_more">
-            <template v-slot:label>
-              <q-avatar rounded>
-                <q-img :src="$url+ '../images/' + $store.user.avatar" v-if="$store.user.avatar" />
+
+        <q-btn-dropdown flat unelevated no-caps dropdown-icon="expand_more" content-class="user-menu">
+          <template #label>
+            <div class="user-trigger">
+              <q-avatar rounded size="34px" class="user-trigger__avatar">
+                <q-img :src="$url + '../images/' + $store.user.avatar" v-if="$store.user.avatar" />
+                <q-icon v-else name="person" color="grey-7" />
               </q-avatar>
-              <div class="text-center" style="line-height: 1">
-                <div style="width: 100px; white-space: normal; overflow-wrap: break-word;">
-                  {{ $store.user.name }} <br>
-                  <q-chip color="red" dense size="xs" class="text-white">{{$store.user.role}}</q-chip>
-                  <q-chip :color="$store.user.es_camion ? 'teal' : 'grey'" dense size="xs" class="text-white q-ml-xs">
-                    Camión: {{ $store.user.es_camion ? 'Sí' : 'No' }}
+              <div class="user-trigger__text">
+                <div class="user-trigger__name">{{ $store.user.name }}</div>
+                <div class="user-trigger__chips">
+                  <q-chip color="red" dense size="sm" class="text-white">{{ $store.user.role }}</q-chip>
+                  <q-chip :color="$store.user.es_camion ? 'teal' : 'grey'" dense size="sm" class="text-white">
+                    Camion: {{ $store.user.es_camion ? 'Si' : 'No' }}
                   </q-chip>
                 </div>
-                <!--                <pre>{{$store.user}}</pre>-->
               </div>
-            </template>
-            <q-item clickable v-ripple @click="logout" v-close-popup>
-              <q-item-section avatar>
-                <q-icon name="logout" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>Salir</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-btn-dropdown>
-        </div>
+            </div>
+          </template>
+          <q-item clickable v-ripple v-close-popup @click="logout">
+            <q-item-section avatar>
+              <q-icon name="logout" />
+            </q-item-section>
+            <q-item-section>
+              <q-item-label>Salir</q-item-label>
+            </q-item-section>
+          </q-item>
+        </q-btn-dropdown>
       </q-toolbar>
     </q-header>
 
@@ -78,149 +82,162 @@
       v-model="leftDrawerOpen"
       bordered
       show-if-above
-      :width="200"
-      :breakpoint="500"
-      class="bg-primary text-white"
+      :width="250"
+      :breakpoint="900"
+      class="app-drawer"
     >
-      <q-list>
-        <q-item-label
-          header
-          class="text-center"
-        >
-          <q-avatar size="80px" class="bg-white" rounded>
-            <q-img src="/logo.png" width="100px" />
+      <div class="drawer-inner">
+        <div class="drawer-brand">
+          <q-avatar size="46px" rounded class="drawer-brand__logo">
+            <q-img src="/logo.png" fit="contain" />
           </q-avatar>
-        </q-item-label>
+          <div class="drawer-brand__copy">
+            <div class="drawer-brand__title">Sofia Factu</div>
+            <div class="drawer-brand__subtitle">Ventas, pedidos y facturacion</div>
+          </div>
+        </div>
 
-        <!--        <EssentialLink-->
-        <!--          v-for="link in linksList"-->
-        <!--          :key="link.title"-->
-        <!--          v-bind="link"-->
-        <!--        />-->
-        <template v-for="link in linksList" :key="link.title">
-          <!--          v-if="link.can === 'Todos' || $store.permissions.some(permission => permission.name === link.can)"-->
-          <q-item  clickable :to="link.link" exact
-                   class="text-black"
-                   active-class="menu"
-                   dense
-                   v-close-popup
-                   v-if="canSee(link)"
-          >
-            <q-item-section avatar>
-              <q-icon :name="$route.path === link.link ? 'o_' + link.icon : link.icon"
-                      :class="$route.path === link.link ? 'text-black' : ''"/>
+        <q-scroll-area class="drawer-scroll">
+          <q-list class="menu-list">
+            <template v-for="group in groupedLinks" :key="group.title">
+              <div v-if="group.links.length" class="menu-group">
+                <div class="menu-group__label">{{ group.title }}</div>
+
+                <q-item
+                  v-for="link in group.links"
+                  :key="link.title"
+                  clickable
+                  :to="link.link"
+                  exact
+                  class="menu-item"
+                  active-class="menu-item--active"
+                  dense
+                  v-close-popup
+                >
+                  <q-item-section avatar class="menu-item__avatar">
+                    <q-icon :name="$route.path === link.link ? 'o_' + link.icon : link.icon" size="18px" />
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label class="menu-item__label">{{ link.title }}</q-item-label>
+                  </q-item-section>
+                </q-item>
+              </div>
+            </template>
+          </q-list>
+        </q-scroll-area>
+
+        <div class="drawer-footer">
+          <q-item clickable class="menu-item menu-item--logout" @click="logout" v-close-popup dense>
+            <q-item-section avatar class="menu-item__avatar">
+              <q-icon name="logout" size="18px" />
             </q-item-section>
             <q-item-section>
-              <q-item-label :class="$route.path === link.link ? `text-black text-bold ${link.color}` : ''">
-                {{ link.title }}
-              </q-item-label>
+              <q-item-label class="menu-item__label">Salir</q-item-label>
             </q-item-section>
           </q-item>
-        </template>
-        <q-item clickable class="text-black" @click="logout" v-close-popup>
-          <q-item-section avatar>
-            <q-icon name="logout" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>Salir</q-item-label>
-          </q-item-section>
-        </q-item>
-      </q-list>
+        </div>
+      </div>
     </q-drawer>
 
-    <q-page-container class="bg-grey-3">
+    <q-page-container class="page-shell">
       <router-view />
     </q-page-container>
   </q-layout>
 </template>
 
 <script setup>
-import {getCurrentInstance, onBeforeUnmount, onMounted, ref} from 'vue'
-// import EssentialLink from 'components/EssentialLink.vue'
-const {proxy} = getCurrentInstance()
-const linksList = ref([])
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref } from 'vue'
 
+const { proxy } = getCurrentInstance()
+const linksList = ref([])
 
 const leftDrawerOpen = ref(false)
 const fallasPendientes = ref(0)
 const fallas = ref([])
 let pollTimer = null
 
-const version =import.meta.env.VITE_API_VERSION
+const version = import.meta.env.VITE_API_VERSION
+
+const menuGroups = [
+  { title: 'General', keys: ['Principal'] },
+  { title: 'Comercial', keys: ['Clientes', 'Nueva Cliente', 'Ventas', 'Nueva Venta', 'Pedidos', 'Realizar pedido', 'Mis pedidos', 'Mis pedidos totales', 'Visitas', 'Cobranzas deudas', 'Historial cobranzas'] },
+  { title: 'Inventario', keys: ['Productos', 'Productos por vencer', 'Productos vencidos', 'Proveedores', 'Compras', 'Compras Nueva', 'Auxiliar de camara'] },
+  { title: 'Operacion', keys: ['Rutas', 'Despacho', 'Mapa cliente', 'Mapa zona', 'Mapa zonas', 'Verificacion'] },
+  { title: 'Administracion', keys: ['Usuarios', 'Impuestos', 'Digitador factura'] },
+]
+
+const groupedLinks = computed(() => {
+  const visibleLinks = linksList.value.filter((link) => canSee(link))
+  const groups = menuGroups.map((group) => ({
+    title: group.title,
+    links: group.keys
+      .map((key) => visibleLinks.find((link) => link.title === key))
+      .filter(Boolean),
+  }))
+
+  const groupedTitles = new Set(groups.flatMap((group) => group.links.map((link) => link.title)))
+  const remainder = visibleLinks.filter((link) => !groupedTitles.has(link.title))
+  if (remainder.length) {
+    groups.push({ title: 'Otros', links: remainder })
+  }
+
+  return groups
+})
 
 onMounted(() => {
-  const user = JSON.parse(localStorage.getItem('user')) || {}
-
   const baseLinks = [
     { title: 'Principal', icon: 'home', link: '/', always: true },
     { title: 'Usuarios', icon: 'people', link: '/usuarios', perm: 'Usuarios' },
     { title: 'Impuestos', icon: 'percent', link: '/impuestos', perm: 'Impuestos' },
-    { title: 'Productos', icon: 'shopping_cart', link: '/productos', perm: 'Productos' },
+    { title: 'Productos', icon: 'inventory_2', link: '/productos', perm: 'Productos' },
     { title: 'Clientes', icon: 'groups', link: '/clientes', perm: 'Clientes' },
     { title: 'Nueva Cliente', icon: 'person_add', link: '/alta-cliente', perm: 'Clientes' },
-    { title: 'Ventas', icon: 'shopping_bag', link: '/venta', perm: 'Ventas' },
+    { title: 'Ventas', icon: 'point_of_sale', link: '/venta', perm: 'Ventas' },
     { title: 'Nueva Venta', icon: 'add_shopping_cart', link: '/ventaNuevo', perm: 'Nueva Venta' },
-    { title: 'Proveedores', icon: 'manage_accounts', link: '/proveedores', perm: 'Proveedores'},
-    { title: 'Compras', icon: 'storefront', link: '/compras', perm: 'Compras'},
-    { title: 'Compras Nueva', icon: 'shopping_basket', link: '/compras-create', perm: 'Nueva Compra'},
-    { title: 'Productos por vencer', icon: 'warning', link: '/productos-vencer', perm: 'Productos por vencer'},
-    { title: 'Productos vencidos', icon: 'do_not_touch', link: '/productos-vencidos', perm: 'Productos vencidos'},
-    { title: 'Pedidos', icon: 'real_estate_agent', link: '/pedidos', perm: 'Pedidos'},
-    { title: 'Visitas', icon: 'map', link: '/visitas', perm: 'Pedidos'},
-    { title: 'Mis pedidos', icon: 'playlist_add_check', link: '/mis-pedidos', perm: 'Pedidos'},
-    { title: 'Mis pedidos totales', icon: 'summarize', link: '/mis-pedidos-totales', perm: 'Mis pedidos totales'},
-    { title: 'Mapa cliente', icon: 'map', link: '/mapa-cliente', perm: 'Mapa cliente'},
-    { title: 'Mapa zona', icon: 'polyline', link: '/mapa-zona', perm: 'Mapa zona'},
-    { title: 'Mapa zonas', icon: 'palette', link: '/mapa-zonas', perm: 'Mapa cliente zonas'},
-    { title: 'Auxiliar de camara', icon: 'warehouse', link: '/auxiliar-camara', perm: 'Auxiliar de camara'},
-    { title: 'Verificacion', icon: 'fact_check', link: '/verificacion', perm: 'Verificacion'},
-    { title: 'Digitador factura', icon: 'receipt_long', link: '/digitador-factura', perm: 'Digitador factura'},
+    { title: 'Proveedores', icon: 'store', link: '/proveedores', perm: 'Proveedores' },
+    { title: 'Compras', icon: 'shopping_basket', link: '/compras', perm: 'Compras' },
+    { title: 'Compras Nueva', icon: 'post_add', link: '/compras-create', perm: 'Nueva Compra' },
+    { title: 'Productos por vencer', icon: 'warning_amber', link: '/productos-vencer', perm: 'Productos por vencer' },
+    { title: 'Productos vencidos', icon: 'dangerous', link: '/productos-vencidos', perm: 'Productos vencidos' },
+    { title: 'Pedidos', icon: 'receipt_long', link: '/pedidos', perm: 'Pedidos' },
+    { title: 'Visitas', icon: 'map', link: '/visitas', perm: 'Pedidos' },
+    { title: 'Mis pedidos', icon: 'task_alt', link: '/mis-pedidos', perm: 'Pedidos' },
+    { title: 'Mis pedidos totales', icon: 'summarize', link: '/mis-pedidos-totales', perm: 'Mis pedidos totales' },
+    { title: 'Mapa cliente', icon: 'location_on', link: '/mapa-cliente', perm: 'Mapa cliente' },
+    { title: 'Mapa zona', icon: 'polyline', link: '/mapa-zona', perm: 'Mapa zona' },
+    { title: 'Mapa zonas', icon: 'grid_view', link: '/mapa-zonas', perm: 'Mapa cliente zonas' },
+    { title: 'Auxiliar de camara', icon: 'warehouse', link: '/auxiliar-camara', perm: 'Auxiliar de camara' },
+    { title: 'Verificacion', icon: 'fact_check', link: '/verificacion', perm: 'Verificacion' },
+    { title: 'Digitador factura', icon: 'receipt', link: '/digitador-factura', perm: 'Digitador factura' },
     { title: 'Cobranzas deudas', icon: 'payments', link: '/cobranzas', perm: 'Cobranzas' },
     { title: 'Historial cobranzas', icon: 'history', link: '/historial-cobranzas', perm: 'Cobranzas' },
     { title: 'Rutas', icon: 'route', link: '/rutas-camion', perm: 'Rutas', esCamion: true },
     { title: 'Despacho', icon: 'local_shipping', link: '/despacho-camion', perm: 'Despacho', esCamion: true },
-    { title: 'Realizar pedido', icon: 'shopping_cart_checkout', link: '/pedidosCompra', perm: 'Nuevo Pedido'},
+    { title: 'Realizar pedido', icon: 'shopping_cart_checkout', link: '/pedidosCompra', perm: 'Nuevo Pedido' },
   ]
+
   linksList.value = baseLinks
   loadFallas()
-  // pollTimer = setInterval(() => loadFallas(false), 60000)
-
-  // const sucursalLinks = {
-  //   'Ayacucho': { title: 'Ayacucho', icon: 'event', link: '/reservas', can: 'Todos', color: 'text-green' },
-  //   'Oquendo': { title: 'Oquendo', icon: 'event', link: '/reservasOquendo', can: 'Todos', color: 'text-blue' },
-  // }
-  //
-  // const altSucursal = user.sucursal === 'Ayacucho' ? 'Oquendo' : 'Ayacucho'
-  //
-  // linksList.value = [
-  //   ...baseLinks.slice(0, 2),
-  //   sucursalLinks[user.sucursal],
-  //   ...baseLinks.slice(2),
-  //   sucursalLinks[altSucursal]
-  // ]
 })
 
 onBeforeUnmount(() => {
   if (pollTimer) clearInterval(pollTimer)
 })
 
-function toggleLeftDrawer () {
+function toggleLeftDrawer() {
   leftDrawerOpen.value = !leftDrawerOpen.value
 }
+
 function logout() {
-  proxy.$alert.dialog('¿Desea salir del sistema?')
+  proxy.$alert.dialog('Desea salir del sistema?')
     .onOk(() => {
-      // proxy.$store.isLogged = false
-      // proxy.$store.user = {}
-      // localStorage.removeItem('tokenProvidencia')
-      // proxy.$router.push('/login')
       proxy.$axios.post('/logout')
         .then(() => {
           proxy.$store.isLogged = false
           proxy.$store.user = {}
           localStorage.removeItem('tokenSofiaFactu')
           localStorage.removeItem('user')
-          proxy.$alert.success('Sesión cerrada', 'Éxito')
+          proxy.$alert.success('Sesion cerrada', 'Exito')
           proxy.$router.push('/login')
         })
         .catch(() => {
@@ -228,27 +245,33 @@ function logout() {
           proxy.$store.user = {}
           localStorage.removeItem('tokenSofiaFactu')
           localStorage.removeItem('user')
-          proxy.$alert.success('Sesión cerrada', 'Éxito')
+          proxy.$alert.success('Sesion cerrada', 'Exito')
           proxy.$router.push('/login')
         })
     })
 }
+
 function canSee(link) {
   if (!link || !proxy.$store?.user) return false
   if (link.always) return true
+
   const isCamion = !!proxy.$store.user.es_camion
   const isCobrador = String(proxy.$store.user.role || '').toUpperCase() === 'COBRADOR'
-  const perms = (proxy.$store.permissions || []).map(p => typeof p === 'string' ? p : p?.name).filter(Boolean)
+  const perms = (proxy.$store.permissions || [])
+    .map((permission) => typeof permission === 'string' ? permission : permission?.name)
+    .filter(Boolean)
   const requiredPerm = link.perm || link.title
+
   if (perms.includes(requiredPerm)) return true
   if (requiredPerm === 'Cobranzas' && isCobrador) return true
   return !!link.esCamion && isCamion
 }
+
 function loadFallas(showError = false) {
   proxy.$axios.get('/impuestos/fallas')
     .then((res) => {
       fallasPendientes.value = res.data?.pending || 0
-      fallas.value = (res.data?.data || []).filter((x) => x.estado === 'pendiente')
+      fallas.value = (res.data?.data || []).filter((item) => item.estado === 'pendiente')
     })
     .catch((err) => {
       if (showError) {
@@ -257,12 +280,192 @@ function loadFallas(showError = false) {
     })
 }
 </script>
-<style>
-.menu{
-  background-color: #fff;
-  color: #000 !important;
+
+<style scoped>
+.main-shell {
+  background: #eef2f6;
+}
+
+.app-header {
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+}
+
+.header-toolbar {
+  min-height: 60px;
+  padding: 0 14px;
+}
+
+.header-brand {
+  margin-left: 10px;
+  line-height: 1.05;
+}
+
+.header-brand__title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #182433;
+  letter-spacing: 0.02em;
+}
+
+.header-brand__meta {
+  font-size: 11px;
+  color: #6c7a89;
+}
+
+.user-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 260px;
+}
+
+.user-trigger__avatar {
+  background: #eef3f8;
+  border: 1px solid #d7e0ea;
+}
+
+.user-trigger__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.user-trigger__name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2d3d;
+}
+
+.user-trigger__chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.app-drawer {
+  background: linear-gradient(180deg, #f7fafc 0%, #f0f4f8 100%);
+  color: #223142;
+}
+
+.drawer-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.drawer-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid rgba(27, 43, 65, 0.08);
+}
+
+.drawer-brand__logo {
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(32, 54, 86, 0.08);
+}
+
+.drawer-brand__copy {
+  min-width: 0;
+}
+
+.drawer-brand__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #162334;
+}
+
+.drawer-brand__subtitle {
+  font-size: 11px;
+  color: #708095;
+}
+
+.drawer-scroll {
+  flex: 1;
+}
+
+.menu-list {
+  padding: 8px 8px 12px;
+}
+
+.menu-group {
+  margin-bottom: 10px;
+}
+
+.menu-group__label {
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7a8795;
+}
+
+.menu-item {
+  min-height: 34px;
+  margin-bottom: 2px;
+  padding: 0 10px;
   border-radius: 10px;
-  margin: 5px;
-  padding: 5px
+  color: #334155;
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.menu-item:hover {
+  background: rgba(32, 72, 121, 0.08);
+  color: #10243d;
+}
+
+.menu-item--active {
+  background: linear-gradient(90deg, #dceeff 0%, #eef6ff 100%);
+  color: #12314f;
+  box-shadow: inset 0 0 0 1px rgba(47, 108, 176, 0.12);
+}
+
+.menu-item__avatar {
+  min-width: 28px;
+  color: inherit;
+}
+
+.menu-item__label {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.drawer-footer {
+  padding: 8px;
+  border-top: 1px solid rgba(27, 43, 65, 0.08);
+}
+
+.menu-item--logout {
+  color: #7a1d1d;
+}
+
+.page-shell {
+  background: #eef2f6;
+}
+
+@media (max-width: 700px) {
+  .header-toolbar {
+    padding: 0 10px;
+  }
+
+  .user-trigger__chips,
+  .drawer-brand__subtitle {
+    display: none;
+  }
+
+  .user-trigger__name {
+    max-width: 90px;
+  }
 }
 </style>

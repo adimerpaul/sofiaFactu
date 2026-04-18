@@ -86,14 +86,21 @@
       </q-markup-table>
     </q-card>
 
-    <q-dialog v-model="dialogAcciones">
-      <q-card style="min-width: 900px; max-width: 95vw;">
-        <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">{{ selectedCliente?.codcli || selectedCliente?.id }} {{ selectedCliente?.nombre }}</div>
+    <q-dialog
+      v-model="dialogAcciones"
+      :maximized="$q.screen.lt.md"
+      transition-show="slide-up"
+      transition-hide="slide-down"
+    >
+      <q-card class="visitas-acciones-card">
+        <q-card-section class="row items-center q-pb-none visitas-acciones-header">
+          <div class="visitas-acciones-title">
+            <div class="text-h6">{{ selectedCliente?.codcli || selectedCliente?.id }} {{ selectedCliente?.nombre }}</div>
+          </div>
           <q-space />
           <q-btn flat round dense icon="close" v-close-popup />
         </q-card-section>
-        <q-card-section>
+        <q-card-section class="visitas-acciones-body">
           <div class="row q-col-gutter-sm">
             <div class="col-12 col-md-5">
               <div><b>Cel:</b> {{ selectedCliente?.telefono || '-' }}</div>
@@ -111,9 +118,9 @@
             <div class="col-12">
               <div class="text-subtitle2 q-mb-sm">Fotos del cliente</div>
               <div v-if="clienteFotosSeleccionado.length" class="row q-col-gutter-sm">
-                <div v-for="(foto, index) in clienteFotosSeleccionado" :key="`${foto}-${index}`" class="col-6 col-md-4">
+                <div v-for="(foto, index) in clienteFotosSeleccionado" :key="`${foto}-${index}`" class="col-6 col-sm-4 col-md-4">
                   <q-card flat bordered class="cliente-foto-card">
-                    <q-img :src="clienteFotoUrl(foto)" style="height: 170px" fit="cover" />
+                    <q-img :src="clienteFotoUrl(foto)" class="cliente-foto-img" fit="cover" />
                   </q-card>
                 </div>
               </div>
@@ -121,7 +128,7 @@
             </div>
           </div>
         </q-card-section>
-        <q-card-actions align="stretch" class="row q-col-gutter-sm q-px-md q-pb-md">
+        <q-card-actions align="stretch" class="row q-col-gutter-sm q-px-md q-pb-md visitas-acciones-footer">
           <div class="col-12 col-md-6">
             <q-btn color="green" icon="shopping_cart" no-caps class="full-width" label="Realizar pedido" @click="accionSeleccionada('REALIZAR_PEDIDO')" :loading="loadingAccion === 'REALIZAR_PEDIDO'" :disable="Boolean(loadingAccion)" />
           </div>
@@ -1230,10 +1237,32 @@ export default {
 .cliente-no-pedido {
   background: #ffd6d6;
 }
+.visitas-acciones-card {
+  width: min(920px, 95vw);
+  max-width: 95vw;
+  display: flex;
+  flex-direction: column;
+}
+.visitas-acciones-header {
+  padding-top: 14px;
+}
+.visitas-acciones-title {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.visitas-acciones-body {
+  overflow-y: auto;
+}
+.visitas-acciones-footer {
+  margin-top: auto;
+}
 .cliente-foto-card {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+.cliente-foto-img {
+  height: 170px;
 }
 :deep(.cliente-id-tooltip) {
   background: #22b8cf;
@@ -1271,6 +1300,34 @@ export default {
   font-weight: 700;
 }
 @media (max-width: 700px) {
+  .visitas-acciones-card {
+    width: 100vw;
+    max-width: 100vw;
+    min-height: 100vh;
+    border-radius: 0;
+  }
+
+  .visitas-acciones-header {
+    padding: 10px 12px 0;
+  }
+
+  .visitas-acciones-title .text-h6 {
+    font-size: 16px;
+    line-height: 1.15;
+  }
+
+  .visitas-acciones-body {
+    padding: 12px;
+  }
+
+  .visitas-acciones-footer {
+    padding: 0 12px 12px;
+  }
+
+  .cliente-foto-img {
+    height: 112px;
+  }
+
   .map-debug-summary {
     top: 8px;
     right: 12px;

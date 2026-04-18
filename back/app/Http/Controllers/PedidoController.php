@@ -10,6 +10,7 @@ use App\Models\Visita;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class PedidoController extends Controller {
     private array $estadosEditables = ['Creado', 'Pendiente'];
@@ -157,6 +158,7 @@ class PedidoController extends Controller {
                 }
 
                 if (array_key_exists('productos', $data)) {
+                    $this->assertProductosTipoUnico($data['productos'] ?? []);
                     [$total, $contiene] = $this->syncDetalles($pedido, $data['productos'] ?? []);
                     $pedido->update([
                         'total' => $total,
@@ -175,6 +177,9 @@ class PedidoController extends Controller {
 
             DB::commit();
             return response()->json($pedido->load(['detalles.producto', 'cliente', 'clienteBaja', 'user']));
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['error' => $e->getMessage()], 500);
@@ -263,6 +268,7 @@ class PedidoController extends Controller {
             $productoTipos = Producto::query()
                 ->whereIn('id', collect($productos)->pluck('producto_id')->values()->all())
                 ->pluck('tipo', 'id');
+            $tipoPedidoProducto = $this->assertProductosTipoUnico($productos, $productoTipos);
 
             $contiene = [
                 'normal' => false,
@@ -270,13 +276,15 @@ class PedidoController extends Controller {
                 'cerdo' => false,
                 'pollo' => false,
             ];
-            foreach ($productos as $item) {
-                $tipo = strtoupper((string) ($productoTipos[$item['producto_id']] ?? 'NORMAL'));
-                if ($tipo === 'RES') $contiene['res'] = true;
-                elseif ($tipo === 'CERDO') $contiene['cerdo'] = true;
-                elseif ($tipo === 'POLLO') $contiene['pollo'] = true;
-                else $contiene['normal'] = true;
+            if ($tipoPedidoProducto === 'RES') $contiene['res'] = true;
+            elseif ($tipoPedidoProducto === 'CERDO') $contiene['cerdo'] = true;
+            elseif ($tipoPedidoProducto === 'POLLO') $contiene['pollo'] = true;
+            else $contiene['normal'] = true;
+
+            foreach ($productos as &$item) {
+                $item['detalle_extra'] = $this->sanitizeDetalleExtra($tipoPedidoProducto, $item['detalle_extra'] ?? null);
             }
+            unset($item);
 
             $pedido = Pedido::create([
                 'user_id' => $user->id,
@@ -325,6 +333,9 @@ class PedidoController extends Controller {
 
             DB::commit();
             return response()->json($pedido->load(['detalles.producto', 'cliente', 'clienteBaja', 'user']), 201);
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['error' => $e->getMessage()], 500);
@@ -336,6 +347,7 @@ class PedidoController extends Controller {
         $productoTipos = Producto::query()
             ->whereIn('id', collect($productos)->pluck('producto_id')->values()->all())
             ->pluck('tipo', 'id');
+        $tipoPedido = $this->assertProductosTipoUnico($productos, $productoTipos);
 
         $contiene = [
             'normal' => false,
@@ -343,6 +355,10 @@ class PedidoController extends Controller {
             'cerdo' => false,
             'pollo' => false,
         ];
+        if ($tipoPedido === 'RES') $contiene['res'] = true;
+        elseif ($tipoPedido === 'CERDO') $contiene['cerdo'] = true;
+        elseif ($tipoPedido === 'POLLO') $contiene['pollo'] = true;
+        else $contiene['normal'] = true;
 
         $pedido->detalles()->delete();
         $total = 0.0;
@@ -352,12 +368,6 @@ class PedidoController extends Controller {
             $precio = (float) ($item['precio'] ?? 0);
             if ($cantidad <= 0) continue;
 
-            $tipo = strtoupper((string) ($productoTipos[$item['producto_id']] ?? 'NORMAL'));
-            if ($tipo === 'RES') $contiene['res'] = true;
-            elseif ($tipo === 'CERDO') $contiene['cerdo'] = true;
-            elseif ($tipo === 'POLLO') $contiene['pollo'] = true;
-            else $contiene['normal'] = true;
-
             $subtotal = $precio * $cantidad;
             $pedido->detalles()->create([
                 'producto_id' => $item['producto_id'],
@@ -365,7 +375,7 @@ class PedidoController extends Controller {
                 'precio' => $precio,
                 'total' => $subtotal,
                 'observacion_detalle' => $item['observacion'] ?? null,
-                'detalle_extra' => $item['detalle_extra'] ?? null,
+                'detalle_extra' => $this->sanitizeDetalleExtra($tipoPedido, $item['detalle_extra'] ?? null),
             ]);
             $total += $subtotal;
         }
@@ -386,6 +396,115 @@ class PedidoController extends Controller {
     private function isEditable(Pedido $pedido): bool
     {
         return in_array((string) $pedido->estado, $this->estadosEditables, true);
+    }
+
+    private function normalizeProductoTipo(?string $tipo): string
+    {
+        $tipo = strtoupper(trim((string) $tipo));
+
+        return in_array($tipo, ['NORMAL', 'POLLO', 'RES', 'CERDO'], true)
+            ? $tipo
+            : 'NORMAL';
+    }
+
+    private function assertProductosTipoUnico(array $productos, $productoTipos = null): ?string
+    {
+        if (empty($productos)) {
+            return null;
+        }
+
+        $productoTipos = $productoTipos ?? Producto::query()
+            ->whereIn('id', collect($productos)->pluck('producto_id')->values()->all())
+            ->pluck('tipo', 'id');
+
+        $tipos = collect($productos)
+            ->map(fn ($item) => $this->normalizeProductoTipo($productoTipos[$item['producto_id']] ?? 'NORMAL'))
+            ->unique()
+            ->values();
+
+        if ($tipos->count() !== 1) {
+            throw ValidationException::withMessages([
+                'productos' => ['Todo el pedido debe ser de un solo tipo: NORMAL, POLLO, RES o CERDO.'],
+            ]);
+        }
+
+        return $tipos->first() ?: 'NORMAL';
+    }
+
+    private function detalleDefaultsByTipo(?string $tipo): array
+    {
+        return match ($this->normalizeProductoTipo($tipo)) {
+            'RES' => [
+                'precio_res' => '',
+                'res_trozado' => '',
+                'res_entero' => '',
+                'res_pierna' => '',
+                'res_brazo' => '',
+                'observacion' => '',
+            ],
+            'CERDO' => [
+                'cerdo_precio_total' => '',
+                'cerdo_entero' => '',
+                'cerdo_desmembrado' => '',
+                'cerdo_corte' => '',
+                'cerdo_kilo' => '',
+                'observacion' => '',
+            ],
+            'POLLO' => [
+                'pollo_cja_b5' => '',
+                'pollo_uni_b5' => '',
+                'pollo_cja_b6' => '',
+                'pollo_uni_b6' => '',
+                'pollo_cja_104' => '',
+                'pollo_uni_104' => '',
+                'pollo_cja_105' => '',
+                'pollo_uni_105' => '',
+                'pollo_cja_106' => '',
+                'pollo_uni_106' => '',
+                'pollo_cja_107' => '',
+                'pollo_uni_107' => '',
+                'pollo_cja_108' => '',
+                'pollo_uni_108' => '',
+                'pollo_cja_109' => '',
+                'pollo_uni_109' => '',
+                'pollo_rango_unidades' => '',
+                'pollo_ala' => '',
+                'pollo_ala_unidad' => 'KG',
+                'pollo_cadera' => '',
+                'pollo_cadera_unidad' => 'KG',
+                'pollo_pecho' => '',
+                'pollo_pecho_unidad' => 'KG',
+                'pollo_pi_mu' => '',
+                'pollo_pi_mu_unidad' => 'KG',
+                'pollo_filete' => '',
+                'pollo_filete_unidad' => 'KG',
+                'pollo_cuello' => '',
+                'pollo_cuello_unidad' => 'KG',
+                'pollo_hueso' => '',
+                'pollo_hueso_unidad' => 'KG',
+                'pollo_menudencia' => '',
+                'pollo_menudencia_unidad' => 'KG',
+                'pollo_bs' => '',
+                'pollo_bs2' => '',
+                'observacion' => '',
+            ],
+            default => [
+                'observacion' => '',
+            ],
+        };
+    }
+
+    private function sanitizeDetalleExtra(?string $tipo, $detalle): ?array
+    {
+        $defaults = $this->detalleDefaultsByTipo($tipo);
+        $detalle = is_array($detalle) ? $detalle : [];
+        $sanitized = [];
+
+        foreach ($defaults as $key => $value) {
+            $sanitized[$key] = array_key_exists($key, $detalle) ? $detalle[$key] : $value;
+        }
+
+        return $sanitized;
     }
 
     private function registrarVisita(int $userId, ?int $clienteId, string $tipoVisita, ?string $comentario): Visita

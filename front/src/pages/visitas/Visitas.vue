@@ -244,7 +244,7 @@
                       <q-item-section avatar><q-icon name="tune" color="purple" /></q-item-section>
                       <q-item-section>Editar detalle</q-item-section>
                     </q-item>
-                    <q-item clickable v-ripple @click="pedidoItems.splice(index, 1)" v-close-popup>
+                    <q-item clickable v-ripple @click="removePedidoItem(index)" v-close-popup>
                       <q-item-section avatar><q-icon name="delete" color="negative" /></q-item-section>
                       <q-item-section>Eliminar producto</q-item-section>
                     </q-item>
@@ -566,8 +566,40 @@ export default {
     },
     normalizeTipoProducto (tipo) {
       const t = String(tipo || 'NORMAL').trim().toUpperCase()
-      if (t === 'RES' || t === 'CERDO' || t === 'POLLO') return t
+      if (t === 'NORMAL' || t === 'RES' || t === 'CERDO' || t === 'POLLO') return t
       return 'NORMAL'
+    },
+    getPedidoTipos () {
+      return [...new Set(this.pedidoItems.map(item => this.normalizeTipoProducto(item?.tipo)))]
+    },
+    getPedidoTipoActual () {
+      const tipos = this.getPedidoTipos()
+      return tipos.length === 1 ? tipos[0] : null
+    },
+    sanitizeDetalleExtra (tipo, detalle = {}) {
+      const defaults = this.detalleDefaultsByTipo(this.normalizeTipoProducto(tipo))
+      const sanitized = { ...defaults }
+
+      Object.keys(defaults).forEach((key) => {
+        if (Object.prototype.hasOwnProperty.call(detalle, key)) {
+          sanitized[key] = detalle[key]
+        }
+      })
+
+      return sanitized
+    },
+    refreshProductosDisponibles (needle = '') {
+      const tipoPedido = this.getPedidoTipoActual()
+      const texto = String(needle || '').toLowerCase()
+
+      this.productos = this.productosSource
+        .filter((p) => {
+          const tipoProducto = this.normalizeTipoProducto(p?.tipo)
+          if (tipoPedido && tipoProducto !== tipoPedido) return false
+          if (!texto) return true
+          return `${p.nombre || ''} ${p.codigo || ''}`.toLowerCase().includes(texto)
+        })
+        .map(this.mapStockOption)
     },
     detalleDefaultsByTipo (tipo) {
       if (tipo === 'RES') {
@@ -634,19 +666,29 @@ export default {
     },
     openDetalleDialog (item, index) {
       this.detalleEditIndex = index
-      this.detalleTipo = this.normalizeTipoProducto(item?.tipo)
+      const tipoItem = this.normalizeTipoProducto(item?.tipo)
+      const tipoPedido = this.getPedidoTipoActual()
+      if (tipoPedido && tipoPedido !== tipoItem) {
+        this.$alert.error('Todo el pedido debe ser del mismo tipo')
+        return
+      }
+      this.detalleTipo = tipoPedido || tipoItem
       const defaults = this.detalleDefaultsByTipo(this.detalleTipo)
-      this.detalleEdit = { ...defaults, ...(item?.detalle_extra || {}) }
+      this.detalleEdit = { ...defaults, ...this.sanitizeDetalleExtra(this.detalleTipo, item?.detalle_extra || {}) }
       this.dialogDetalle = true
     },
     saveDetalleDialog () {
       if (this.detalleEditIndex < 0 || !this.pedidoItems[this.detalleEditIndex]) return
       const current = this.pedidoItems[this.detalleEditIndex]
-      current.detalle_extra = { ...this.detalleEdit }
+      current.detalle_extra = this.sanitizeDetalleExtra(this.detalleTipo, this.detalleEdit)
       current.observacion = this.detalleEdit.observacion || current.observacion || ''
       this.dialogDetalle = false
       this.detalleEditIndex = -1
       this.detalleEdit = {}
+    },
+    removePedidoItem (index) {
+      this.pedidoItems.splice(index, 1)
+      this.refreshProductosDisponibles()
     },
     rowClassByCliente (cliente) {
       const status = this.clienteStatus(cliente?.id)
@@ -903,7 +945,7 @@ export default {
             if (pa !== pb) return pa - pb
             return String(a?.nombre || '').localeCompare(String(b?.nombre || ''), 'es')
           })
-        this.productos = this.productosSource.map(this.mapStockOption)
+        this.refreshProductosDisponibles()
       } catch (_) {
         this.productos = []
         this.productosSource = []
@@ -911,20 +953,20 @@ export default {
     },
     filtrarProductos (val, update) {
       update(() => {
-        const needle = (val || '').toLowerCase()
-        if (!needle) {
-          this.productos = this.productosSource.map(this.mapStockOption)
-          return
-        }
-        this.productos = this.productosSource
-          .filter(p => `${p.nombre || ''} ${p.codigo || ''}`.toLowerCase().includes(needle))
-          .map(this.mapStockOption)
+        this.refreshProductosDisponibles(val)
       })
     },
     agregarProducto () {
       if (!this.productoSeleccionado) return
       const p = this.productos.find(x => x.id === this.productoSeleccionado)
       if (!p) return
+      const tipoProducto = this.normalizeTipoProducto(p.tipo)
+      const tipoPedido = this.getPedidoTipoActual()
+
+      if (tipoPedido && tipoPedido !== tipoProducto) {
+        this.$alert.error(`Todo el pedido debe ser del mismo tipo: ${tipoPedido}`)
+        return
+      }
 
       const ex = this.pedidoItems.find(x => x.producto_id === p.id)
       if (ex) {
@@ -938,11 +980,12 @@ export default {
           cantidad: 1,
           precio: Number(p.precio || 0),
           observacion: '',
-          tipo: this.normalizeTipoProducto(p.tipo),
-          detalle_extra: this.detalleDefaultsByTipo(this.normalizeTipoProducto(p.tipo)),
+          tipo: tipoProducto,
+          detalle_extra: this.detalleDefaultsByTipo(tipoProducto),
         })
       }
       this.productoSeleccionado = null
+      this.refreshProductosDisponibles()
     },
     async guardarPedido () {
       if (!this.selectedCliente) return
@@ -955,12 +998,20 @@ export default {
         return
       }
 
+      const tiposPedido = this.getPedidoTipos()
+      if (tiposPedido.length !== 1) {
+        this.$alert.error('Todo el pedido debe ser de un solo tipo: NORMAL, POLLO, RES o CERDO')
+        return
+      }
+
+      const tipoPedido = tiposPedido[0]
+
       const productos = this.pedidoItems.map(p => ({
         producto_id: p.producto_id,
         cantidad: Number(p.cantidad || 0),
         precio: Number(p.precio || 0),
         observacion: p.observacion || '',
-        detalle_extra: p.detalle_extra || null,
+        detalle_extra: this.sanitizeDetalleExtra(tipoPedido, p.detalle_extra || {}),
       })).filter(p => p.cantidad > 0 && p.precio >= 0)
 
       if (productos.length === 0) {

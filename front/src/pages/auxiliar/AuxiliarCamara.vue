@@ -166,31 +166,27 @@
               </template>
               <template #body-cell-cantidad="props">
                 <q-td :props="props">
-                  <q-input
-                    :model-value="getEditCantidad(pedido.id, props.row)"
+                  <input
+                    :value="getEditCantidad(pedido.id, props.row)"
                     type="number"
-                    dense
-                    outlined
                     step="0.01"
                     min="0"
-                    class="edit-input"
-                    :disable="isLocked(pedido)"
-                    @update:model-value="(v) => setEditCantidad(pedido.id, props.row.id, v)"
+                    class="edit-input-native"
+                    :disabled="isLocked(pedido)"
+                    @input="(e) => setEditCantidad(pedido.id, props.row.id, e.target.value)"
                   />
                 </q-td>
               </template>
               <template #body-cell-precio="props">
                 <q-td :props="props">
-                  <q-input
-                    :model-value="getEditPrecio(pedido.id, props.row)"
+                  <input
+                    :value="getEditPrecio(pedido.id, props.row)"
                     type="number"
-                    dense
-                    outlined
                     step="0.01"
                     min="0"
-                    class="edit-input"
-                    :disable="isLocked(pedido)"
-                    @update:model-value="(v) => setEditPrecio(pedido.id, props.row.id, v)"
+                    class="edit-input-native"
+                    :disabled="isLocked(pedido)"
+                    @input="(e) => setEditPrecio(pedido.id, props.row.id, e.target.value)"
                   />
                 </q-td>
               </template>
@@ -548,6 +544,29 @@ importarPedidos()
   width: 110px;
 }
 
+.edit-input-native {
+  width: 62px;
+  min-width: 62px;
+  height: 28px;
+  padding: 2px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1;
+  outline: none;
+  background: #fff;
+}
+
+.edit-input-native:focus {
+  border-color: #1976d2;
+  box-shadow: 0 0 0 1px rgba(25, 118, 210, 0.2);
+}
+
+.edit-input-native:disabled {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
 .detalle-producto-wrap {
   min-width: 200px;
   line-height: 1.1;
@@ -560,6 +579,14 @@ importarPedidos()
 
   .edit-input {
     width: 130px;
+  }
+
+  .edit-input-native {
+    width: 54px;
+    min-width: 54px;
+    height: 26px;
+    padding: 2px 4px;
+    font-size: 11px;
   }
 
   .detalle-producto-wrap {

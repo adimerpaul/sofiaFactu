@@ -82,7 +82,7 @@
       v-model="leftDrawerOpen"
       bordered
       show-if-above
-      :width="250"
+      :width="180"
       :breakpoint="900"
       class="app-drawer"
     >

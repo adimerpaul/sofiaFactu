@@ -9,13 +9,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('mapa_zona_tipos', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedInteger('nombre')->unique();
-            $table->unsignedInteger('orden')->default(0);
-            $table->boolean('activo')->default(true);
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('mapa_zona_tipos')) {
+            Schema::create('mapa_zona_tipos', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedInteger('nombre')->unique();
+                $table->unsignedInteger('orden')->default(0);
+                $table->boolean('activo')->default(true);
+                $table->timestamps();
+            });
+        }
 
         DB::statement('ALTER TABLE mapa_zona_poligonos MODIFY tipo INT UNSIGNED NOT NULL');
 
@@ -36,13 +38,15 @@ return new class extends Migration
         rsort($tipos);
 
         foreach (array_values($tipos) as $index => $tipo) {
-            DB::table('mapa_zona_tipos')->insert([
-                'nombre' => $tipo,
-                'orden' => $index + 1,
-                'activo' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            DB::table('mapa_zona_tipos')->updateOrInsert(
+                ['nombre' => $tipo],
+                [
+                    'orden' => $index + 1,
+                    'activo' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
         }
     }
 

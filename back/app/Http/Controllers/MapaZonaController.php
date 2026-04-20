@@ -9,12 +9,30 @@ use Illuminate\Validation\Rule;
 
 class MapaZonaController extends Controller
 {
+    public function publicIndex(Request $request, ?int $tipo = null)
+    {
+        $tipoFiltro = $tipo ?? ($request->filled('tipo') ? (int) $request->input('tipo') : null);
+
+        if ($tipoFiltro !== null && ($tipoFiltro < 1 || $tipoFiltro > 99999)) {
+            return response()->json(['message' => 'Tipo de mapa zona no valido'], 422);
+        }
+
+        return response()->json($this->buildMapaZonaResponse($tipoFiltro, true));
+    }
+
     public function index(Request $request)
     {
         $this->authorizeMapaZonaAccess($request);
 
+        return response()->json($this->buildMapaZonaResponse());
+    }
+
+    private function buildMapaZonaResponse(?int $tipoFiltro = null, bool $soloActivos = false): array
+    {
         $poligonos = MapaZonaPoligono::query()
             ->with(['pedidoZona:id,nombre,color,orden,activo'])
+            ->when($soloActivos, fn ($query) => $query->where('activo', true))
+            ->when($tipoFiltro !== null, fn ($query) => $query->where('tipo', $tipoFiltro))
             ->orderBy('orden')
             ->orderBy('nombre')
             ->get()
@@ -23,15 +41,17 @@ class MapaZonaController extends Controller
 
         $tipos = MapaZonaTipo::query()
             ->where('activo', true)
+            ->when($tipoFiltro !== null, fn ($query) => $query->where('nombre', $tipoFiltro))
             ->orderByDesc('nombre')
             ->get()
             ->map(fn (MapaZonaTipo $tipo) => $this->formatTipo($tipo))
             ->values();
 
-        return response()->json([
+        return [
+            'filtro_tipo' => $tipoFiltro,
             'tipos' => $tipos,
             'poligonos' => $poligonos,
-        ]);
+        ];
     }
 
     public function storeTipo(Request $request)

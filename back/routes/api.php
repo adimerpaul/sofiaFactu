@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Route;
 //})->middleware('auth:sanctum');
 //app.config.globalProperties.$agencias = ['Challgua','Socavon','Catalina']
 Route::post('/login', [App\Http\Controllers\UserController::class, 'login']);
+Route::get('/public/mapa-zona', [App\Http\Controllers\MapaZonaController::class, 'publicIndex']);
+Route::get('/public/mapa-zona/{tipo}', [App\Http\Controllers\MapaZonaController::class, 'publicIndex'])->whereNumber('tipo');
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [App\Http\Controllers\UserController::class, 'logout']);
     Route::get('/me', [App\Http\Controllers\UserController::class, 'me']);

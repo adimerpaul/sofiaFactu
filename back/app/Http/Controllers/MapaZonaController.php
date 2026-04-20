@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\MapaZonaTipo;
 use App\Models\MapaZonaPoligono;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -20,9 +21,49 @@ class MapaZonaController extends Controller
             ->map(fn (MapaZonaPoligono $poligono) => $this->formatPoligono($poligono))
             ->values();
 
+        $tipos = MapaZonaTipo::query()
+            ->where('activo', true)
+            ->orderByDesc('nombre')
+            ->get()
+            ->map(fn (MapaZonaTipo $tipo) => $this->formatTipo($tipo))
+            ->values();
+
         return response()->json([
+            'tipos' => $tipos,
             'poligonos' => $poligonos,
         ]);
+    }
+
+    public function storeTipo(Request $request)
+    {
+        $this->authorizeMapaZonaAccess($request);
+
+        $data = $request->validate([
+            'nombre' => ['required', 'integer', 'min:1', 'max:99999', Rule::unique('mapa_zona_tipos', 'nombre')],
+        ]);
+
+        $tipo = MapaZonaTipo::create([
+            'nombre' => (int) $data['nombre'],
+            'orden' => (int) $data['nombre'],
+            'activo' => true,
+        ]);
+
+        return response()->json($this->formatTipo($tipo), 201);
+    }
+
+    public function destroyTipo(Request $request, MapaZonaTipo $mapaZonaTipo)
+    {
+        $this->authorizeMapaZonaAccess($request);
+
+        $hasPoligonos = MapaZonaPoligono::query()
+            ->where('tipo', (int) $mapaZonaTipo->nombre)
+            ->exists();
+
+        abort_if($hasPoligonos, 422, 'No se puede eliminar el mapa zona porque tiene poligonos registrados');
+
+        $mapaZonaTipo->delete();
+
+        return response()->json(['message' => 'Mapa zona eliminado']);
     }
 
     public function storePoligono(Request $request)
@@ -30,6 +71,7 @@ class MapaZonaController extends Controller
         $this->authorizeMapaZonaAccess($request);
 
         $data = $this->validatePoligono($request);
+        $this->ensureTipoExists((int) $data['tipo']);
 
         $poligono = MapaZonaPoligono::create($this->mapPoligonoData($data));
 
@@ -41,6 +83,7 @@ class MapaZonaController extends Controller
         $this->authorizeMapaZonaAccess($request);
 
         $data = $this->validatePoligono($request, $mapaZonaPoligono->id);
+        $this->ensureTipoExists((int) $data['tipo']);
 
         $mapaZonaPoligono->update($this->mapPoligonoData($data));
 
@@ -60,7 +103,7 @@ class MapaZonaController extends Controller
     {
         return $request->validate([
             'nombre' => ['required', 'string', 'max:80', Rule::unique('mapa_zona_poligonos', 'nombre')->ignore($ignoreId)],
-            'tipo' => 'required|integer|in:3,4,5',
+            'tipo' => 'required|integer|min:1|max:99999',
             'color' => 'required|string|max:20',
             'pedido_zona_id' => 'nullable|integer|exists:pedido_zonas,id',
             'orden' => 'nullable|integer|min:0|max:99999',
@@ -111,6 +154,24 @@ class MapaZonaController extends Controller
                 'activo' => (bool) $pedidoZona->activo,
             ] : null,
         ];
+    }
+
+    private function formatTipo(MapaZonaTipo $tipo): array
+    {
+        return [
+            'id' => $tipo->id,
+            'nombre' => (int) $tipo->nombre,
+            'orden' => (int) $tipo->orden,
+            'activo' => (bool) $tipo->activo,
+        ];
+    }
+
+    private function ensureTipoExists(int $tipo): void
+    {
+        MapaZonaTipo::query()->firstOrCreate(
+            ['nombre' => $tipo],
+            ['orden' => $tipo, 'activo' => true]
+        );
     }
 
     private function authorizeMapaZonaAccess(Request $request): void

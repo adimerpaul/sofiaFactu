@@ -29,6 +29,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/pedido-zonas/{pedidoZona}', [App\Http\Controllers\PedidoZonaController::class, 'update']);
     Route::delete('/pedido-zonas/{pedidoZona}', [App\Http\Controllers\PedidoZonaController::class, 'destroy']);
     Route::get('/mapa-zona', [App\Http\Controllers\MapaZonaController::class, 'index']);
+    Route::post('/mapa-zona/tipos', [App\Http\Controllers\MapaZonaController::class, 'storeTipo']);
+    Route::delete('/mapa-zona/tipos/{mapaZonaTipo}', [App\Http\Controllers\MapaZonaController::class, 'destroyTipo']);
     Route::post('/mapa-zona/poligonos', [App\Http\Controllers\MapaZonaController::class, 'storePoligono']);
     Route::put('/mapa-zona/poligonos/{mapaZonaPoligono}', [App\Http\Controllers\MapaZonaController::class, 'updatePoligono']);
     Route::delete('/mapa-zona/poligonos/{mapaZonaPoligono}', [App\Http\Controllers\MapaZonaController::class, 'destroyPoligono']);

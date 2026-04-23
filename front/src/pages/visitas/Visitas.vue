@@ -488,6 +488,7 @@ export default {
       loadingAccion: '',
       map: null,
       markersLayer: null,
+      zonasLayer: null,
       meMarker: null,
       search: '',
       showAllDays: false,
@@ -633,6 +634,7 @@ export default {
     } catch (_) {}
     this.map = null
     this.markersLayer = null
+    this.zonasLayer = null
     this.meMarker = null
   },
   methods: {
@@ -821,6 +823,63 @@ export default {
     mapReady () {
       return !!(this.map && this.map._loaded && this.map.getPane && this.map.getPane('mapPane'))
     },
+    clearZonasLayer () {
+      if (!this.zonasLayer) return
+      this.zonasLayer.clearLayers()
+    },
+    renderZonasFondo (poligonos) {
+      if (!this.mapReady() || !this.zonasLayer) return
+      this.clearZonasLayer()
+
+      const rows = Array.isArray(poligonos) ? poligonos : []
+      rows.forEach((poligono) => {
+        const latlngs = Array.isArray(poligono?.coordenadas)
+          ? poligono.coordenadas
+            .map(point => [Number(point?.lat), Number(point?.lng)])
+            .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng))
+          : []
+
+        if (latlngs.length < 3) return
+
+        const color = poligono?.color || '#607d8b'
+
+        L.polygon(latlngs, {
+          pane: 'zonasVisitaPane',
+          color,
+          fillColor: color,
+          weight: 1,
+          opacity: 0.45,
+          fillOpacity: 0.07,
+          interactive: false,
+          smoothFactor: 1
+        }).addTo(this.zonasLayer)
+
+        latlngs.forEach(([lat, lng]) => {
+          L.circleMarker([lat, lng], {
+            pane: 'zonasVisitaPane',
+            radius: 2,
+            color,
+            weight: 1,
+            opacity: 0.5,
+            fillColor: color,
+            fillOpacity: 0.18,
+            interactive: false
+          }).addTo(this.zonasLayer)
+        })
+      })
+    },
+    async cargarZonasFondo () {
+      if (!this.mapReady()) return
+      try {
+        const res = await fetch('https://bsofiafactu.tuprogam.com/api/public/mapa-zona/2')
+        if (!res.ok) throw new Error('No se pudo cargar mapa zona')
+        const data = await res.json()
+        if (!this.isAlive) return
+        this.renderZonasFondo(data)
+      } catch (_) {
+        this.clearZonasLayer()
+      }
+    },
     initMap () {
       if (!this.$refs.mapRef || !this.isAlive) return
       this.map = L.map(this.$refs.mapRef, { center: ORURO_CENTER, zoom: 13, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false })
@@ -838,7 +897,16 @@ export default {
         OpenStreetMap: osm
       }, {}, { position: 'topleft' }).addTo(this.map)
 
+      this.map.createPane('zonasVisitaPane')
+      const zonasPane = this.map.getPane('zonasVisitaPane')
+      if (zonasPane) {
+        zonasPane.style.zIndex = 350
+        zonasPane.style.pointerEvents = 'none'
+      }
+
+      this.zonasLayer = L.layerGroup().addTo(this.map)
       this.markersLayer = L.layerGroup().addTo(this.map)
+      this.cargarZonasFondo()
     },
     async cargarClientes () {
       this.loading = true

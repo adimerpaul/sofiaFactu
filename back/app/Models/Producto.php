@@ -33,6 +33,7 @@ class Producto extends Model implements Auditable{
         'codigo_unidad',
         'unidades_caja',
         'cantidad_presentacion',
+        'peso_estimado',
         'tipo',
         'oferta',
         'codigo_producto_sin',

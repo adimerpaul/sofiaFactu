@@ -165,7 +165,6 @@ class PedidoController extends Controller {
                 }
 
                 if (array_key_exists('productos', $data)) {
-                    $this->assertProductosTipoUnico($data['productos'] ?? []);
                     [$total, $contiene] = $this->syncDetalles($pedido, $data['productos'] ?? []);
                     $pedido->update([
                         'total' => $total,
@@ -282,21 +281,13 @@ class PedidoController extends Controller {
             $productoTipos = Producto::query()
                 ->whereIn('id', collect($productos)->pluck('producto_id')->values()->all())
                 ->pluck('tipo', 'id');
-            $tipoPedidoProducto = $this->assertProductosTipoUnico($productos, $productoTipos);
 
-            $contiene = [
-                'normal' => false,
-                'res' => false,
-                'cerdo' => false,
-                'pollo' => false,
-            ];
-            if ($tipoPedidoProducto === 'RES') $contiene['res'] = true;
-            elseif ($tipoPedidoProducto === 'CERDO') $contiene['cerdo'] = true;
-            elseif ($tipoPedidoProducto === 'POLLO') $contiene['pollo'] = true;
-            else $contiene['normal'] = true;
+            $tiposUnicos = $this->collectProductosTipos($productos, $productoTipos);
+            $contiene = $this->buildContiene($tiposUnicos);
 
             foreach ($productos as &$item) {
-                $item['detalle_extra'] = $this->sanitizeDetalleExtra($tipoPedidoProducto, $item['detalle_extra'] ?? null);
+                $tipoItem = $this->normalizeProductoTipo($productoTipos[$item['producto_id']] ?? 'EMBUTIDO');
+                $item['detalle_extra'] = $this->sanitizeDetalleExtra($tipoItem, $item['detalle_extra'] ?? null);
             }
             unset($item);
 
@@ -361,18 +352,9 @@ class PedidoController extends Controller {
         $productoTipos = Producto::query()
             ->whereIn('id', collect($productos)->pluck('producto_id')->values()->all())
             ->pluck('tipo', 'id');
-        $tipoPedido = $this->assertProductosTipoUnico($productos, $productoTipos);
 
-        $contiene = [
-            'normal' => false,
-            'res' => false,
-            'cerdo' => false,
-            'pollo' => false,
-        ];
-        if ($tipoPedido === 'RES') $contiene['res'] = true;
-        elseif ($tipoPedido === 'CERDO') $contiene['cerdo'] = true;
-        elseif ($tipoPedido === 'POLLO') $contiene['pollo'] = true;
-        else $contiene['normal'] = true;
+        $tiposUnicos = $this->collectProductosTipos($productos, $productoTipos);
+        $contiene = $this->buildContiene($tiposUnicos);
 
         $pedido->detalles()->delete();
         $total = 0.0;
@@ -382,6 +364,7 @@ class PedidoController extends Controller {
             $precio = (float) ($item['precio'] ?? 0);
             if ($cantidad <= 0) continue;
 
+            $tipoItem = $this->normalizeProductoTipo($productoTipos[$item['producto_id']] ?? 'EMBUTIDO');
             $subtotal = $precio * $cantidad;
             $pedido->detalles()->create([
                 'producto_id' => $item['producto_id'],
@@ -389,7 +372,7 @@ class PedidoController extends Controller {
                 'precio' => $precio,
                 'total' => $subtotal,
                 'observacion_detalle' => $item['observacion'] ?? null,
-                'detalle_extra' => $this->sanitizeDetalleExtra($tipoPedido, $item['detalle_extra'] ?? null),
+                'detalle_extra' => $this->sanitizeDetalleExtra($tipoItem, $item['detalle_extra'] ?? null),
             ]);
             $total += $subtotal;
         }
@@ -415,39 +398,41 @@ class PedidoController extends Controller {
     private function normalizeProductoTipo(?string $tipo): string
     {
         $tipo = strtoupper(trim((string) $tipo));
+        if ($tipo === 'NORMAL') return 'EMBUTIDO';
 
-        return in_array($tipo, ['NORMAL', 'POLLO', 'RES', 'CERDO'], true)
+        return in_array($tipo, ['EMBUTIDO', 'POLLO', 'RES', 'CERDO'], true)
             ? $tipo
-            : 'NORMAL';
+            : 'EMBUTIDO';
     }
 
-    private function assertProductosTipoUnico(array $productos, $productoTipos = null): ?string
+    private function collectProductosTipos(array $productos, $productoTipos = null): array
     {
-        if (empty($productos)) {
-            return null;
-        }
+        if (empty($productos)) return [];
 
         $productoTipos = $productoTipos ?? Producto::query()
             ->whereIn('id', collect($productos)->pluck('producto_id')->values()->all())
             ->pluck('tipo', 'id');
 
-        $tipos = collect($productos)
-            ->map(fn ($item) => $this->normalizeProductoTipo($productoTipos[$item['producto_id']] ?? 'NORMAL'))
+        return collect($productos)
+            ->map(fn ($item) => $this->normalizeProductoTipo($productoTipos[$item['producto_id']] ?? 'EMBUTIDO'))
             ->unique()
-            ->values();
+            ->values()
+            ->all();
+    }
 
-        if ($tipos->count() !== 1) {
-            throw ValidationException::withMessages([
-                'productos' => ['Todo el pedido debe ser de un solo tipo: NORMAL, POLLO, RES o CERDO.'],
-            ]);
-        }
-
-        return $tipos->first() ?: 'NORMAL';
+    private function buildContiene(array $tiposUnicos): array
+    {
+        return [
+            'normal' => in_array('EMBUTIDO', $tiposUnicos),
+            'res'    => in_array('RES', $tiposUnicos),
+            'cerdo'  => in_array('CERDO', $tiposUnicos),
+            'pollo'  => in_array('POLLO', $tiposUnicos),
+        ];
     }
 
     private function detalleDefaultsByTipo(?string $tipo): array
     {
-        return match ($this->normalizeProductoTipo($tipo)) {
+        return match ($this->normalizeProductoTipo($tipo ?? '')) {
             'RES' => [
                 'precio_res' => '',
                 'res_trozado' => '',

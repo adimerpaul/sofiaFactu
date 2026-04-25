@@ -6,6 +6,8 @@ import moment from "moment";
 // import {io} from "socket.io-client";
 import VueApexCharts from "vue3-apexcharts";
 
+const TIPOS_PRODUCTO = ['HUEVO', 'PET', 'POLLO', 'CERDO', 'EMBUTIDO', 'RES']
+
 // Be careful when using SSR for cross-request state pollution
 // due to creating a Singleton instance here;
 // If any client changes this (global) instance, it might be a
@@ -21,7 +23,8 @@ export default boot(({ app, router }) => {
   app.config.globalProperties.$axios = axios.create({ baseURL: import.meta.env.VITE_API_BACK })
   // console.log(import.meta.env.VITE_API_BACK)
   app.config.globalProperties.$alert = Alert
-  app.config.globalProperties.$agencias = ['Almacen','Challgua','Socavon','Catalina']
+  // app.config.globalProperties.$agencias = ['Almacen','Challgua','Socavon','Catalina']
+  app.config.globalProperties.$tiposProducto = TIPOS_PRODUCTO
   // app.config.globalProperties.$socket = io(import.meta.env.VITE_API_SOCKET)
   app.config.globalProperties.$store = useCounterStore()
   app.config.globalProperties.$url = import.meta.env.VITE_API_BACK
@@ -78,4 +81,4 @@ export default boot(({ app, router }) => {
   //       so you can easily perform requests against your app's API
 })
 
-export { api }
+export { api, TIPOS_PRODUCTO }

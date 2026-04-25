@@ -210,7 +210,8 @@
                 map-options
                 dense
                 outlined
-                label="Productos (solo stock de compras)"
+                label="Productos (todos, con busqueda y paginacion)"
+                :loading="loadingProductos"
                 use-input
                 input-debounce="350"
                 @filter="filtrarProductos"
@@ -243,39 +244,72 @@
                   </div>
                 </template>
                 <template #option="scope">
-                  <q-item v-bind="scope.itemProps">
-                    <q-item-section avatar>
-                      <q-avatar rounded size="28px">
-                        <q-img :src="productImageUrl(scope.opt.imagen)" />
-                      </q-avatar>
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label class="row items-center q-gutter-xs">
-                        <span>{{ scope.opt.label }}</span>
-                        <q-chip
-                          dense
-                          square
-                          size="sm"
-                          :color="tipoProductoColor(scope.opt.tipo)"
-                          text-color="white"
-                        >
-                          ({{ tipoProductoLabel(scope.opt.tipo) }})
-                        </q-chip>
-                        <q-chip
-                          v-if="scope.opt.codigo_unidad"
-                          dense
-                          square
-                          size="sm"
-                          :color="unidadProductoColor(scope.opt.codigo_unidad)"
-                          text-color="white"
-                        >
-                          ({{ unidadProductoLabel(scope.opt.codigo_unidad) }})
-                        </q-chip>
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
+                  <div>
+                    <q-item v-bind="scope.itemProps">
+                      <q-item-section avatar>
+                        <q-avatar rounded size="28px">
+                          <q-img :src="productImageUrl(scope.opt.imagen)" />
+                        </q-avatar>
+                      </q-item-section>
+                      <q-item-section>
+                        <q-item-label class="row items-center q-gutter-xs">
+                          <span>{{ scope.opt.label }}</span>
+                          <q-chip
+                            dense
+                            square
+                            size="sm"
+                            :color="tipoProductoColor(scope.opt.tipo)"
+                            text-color="white"
+                          >
+                            ({{ tipoProductoLabel(scope.opt.tipo) }})
+                          </q-chip>
+                          <q-chip
+                            v-if="scope.opt.codigo_unidad"
+                            dense
+                            square
+                            size="sm"
+                            :color="unidadProductoColor(scope.opt.codigo_unidad)"
+                            text-color="white"
+                          >
+                            ({{ unidadProductoLabel(scope.opt.codigo_unidad) }})
+                          </q-chip>
+                        </q-item-label>
+                      </q-item-section>
+                    </q-item>
+                    <q-separator v-if="scope.index < (productos.length - 1)" color="grey-4" inset />
+                  </div>
                 </template>
               </q-select>
+              <div class="row items-center q-col-gutter-xs q-mt-xs">
+                <div class="col-auto">
+                  <q-btn
+                    flat
+                    dense
+                    icon="chevron_left"
+                    @click="cambiarPaginaProductos(-1)"
+                    :disable="loadingProductos || productosPagination.page <= 1"
+                  />
+                </div>
+                <div class="col-auto">
+                  <q-btn
+                    flat
+                    dense
+                    icon="chevron_right"
+                    @click="cambiarPaginaProductos(1)"
+                    :disable="loadingProductos || productosPagination.page >= productosPagination.lastPage"
+                  />
+                </div>
+                <div class="col-auto">
+                  <q-chip dense square color="primary" text-color="white">
+                    Pagina {{ productosPagination.page }} / {{ productosPagination.lastPage }}
+                  </q-chip>
+                </div>
+                <div class="col-auto">
+                  <q-chip dense square color="grey-7" text-color="white">
+                    Total: {{ productosPagination.rowsNumber }}
+                  </q-chip>
+                </div>
+              </div>
             </div>
             <div class="col-12 col-md-2">
               <q-btn color="negative" icon="add" class="full-width" @click="agregarProducto" />
@@ -299,7 +333,7 @@
             <tr v-for="(p, index) in pedidoItems" :key="`${p.producto_id}-${index}`">
               <td>
 <!--                <q-btn flat dense round icon="tune" color="purple" @click="openDetalleDialog(p, index)" />-->
-                <q-btn-dropdown dense :label="'Op(' + p.tipo + ')'" :color="normalizeTipoProducto(p.tipo) === 'RES' ? 'red' : (normalizeTipoProducto(p.tipo) === 'CERDO' ? 'brown' : (normalizeTipoProducto(p.tipo) === 'POLLO' ? 'orange' : 'primary'))" no-caps size="10px">
+                <q-btn-dropdown dense :label="'Op(' + p.tipo + ')'" :color="tipoProductoColor(p.tipo)" no-caps size="10px">
                   <q-list>
                     <q-item clickable v-ripple @click="openDetalleDialog(p, index)" v-close-popup>
                       <q-item-section avatar><q-icon name="tune" color="purple" /></q-item-section>
@@ -388,9 +422,15 @@
           <q-btn flat round dense icon="close" v-close-popup />
         </q-card-section>
         <q-card-section>
-          <div class="row q-col-gutter-sm" v-if="detalleTipo === 'NORMAL'">
+          <div class="row q-col-gutter-sm" v-if="detalleTipo === 'EMBUTIDO'">
             <div class="col-12">
               <q-input v-model="detalleEdit.observacion" dense outlined label="Observacion detalle" />
+            </div>
+          </div>
+
+          <div class="row q-col-gutter-sm" v-else-if="detalleTipo === 'HUEVO'">
+            <div class="col-12">
+              <q-input v-model="detalleEdit.observacion" dense outlined label="Observacion detalle huevo" />
             </div>
           </div>
 
@@ -412,7 +452,7 @@
             <div class="col-12"><q-input v-model="detalleEdit.observacion" dense outlined label="Observacion detalle" /></div>
           </div>
 
-          <div class="row q-col-gutter-sm" v-else>
+          <div class="row q-col-gutter-sm" v-else-if="detalleTipo === 'POLLO'">
             <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_cja_b5" dense outlined label="Cja b5" /></div>
             <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_uni_b5" dense outlined label="Uni b5" /></div>
             <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_cja_b6" dense outlined label="Cja b6" /></div>
@@ -451,6 +491,12 @@
             <div class="col-12 col-md-6"><q-input v-model="detalleEdit.pollo_bs2" dense outlined label="BS2" /></div>
             <div class="col-12"><q-input v-model="detalleEdit.observacion" dense outlined label="Observacion detalle" /></div>
           </div>
+
+          <div class="row q-col-gutter-sm" v-else>
+            <div class="col-12">
+              <q-input v-model="detalleEdit.observacion" dense outlined label="Observacion detalle" />
+            </div>
+          </div>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat color="negative" label="Cerrar" v-close-popup />
@@ -476,7 +522,6 @@ L.Icon.Default.mergeOptions({
 
 const ORURO_CENTER = [-17.967, -67.106]
 const DAY_MAP = ['do', 'lu', 'ma', 'mi', 'ju', 'vi', 'sa']
-const TIPOS_OBLIGATORIOS = ['POLLO', 'RES', 'CERDO']
 const CLIENTES_EXTRA_VISITAS = [1520, 1179]
 
 export default {
@@ -520,13 +565,20 @@ export default {
       ],
       horaPedido: null,
       productos: [],
-      productosSource: [],
+      loadingProductos: false,
+      productosBusqueda: '',
+      productosPagination: {
+        page: 1,
+        rowsPerPage: 25,
+        rowsNumber: 0,
+        lastPage: 1
+      },
       productoSeleccionado: null,
       pedidoItems: [],
       dialogDetalle: false,
       detalleEditIndex: -1,
       detalleEdit: {},
-      detalleTipo: 'NORMAL',
+      detalleTipo: 'EMBUTIDO',
       unidadesPollo: ['KG', 'CAJA', 'UNIDAD'],
       isAlive: true
     }
@@ -612,7 +664,9 @@ export default {
       if (this.detalleTipo === 'RES') return 'Res'
       if (this.detalleTipo === 'CERDO') return 'Cerdo'
       if (this.detalleTipo === 'POLLO') return 'Pollo'
-      return 'Normal'
+      if (this.detalleTipo === 'HUEVO') return 'Huevo'
+      if (this.detalleTipo === 'PET') return 'Pet'
+      return 'Embutido'
     },
     clienteFotosSeleccionado () {
       return Array.isArray(this.selectedCliente?.fotos) ? this.selectedCliente.fotos : []
@@ -658,23 +712,28 @@ export default {
       return String(status || 'ACTIVO').trim().toUpperCase()
     },
     normalizeTipoProducto (tipo) {
-      const t = String(tipo || 'NORMAL').trim().toUpperCase()
-      if (t === 'NORMAL' || t === 'RES' || t === 'CERDO' || t === 'POLLO') return t
-      return 'NORMAL'
+      const t = String(tipo || 'EMBUTIDO').trim().toUpperCase()
+      if (t === 'NORMAL') return 'EMBUTIDO'
+      if (!t) return 'EMBUTIDO'
+      return t
     },
     tipoProductoLabel (tipo) {
       const t = this.normalizeTipoProducto(tipo)
+      if (t === 'HUEVO') return 'Huevo'
+      if (t === 'PET') return 'Pet'
       if (t === 'RES') return 'Res'
       if (t === 'CERDO') return 'Cerdo'
       if (t === 'POLLO') return 'Pollo'
-      return 'Normal'
+      return 'Embutido'
     },
     tipoProductoColor (tipo) {
       const t = this.normalizeTipoProducto(tipo)
+      if (t === 'HUEVO') return 'amber-8'
+      if (t === 'PET') return 'blue-grey'
       if (t === 'RES') return 'red'
       if (t === 'CERDO') return 'brown'
       if (t === 'POLLO') return 'orange'
-      return 'blue-grey'
+      return 'green-7'
     },
     unidadProductoLabel (codigoUnidad) {
       const unidad = String(codigoUnidad || '').trim().toUpperCase()
@@ -706,19 +765,6 @@ export default {
       })
 
       return sanitized
-    },
-    refreshProductosDisponibles (needle = '') {
-      const tipoPedido = this.getPedidoTipoActual()
-      const texto = String(needle || '').toLowerCase()
-
-      this.productos = this.productosSource
-        .filter((p) => {
-          const tipoProducto = this.normalizeTipoProducto(p?.tipo)
-          if (tipoPedido && tipoProducto !== tipoPedido) return false
-          if (!texto) return true
-          return `${p.nombre || ''} ${p.codigo || ''}`.toLowerCase().includes(texto)
-        })
-        .map(this.mapStockOption)
     },
     detalleDefaultsByTipo (tipo) {
       if (tipo === 'RES') {
@@ -785,13 +831,7 @@ export default {
     },
     openDetalleDialog (item, index) {
       this.detalleEditIndex = index
-      const tipoItem = this.normalizeTipoProducto(item?.tipo)
-      const tipoPedido = this.getPedidoTipoActual()
-      if (tipoPedido && tipoPedido !== tipoItem) {
-        this.$alert.error('Todo el pedido debe ser del mismo tipo')
-        return
-      }
-      this.detalleTipo = tipoPedido || tipoItem
+      this.detalleTipo = this.normalizeTipoProducto(item?.tipo)
       const defaults = this.detalleDefaultsByTipo(this.detalleTipo)
       this.detalleEdit = { ...defaults, ...this.sanitizeDetalleExtra(this.detalleTipo, item?.detalle_extra || {}) }
       this.dialogDetalle = true
@@ -807,7 +847,6 @@ export default {
     },
     removePedidoItem (index) {
       this.pedidoItems.splice(index, 1)
-      this.refreshProductosDisponibles()
     },
     rowClassByCliente (cliente) {
       const status = this.clienteStatus(cliente?.id)
@@ -1130,75 +1169,67 @@ export default {
       const safe = path || 'uploads/default.png'
       return `${this.$url}../${safe}`
     },
-    async cargarProductos () {
+    async cargarProductos (search = '', page = 1) {
+      this.loadingProductos = true
+      const safeSearch = String(search || '').trim()
+      const safePage = Number(page || 1)
+      const targetPage = Number.isFinite(safePage) && safePage > 0 ? safePage : 1
       try {
-        const [resStock, resAll] = await Promise.all([
-          this.$axios.get('productosStock', { params: { per_page: 500 } }),
-          this.$axios.get('productosAll')
-        ])
-
-        const stockData = resStock.data?.data || []
-        const allData = Array.isArray(resAll.data) ? resAll.data : []
-
-        const extraTipos = allData.filter(p => TIPOS_OBLIGATORIOS.includes(String(p?.tipo || '').toUpperCase()))
-        const mergedById = new Map()
-        ;[...stockData, ...extraTipos].forEach(p => {
-          if (!p?.id) return
-          mergedById.set(p.id, p)
+        const res = await this.$axios.get('productos', {
+          params: {
+            search: safeSearch,
+            page: targetPage,
+            per_page: this.productosPagination.rowsPerPage,
+          }
         })
+        const rows = Array.isArray(res.data?.data) ? res.data.data : []
+        const total = Number(res.data?.total || rows.length || 0)
+        const lastPage = Math.max(1, Number(res.data?.last_page || Math.ceil(total / this.productosPagination.rowsPerPage) || 1))
 
-        const prioridadTipo = { POLLO: 1, RES: 2, CERDO: 3 }
-        this.productosSource = Array.from(mergedById.values())
-          .sort((a, b) => {
-            const ta = String(a?.tipo || '').toUpperCase()
-            const tb = String(b?.tipo || '').toUpperCase()
-            const pa = prioridadTipo[ta] || 99
-            const pb = prioridadTipo[tb] || 99
-            if (pa !== pb) return pa - pb
-            return String(a?.nombre || '').localeCompare(String(b?.nombre || ''), 'es')
-          })
-        this.refreshProductosDisponibles()
+        this.productosBusqueda = safeSearch
+        this.productosPagination.page = Math.min(targetPage, lastPage)
+        this.productosPagination.rowsNumber = total
+        this.productosPagination.lastPage = lastPage
+        this.productos = rows.map(this.mapStockOption)
       } catch (_) {
         this.productos = []
-        this.productosSource = []
+        this.productosPagination.rowsNumber = 0
+        this.productosPagination.lastPage = 1
+      } finally {
+        this.loadingProductos = false
       }
     },
     filtrarProductos (val, update) {
-      update(() => {
-        this.refreshProductosDisponibles(val)
+      const search = String(val || '').trim()
+      this.productosPagination.page = 1
+      this.cargarProductos(search, 1).finally(() => {
+        update(() => {})
       })
+    },
+    cambiarPaginaProductos (delta) {
+      const nextPage = this.productosPagination.page + Number(delta || 0)
+      if (nextPage < 1 || nextPage > this.productosPagination.lastPage) return
+      this.cargarProductos(this.productosBusqueda, nextPage)
     },
     agregarProducto () {
       if (!this.productoSeleccionado) return
       const p = this.productos.find(x => x.id === this.productoSeleccionado)
       if (!p) return
       const tipoProducto = this.normalizeTipoProducto(p.tipo)
-      const tipoPedido = this.getPedidoTipoActual()
 
-      if (tipoPedido && tipoPedido !== tipoProducto) {
-        this.$alert.error(`Todo el pedido debe ser del mismo tipo: ${tipoPedido}`)
-        return
-      }
-
-      const ex = this.pedidoItems.find(x => x.producto_id === p.id)
-      if (ex) {
-        ex.cantidad += 1
-      } else {
-        this.pedidoItems.push({
-          producto_id: p.id,
-          codigo: p.codigo,
-          nombre: p.nombre,
-          imagen: p.imagen || 'uploads/default.png',
-          cantidad: 1,
-          precio: Number(p.precio || 0),
-          observacion: '',
-          tipo: tipoProducto,
-          codigo_unidad: p.codigo_unidad || '',
-          detalle_extra: this.detalleDefaultsByTipo(tipoProducto),
-        })
-      }
+      this.pedidoItems.push({
+        producto_id: p.id,
+        codigo: p.codigo,
+        nombre: p.nombre,
+        imagen: p.imagen || 'uploads/default.png',
+        cantidad: 1,
+        precio: Number(p.precio || 0),
+        observacion: '',
+        tipo: tipoProducto,
+        codigo_unidad: p.codigo_unidad || '',
+        detalle_extra: this.detalleDefaultsByTipo(tipoProducto),
+      })
       this.productoSeleccionado = null
-      this.refreshProductosDisponibles()
     },
     async guardarPedido () {
       if (!this.selectedCliente) return
@@ -1216,20 +1247,12 @@ export default {
         return
       }
 
-      const tiposPedido = this.getPedidoTipos()
-      if (tiposPedido.length !== 1) {
-        this.$alert.error('Todo el pedido debe ser de un solo tipo: NORMAL, POLLO, RES o CERDO')
-        return
-      }
-
-      const tipoPedido = tiposPedido[0]
-
       const productos = this.pedidoItems.map(p => ({
         producto_id: p.producto_id,
         cantidad: Number(p.cantidad || 0),
         precio: Number(p.precio || 0),
         observacion: p.observacion || '',
-        detalle_extra: this.sanitizeDetalleExtra(tipoPedido, p.detalle_extra || {}),
+        detalle_extra: this.sanitizeDetalleExtra(this.normalizeTipoProducto(p.tipo), p.detalle_extra || {}),
       })).filter(p => p.cantidad > 0 && p.precio >= 0)
 
       if (productos.length === 0) {

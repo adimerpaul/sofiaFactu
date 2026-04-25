@@ -155,7 +155,9 @@ class ProductoController extends Controller
         $agencia = $request->agencia;
         $active = $request->input('active');
         $tipo = strtoupper(trim((string) $request->input('tipo', '')));
+        $codigoUnidad = strtoupper(trim((string) $request->input('codigo_unidad', '')));
         $tiposValidos = ['NORMAL', 'POLLO', 'RES', 'CERDO'];
+        $unidadesValidas = ['KG', 'U', 'UNIDA'];
 
         $productos = Producto::query()
             ->with(['productoGrupo:id,nombre,codigo,producto_grupo_padre_id', 'productoGrupoPadre:id,nombre,codigo'])
@@ -164,6 +166,9 @@ class ProductoController extends Controller
             })
             ->when(in_array($tipo, $tiposValidos, true), function ($q) use ($tipo) {
                 $q->where('tipo', $tipo);
+            })
+            ->when(in_array($codigoUnidad, $unidadesValidas, true), function ($q) use ($codigoUnidad) {
+                $q->where('codigo_unidad', $codigoUnidad);
             })
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
@@ -234,7 +239,8 @@ class ProductoController extends Controller
             'codigo_unidad' => [$isUpdate ? 'sometimes' : 'nullable', 'string', 'max:15'],
             'unidades_caja' => [$isUpdate ? 'sometimes' : 'nullable', 'numeric', 'min:0'],
             'cantidad_presentacion' => [$isUpdate ? 'sometimes' : 'nullable', 'numeric', 'min:0'],
-            'tipo' => [$isUpdate ? 'sometimes' : 'nullable', Rule::in(['NORMAL', 'POLLO', 'RES', 'CERDO'])],
+            'peso_estimado' => [$isUpdate ? 'sometimes' : 'nullable', 'numeric', 'min:0'],
+            'tipo' => [$isUpdate ? 'sometimes' : 'nullable'],
             'oferta' => [$isUpdate ? 'sometimes' : 'nullable'],
             'codigo_producto_sin' => [$isUpdate ? 'sometimes' : 'nullable', 'string', 'max:100'],
             'presentacion' => [$isUpdate ? 'sometimes' : 'nullable'],

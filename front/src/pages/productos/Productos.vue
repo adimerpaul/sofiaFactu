@@ -10,6 +10,7 @@
               dense
               outlined
               debounce="300"
+              clearable
               @update:model-value="productosGet"
             >
               <template #append><q-icon name="search" /></template>
@@ -27,6 +28,18 @@
               @update:model-value="onTipoFilterChange"
             />
           </div>
+          <div class="col-12 col-md-2">
+            <q-select
+              v-model="filterUnidad"
+              :options="unidadesFiltro"
+              label="Filtrar unidad"
+              dense
+              outlined
+              emit-value
+              map-options
+              @update:model-value="onUnidadFilterChange"
+            />
+          </div>
           <div class="col-6 col-md-auto">
             <q-btn color="primary" label="Actualizar" no-caps icon="refresh" class="full-width" :loading="loading" @click="productosGet" />
           </div>
@@ -35,6 +48,29 @@
           </div>
           <div class="col-6 col-md-auto">
             <q-btn color="green" label="Nuevo" no-caps icon="add_circle_outline" class="full-width" :loading="loading" @click="productoNew" />
+          </div>
+        </div>
+
+        <div class="row q-col-gutter-sm q-mt-sm">
+          <div class="col-12 col-sm-auto">
+            <q-chip square color="primary" text-color="white" icon="inventory_2">
+              Total productos: {{ totalProductosFiltrados }}
+            </q-chip>
+          </div>
+          <div class="col-12 col-sm-auto">
+            <q-chip square color="teal" text-color="white" icon="view_list">
+              En esta pagina: {{ totalProductosPagina }}
+            </q-chip>
+          </div>
+          <div class="col-12 col-sm-auto">
+            <q-chip square color="grey-8" text-color="white" icon="warehouse">
+              Stock estimado (pagina): {{ totalStockPagina.toFixed(3) }}
+            </q-chip>
+          </div>
+          <div class="col-12 col-sm-auto">
+            <q-chip square color="positive" text-color="white" icon="check_circle">
+              Activos (pagina): {{ totalActivosPagina }}
+            </q-chip>
           </div>
         </div>
 
@@ -62,6 +98,7 @@
               <th>Grupo padre</th>
               <th>Grupo</th>
               <th>Precio 1</th>
+              <th>Peso estimado</th>
               <th>Activo</th>
               <th>Stock</th>
             </tr>
@@ -111,6 +148,7 @@
               <td>{{ producto.producto_grupo_padre?.nombre || '-' }}</td>
               <td>{{ producto.producto_grupo?.nombre || '-' }}</td>
               <td class="text-right">{{ Number(producto.precio1 || 0).toFixed(3) }}</td>
+              <td class="text-right">{{ producto.peso_estimado !== null && producto.peso_estimado !== '' ? Number(producto.peso_estimado).toFixed(3) : '-' }}</td>
               <td>
                 <q-badge :color="producto.active ? 'positive' : 'negative'" text-color="white">
                   {{ producto.active ? 'SI' : 'NO' }}
@@ -212,6 +250,9 @@
                 <q-input v-model.number="producto.cantidad_presentacion" label="Cant. presentacion" dense outlined type="number" step="0.001" />
               </div>
               <div class="col-12 col-md-2">
+                <q-input v-model.number="producto.peso_estimado" label="Peso estimado" dense outlined type="number" step="0.001" clearable />
+              </div>
+              <div class="col-12 col-md-2">
                 <q-input v-model="producto.codigo_producto_sin" label="Codigo prod SIN" dense outlined maxlength="100" />
               </div>
               <div class="col-12 col-md-2">
@@ -264,7 +305,7 @@
       </q-card>
     </q-dialog>
 
-    <q-dialog v-model="dialogImg" persistent>
+    <q-dialog v-model="dialogImg" persistent @show="addPasteListener" @hide="removePasteListener">
       <q-card style="width: 420px; max-width: 95vw">
         <q-card-section class="q-pb-none row items-center text-bold">
           Cambiar imagen de {{ producto?.nombre || 'producto' }}
@@ -279,25 +320,25 @@
             </q-avatar>
           </div>
 
-          <div class="row q-col-gutter-sm">
-            <div class="col-12">
-              <q-btn
-                icon="image"
-                label="Seleccionar foto"
-                no-caps
-                color="primary"
-                outline
-                class="full-width"
-                @click="$refs.productImageInput.click()"
-              />
-              <input
-                ref="productImageInput"
-                type="file"
-                accept="image/*"
-                style="display: none"
-                @change="onImageChange"
-              />
+          <div
+            class="drop-zone q-pa-md text-center cursor-pointer"
+            :class="{ 'drop-zone--active': isDragging }"
+            @dragover.prevent="isDragging = true"
+            @dragleave.prevent="isDragging = false"
+            @drop.prevent="onDrop"
+            @click="$refs.productImageInput.click()"
+          >
+            <q-icon name="cloud_upload" size="2rem" :color="isDragging ? 'primary' : 'grey-6'" />
+            <div class="text-body2 q-mt-xs text-grey-7">
+              Arrastra una imagen aquí, pega con <strong>Ctrl+V</strong><br>o haz clic para seleccionar
             </div>
+            <input
+              ref="productImageInput"
+              type="file"
+              accept="image/*"
+              style="display: none"
+              @change="onImageChange"
+            />
           </div>
         </q-card-section>
 
@@ -355,7 +396,9 @@
 <script>
 import { Excel } from 'src/addons/Excel'
 
-const emptyProducto = () => {
+const normalizeTipoValue = (tipo) => String(tipo || '').trim().toUpperCase()
+
+const emptyProducto = (defaultTipo = 'EMBUTIDO') => {
   const base = {
     codigo: '',
     imagen: 'uploads/default.png',
@@ -366,7 +409,8 @@ const emptyProducto = () => {
     codigo_unidad: '',
     unidades_caja: null,
     cantidad_presentacion: null,
-    tipo: 'NORMAL',
+    peso_estimado: null,
+    tipo: normalizeTipoValue(defaultTipo || 'EMBUTIDO'),
     oferta: ' ',
     codigo_producto_sin: '',
     presentacion: '',
@@ -385,15 +429,24 @@ const emptyProducto = () => {
 export default {
   name: 'ProductosPage',
   data () {
+    const tiposBase = Array.isArray(this.$tiposProducto) && this.$tiposProducto.length
+      ? this.$tiposProducto
+      : ['huevo', 'pet', 'pollo', 'cerdo', 'embutido', 'res']
+    const tiposNormalizados = tiposBase.map(tipo => normalizeTipoValue(tipo)).filter(Boolean)
+    const tiposUnicos = [...new Set(tiposNormalizados)]
+    const defaultTipoProducto = tiposUnicos.includes('EMBUTIDO') ? 'EMBUTIDO' : (tiposUnicos[0] || 'EMBUTIDO')
+    const tiposProducto = tiposUnicos.map(tipo => ({ label: tipo, value: tipo }))
+
     return {
       productos: [],
-      producto: emptyProducto(),
+      producto: emptyProducto(defaultTipoProducto),
       productoDialog: false,
       dialogImg: false,
       loading: false,
       actionPeriodo: '',
       filter: '',
       filterTipo: 'TODOS',
+      filterUnidad: 'TODOS',
       pagination: {
         page: 1,
         rowsPerPage: 15,
@@ -404,45 +457,60 @@ export default {
       productoHistorialNombre: '',
       grupoPadres: [],
       grupos: [],
-      tiposProducto: [
-        { label: 'NORMAL', value: 'NORMAL' },
-        { label: 'POLLO', value: 'POLLO' },
-        { label: 'RES', value: 'RES' },
-        { label: 'CERDO', value: 'CERDO' },
-      ],
-      tiposFiltro: [
-        { label: 'TODOS', value: 'TODOS' },
-        { label: 'NORMAL', value: 'NORMAL' },
-        { label: 'POLLO', value: 'POLLO' },
-        { label: 'RES', value: 'RES' },
-        { label: 'CERDO', value: 'CERDO' },
-      ],
+      defaultTipoProducto,
+      tiposProducto,
+      tiposFiltro: [{ label: 'TODOS', value: 'TODOS' }, ...tiposProducto],
       unidadesCodigo: [
+        { label: 'KG', value: 'KG' },
+        { label: 'U', value: 'U' },
+        // { label: 'UNIDA', value: 'UNIDA' },
+      ],
+      unidadesFiltro: [
+        { label: 'TODOS', value: 'TODOS' },
         { label: 'KG', value: 'KG' },
         { label: 'U', value: 'U' },
         { label: 'UNIDA', value: 'UNIDA' },
       ],
       selectedImage: null,
       imagePreview: '',
+      isDragging: false,
     }
   },
   mounted () {
     this.bootstrap()
   },
+  computed: {
+    totalProductosFiltrados () {
+      return Number(this.pagination.rowsNumber || 0)
+    },
+    totalProductosPagina () {
+      return this.productos.length
+    },
+    totalStockPagina () {
+      return this.productos.reduce((acc, producto) => acc + Number(producto?.stock || 0), 0)
+    },
+    totalActivosPagina () {
+      return this.productos.filter(producto => Boolean(producto?.active)).length
+    },
+  },
   methods: {
     tipoLabel (tipo) {
-      const value = String(tipo || 'NORMAL').trim().toUpperCase()
+      const value = normalizeTipoValue(tipo || this.defaultTipoProducto)
+      if (value === 'HUEVO') return 'Huevo'
+      if (value === 'PET') return 'Pet'
       if (value === 'POLLO') return 'Pollo'
       if (value === 'RES') return 'Res'
       if (value === 'CERDO') return 'Cerdo'
-      return 'Normal'
+      return 'Embutido'
     },
     tipoColor (tipo) {
-      const value = String(tipo || 'NORMAL').trim().toUpperCase()
+      const value = normalizeTipoValue(tipo || this.defaultTipoProducto)
+      if (value === 'HUEVO') return 'amber-8'
+      if (value === 'PET') return 'blue-grey'
       if (value === 'POLLO') return 'orange'
       if (value === 'RES') return 'red'
       if (value === 'CERDO') return 'brown'
-      return 'blue-grey'
+      return 'green-7'
     },
     unidadLabel (codigoUnidad) {
       const value = String(codigoUnidad || '').trim().toUpperCase()
@@ -492,6 +560,10 @@ export default {
       this.pagination.page = 1
       this.productosGet()
     },
+    onUnidadFilterChange () {
+      this.pagination.page = 1
+      this.productosGet()
+    },
     copiarPrecio1 () {
       const base = Number(this.producto.precio1 || 0)
       for (let i = 2; i <= 13; i++) {
@@ -516,11 +588,36 @@ export default {
       this.imagePreview = ''
       this.dialogImg = true
     },
+    addPasteListener () {
+      document.addEventListener('paste', this.onPaste)
+    },
+    removePasteListener () {
+      document.removeEventListener('paste', this.onPaste)
+    },
+    onDrop (e) {
+      this.isDragging = false
+      const file = e.dataTransfer?.files?.[0]
+      if (file && file.type.startsWith('image/')) this.setImageFile(file)
+    },
+    onPaste (e) {
+      const items = e.clipboardData?.items
+      if (!items) return
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile()
+          if (file) { this.setImageFile(file); break }
+        }
+      }
+    },
+    setImageFile (file) {
+      if (this.imagePreview) URL.revokeObjectURL(this.imagePreview)
+      this.selectedImage = file
+      this.imagePreview = URL.createObjectURL(file)
+    },
     onImageChange (e) {
       const file = e.target.files?.[0]
       if (!file) return
-      this.selectedImage = file
-      this.imagePreview = URL.createObjectURL(file)
+      this.setImageFile(file)
     },
     closeImgDialog () {
       this.dialogImg = false
@@ -570,6 +667,7 @@ export default {
           { label: 'Tipo', value: 'tipo' },
           { label: 'Precio1', value: 'precio1' },
           { label: 'Precio13', value: 'precio13' },
+          { label: 'Peso estimado', value: 'peso_estimado' },
           { label: 'Activo', value: row => row.active ? 'SI' : 'NO' },
         ]
         const data = [{ columns, content: res.data }]
@@ -581,7 +679,7 @@ export default {
       })
     },
     productoNew () {
-      this.producto = emptyProducto()
+      this.producto = emptyProducto(this.defaultTipoProducto)
       this.actionPeriodo = 'Nuevo'
       this.productoDialog = true
       this.loadGrupos()
@@ -592,6 +690,7 @@ export default {
         params: {
           search: this.filter,
           tipo: this.filterTipo === 'TODOS' ? '' : this.filterTipo,
+          codigo_unidad: this.filterUnidad === 'TODOS' ? '' : this.filterUnidad,
           page: this.pagination.page,
           per_page: this.pagination.rowsPerPage,
         }
@@ -608,7 +707,9 @@ export default {
       this.producto.codigo = (this.producto.codigo || '').trim()
       this.producto.nombre = (this.producto.nombre || '').trim()
       this.producto.tipo_producto = (this.producto.tipo_producto || 'PF').trim().toUpperCase()
-      this.producto.tipo = (this.producto.tipo || 'NORMAL').toUpperCase()
+      this.producto.tipo = normalizeTipoValue(this.producto.tipo || this.defaultTipoProducto)
+      const pesoEstimado = Number(this.producto.peso_estimado)
+      this.producto.peso_estimado = Number.isFinite(pesoEstimado) && pesoEstimado >= 0 ? pesoEstimado : null
 
       if (!this.producto.codigo) this.autogenerarCodigo()
 
@@ -650,7 +751,7 @@ export default {
       })
     },
     async productoEdit (producto) {
-      this.producto = { ...emptyProducto(), ...producto }
+      this.producto = { ...emptyProducto(this.defaultTipoProducto), ...producto }
       this.actionPeriodo = 'Editar'
       if (this.producto.producto_grupo_padre_id) {
         await this.loadGrupos(this.producto.producto_grupo_padre_id)
@@ -678,6 +779,20 @@ export default {
 </script>
 
 <style scoped>
+.drop-zone {
+  border: 2px dashed #90a4ae;
+  border-radius: 8px;
+  transition: border-color 0.2s, background 0.2s;
+  user-select: none;
+}
+.drop-zone--active {
+  border-color: #1976d2;
+  background: #e3f2fd;
+}
+.drop-zone:hover {
+  border-color: #1976d2;
+}
+
 @media (max-width: 768px) {
   :deep(.q-pagination) {
     justify-content: center;

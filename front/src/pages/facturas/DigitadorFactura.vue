@@ -52,7 +52,7 @@
                 </q-item>
                 <q-item clickable v-close-popup @click="imprimirVouchersMasivo" :disable="loadingPrintFacturas || loadingPrintVouchers">
                   <q-item-section avatar><q-icon name="receipt" /></q-item-section>
-                  <q-item-section>Imprimir todos los vouchers</q-item-section>
+                  <q-item-section>Imprimir todas las boletas</q-item-section>
                 </q-item>
                 <q-separator />
                 <q-item clickable v-close-popup @click="abrirDialogoCamion" :disable="loadingPrintFacturas || loadingPrintVouchers">
@@ -114,7 +114,7 @@
                 </q-item>
                 <q-item clickable v-close-popup @click="imprimirVoucherIndividual(venta)">
                   <q-item-section avatar><q-icon name="description" /></q-item-section>
-                  <q-item-section>Imprimir voucher</q-item-section>
+                  <q-item-section>Imprimir boleta</q-item-section>
                 </q-item>
                 <q-item clickable v-close-popup @click="mandarWhatsappFactura(venta)" v-if="venta.cuf && venta.factura_estado === 'FACTURADO'">
                   <q-item-section avatar><q-icon name="chat" /></q-item-section>
@@ -312,7 +312,7 @@
                 icon="receipt"
                 no-caps
                 class="full-width"
-                label="Imprimir vouchers"
+                label="Imprimir boletas"
                 :disable="!selectedCamionId"
                 :loading="loadingPrintVouchers"
                 @click="imprimirVouchersPorCamion"
@@ -570,7 +570,7 @@ export default {
         link.remove()
         window.URL.revokeObjectURL(fileUrl)
       } catch (e) {
-        this.$alert.error((e && e.response && e.response.data && e.response.data.message) || 'No se pudo generar el PDF')
+        this.$alert.error(await this.resolvePdfErrorMessage(e, 'No se pudo generar el PDF'))
       } finally {
         this[loadingKey] = false
       }
@@ -591,7 +591,7 @@ export default {
         link.remove()
         window.URL.revokeObjectURL(fileUrl)
       } catch (e) {
-        this.$alert.error((e && e.response && e.response.data && e.response.data.message) || 'No se pudo generar el PDF')
+        this.$alert.error(await this.resolvePdfErrorMessage(e, 'No se pudo generar el PDF'))
       }
     },
     async imprimirFacturaIndividual(venta) {
@@ -624,8 +624,29 @@ export default {
         window.URL.revokeObjectURL(fileUrl)
         this.$alert.error('Tu navegador no permite compartir PDF directo. Se descargo el archivo para enviarlo por WhatsApp.')
       } catch (e) {
-        this.$alert.error((e && e.response && e.response.data && e.response.data.message) || 'No se pudo preparar el PDF para compartir')
+        this.$alert.error(await this.resolvePdfErrorMessage(e, 'No se pudo preparar el PDF para compartir'))
       }
+    },
+    async resolvePdfErrorMessage(error, fallback) {
+      const direct = error && error.response && error.response.data && error.response.data.message
+      if (typeof direct === 'string' && direct.trim()) {
+        return direct.trim()
+      }
+
+      const blob = error && error.response && error.response.data
+      if (blob && typeof blob.text === 'function') {
+        try {
+          const text = await blob.text()
+          const parsed = JSON.parse(text)
+          const message = parsed && parsed.message
+          if (typeof message === 'string' && message.trim()) {
+            return message.trim()
+          }
+        } catch (_) {
+          // Ignore parse errors and use fallback.
+        }
+      }
+      return fallback
     },
     async mandarWhatsappFactura(venta) {
       await this.compartirPdf(`/digitador-factura/reportes/facturas/${venta.venta_id}`, `factura_venta_${venta.venta_id}.pdf`)

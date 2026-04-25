@@ -328,6 +328,62 @@ class AuxiliarCamaraController extends Controller
         return $pdf->download('auxiliar_pedidos_' . str_replace('-', '', $fecha) . '.pdf');
     }
 
+    public function reportePedidosCamion(Request $request)
+    {
+        $data = $request->validate([
+            'usuario_camion_id' => 'required|integer|exists:users,id',
+        ]);
+
+        $camion = User::query()->find((int) $data['usuario_camion_id']);
+        if (!$camion || !$camion->es_camion) {
+            return response()->json(['message' => 'Debe seleccionar un usuario camion valido'], 422);
+        }
+
+        $pedidos = $this->queryForReports($request)->with([
+            'cliente:id,nombre,direccion,telefono,codcli,ci,territorio',
+            'user:id,name',
+            'usuarioCamion:id,name,placa',
+            'zona:id,nombre,color',
+            'detalles:id,pedido_id,producto_id,cantidad,precio,total,observacion_detalle,detalle_extra',
+            'detalles.producto:id,codigo,nombre,imagen,tipo',
+        ])
+            ->where('usuario_camion_id', (int) $camion->id)
+            ->orderBy('hora')
+            ->orderBy('id')
+            ->get();
+
+        $pedidos = $pedidos
+            ->map(function (Pedido $pedido) {
+                $pedido->setRelation('detalles', $pedido->detalles->filter(function (PedidoDetalle $detalle) {
+                    return $this->normalizeTipo($detalle->producto?->tipo) === 'NORMAL';
+                })->values());
+                return $pedido;
+            })
+            ->filter(fn (Pedido $pedido) => $pedido->detalles->isNotEmpty())
+            ->values();
+
+        if ($pedidos->isEmpty()) {
+            return response()->json(['message' => 'No hay pedidos para el camion seleccionado'], 404);
+        }
+
+        $pedidos = $pedidos->map(function (Pedido $pedido) {
+            $pedido->detalles->each(function (PedidoDetalle $detalle) {
+                $detalle->setAttribute('imagen_data_url', $this->toDataImage((string) ($detalle->producto?->imagen ?? '')));
+            });
+            return $pedido;
+        });
+
+        $fecha = (string) ($request->input('fecha') ?: now()->toDateString());
+        $pdf = Pdf::loadView('pdf.auxiliar_camara_pedidos_camion', [
+            'pedidos' => $pedidos,
+            'fecha' => $fecha,
+            'camion' => $camion,
+            'total' => (float) $pedidos->sum('total'),
+        ])->setPaper('letter');
+
+        return $pdf->download('auxiliar_pedidos_camion_' . $camion->id . '_' . str_replace('-', '', $fecha) . '.pdf');
+    }
+
     public function reporteProductosTotales(Request $request)
     {
         $includeClientes = $request->boolean('incluir_clientes', true);

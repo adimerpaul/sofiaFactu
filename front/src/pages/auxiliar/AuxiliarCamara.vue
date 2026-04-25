@@ -15,6 +15,10 @@
                 <q-item-section avatar><q-icon name="description" color="indigo" /></q-item-section>
                 <q-item-section>Pedidos</q-item-section>
               </q-item>
+              <q-item clickable v-close-popup @click="openReporteCamionDialog">
+                <q-item-section avatar><q-icon name="local_shipping" color="blue-8" /></q-item-section>
+                <q-item-section>Pedidos por camion</q-item-section>
+              </q-item>
               <q-item clickable v-close-popup @click="reporteVentasGeneradas">
                 <q-item-section avatar><q-icon name="receipt_long" color="secondary" /></q-item-section>
                 <q-item-section>Ventas generales</q-item-section>
@@ -48,6 +52,9 @@
         <div class="col-12 col-md-2">
           <q-select v-model="tipo" :options="tipoOptions" dense outlined emit-value map-options label="Tipo" />
         </div>
+        <div class="col-12 col-md-3">
+          <q-select v-model="camionId" :options="camionOptions" dense outlined emit-value map-options label="Camion" />
+        </div>
 <!--        <div class="col-12 col-md-2">-->
 <!--          <q-select v-model="auxiliarEstado" :options="auxEstadoOptions" dense outlined emit-value map-options label="Estado auxiliar" />-->
 <!--        </div>-->
@@ -63,7 +70,7 @@
 <!--        <div class="col-12 col-md-2">-->
 <!--          <q-select v-model="zonaId" :options="zonaOptions" dense outlined emit-value map-options label="Zona" />-->
 <!--        </div>-->
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-5">
           <q-input v-model="search" dense outlined debounce="300" label="Buscar cliente / direccion / pedido">
             <template #append><q-icon name="search" /></template>
           </q-input>
@@ -261,6 +268,29 @@
         </q-expansion-item>
       </q-list>
     </q-card>
+
+    <q-dialog v-model="showReportCamionDialog">
+      <q-card style="width: 420px; max-width: 95vw">
+        <q-card-section class="text-subtitle1 text-weight-medium">
+          Reporte pedidos por camion
+        </q-card-section>
+        <q-card-section>
+          <q-select
+            v-model="reportCamionId"
+            :options="camionReportOptions"
+            dense
+            outlined
+            emit-value
+            map-options
+            label="Camion"
+          />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps label="Cancelar" v-close-popup />
+          <q-btn color="primary" no-caps label="Generar PDF" :loading="loadingReport" @click="reportePedidosCamionConfirm" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -290,6 +320,8 @@ const clienteId = ref(null)
 const vendedorId = ref(null)
 const camionId = ref(null)
 const zonaId = ref(null)
+const showReportCamionDialog = ref(false)
+const reportCamionId = ref(null)
 
 const tipoOptions = computed(() => {
   const base = Array.isArray(proxy?.$tiposProducto) && proxy.$tiposProducto.length
@@ -344,6 +376,7 @@ const camionOptions = computed(() => {
   })
   return [{ label: 'Todos', value: null }, ...Array.from(map.entries()).map(([id, label]) => ({ label, value: id }))]
 })
+const camionReportOptions = computed(() => camionOptions.value.filter(opt => opt.value !== null))
 
 const zonaOptions = computed(() => {
   const map = new Map()
@@ -574,6 +607,28 @@ async function descargarPdf (url, fileName, extraParams = {}) {
 
 async function reportePedidos () {
   await descargarPdf('/auxiliar-camara/reportes/pedidos', `auxiliar_pedidos_${fecha.value}.pdf`)
+}
+
+function openReporteCamionDialog () {
+  const current = Number(camionId.value || 0)
+  if (current > 0) {
+    reportCamionId.value = current
+  } else if (!reportCamionId.value && camionReportOptions.value.length > 0) {
+    reportCamionId.value = camionReportOptions.value[0].value
+  }
+  showReportCamionDialog.value = true
+}
+
+async function reportePedidosCamionConfirm () {
+  const selected = Number(reportCamionId.value || 0)
+  if (selected <= 0) {
+    proxy.$alert.error('Seleccione un camion para generar el reporte')
+    return
+  }
+  await descargarPdf('/auxiliar-camara/reportes/pedidos-camion', `auxiliar_pedidos_camion_${selected}_${fecha.value}.pdf`, {
+    usuario_camion_id: selected,
+  })
+  showReportCamionDialog.value = false
 }
 
 async function reporteProductosTotales (incluirClientes = true) {

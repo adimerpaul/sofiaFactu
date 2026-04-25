@@ -29,12 +29,29 @@ class DigitadorFacturaController extends Controller
             'fecha_fin' => 'nullable|date',
             'search' => 'nullable|string|max:120',
             'solo_factura' => 'nullable',
+            'usuario_camion_id' => 'nullable|integer|exists:users,id',
+            'tipos' => 'nullable|array',
+            'tipos.*' => 'string|in:HUEVO,PET,POLLO,CERDO,EMBUTIDO,RES,NORMAL',
         ]);
 
         $fechaInicio = $data['fecha_inicio'] ?? now()->toDateString();
         $fechaFin = $data['fecha_fin'] ?? now()->toDateString();
         $soloFactura = $this->parseBoolean($data['solo_factura'] ?? false);
         $search = mb_strtolower(trim((string) ($data['search'] ?? '')));
+        $camionId = !empty($data['usuario_camion_id']) ? (int) $data['usuario_camion_id'] : null;
+        $tipos = collect($data['tipos'] ?? [])
+            ->map(fn ($tipo) => $this->normalizeTipoFiltro(is_string($tipo) ? $tipo : null))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($camionId) {
+            $camion = User::query()->find($camionId);
+            if (!$camion || !$camion->es_camion) {
+                return response()->json(['message' => 'El usuario seleccionado no es tipo camion'], 422);
+            }
+        }
 
         $ventas = Venta::query()
             ->with([
@@ -49,14 +66,18 @@ class DigitadorFacturaController extends Controller
             ])
             ->whereNotNull('pedido_id')
             ->whereBetween('fecha', [$fechaInicio, $fechaFin])
-            ->whereHas('pedido', function (Builder $q) {
+            ->whereHas('pedido', function (Builder $q) use ($camionId) {
                 $q->where('tipo_pedido', 'REALIZAR_PEDIDO');
+                if ($camionId) {
+                    $q->where('usuario_camion_id', $camionId);
+                }
             })
             ->when($soloFactura, fn (Builder $q) => $q->where('facturado', true))
             ->orderBy('fecha', 'desc')
             ->orderBy('hora', 'desc')
             ->orderBy('id', 'desc')
             ->get();
+        $ventas = $this->filterVentasDetallesByTipos($ventas, $tipos);
 
         if ($search !== '') {
             $ventas = $ventas->filter(function (Venta $venta) use ($search) {
@@ -179,6 +200,8 @@ class DigitadorFacturaController extends Controller
                 'fecha_inicio' => $fechaInicio,
                 'fecha_fin' => $fechaFin,
                 'solo_factura' => $soloFactura,
+                'usuario_camion_id' => $camionId,
+                'tipos' => $tipos,
             ],
         ]);
     }
@@ -384,13 +407,14 @@ class DigitadorFacturaController extends Controller
     public function imprimirFacturas(Request $request)
     {
         $this->authorizeDigitador($request);
-        [$fechaInicio, $fechaFin, $camionId] = $this->extractRangoFechas($request);
+        [$fechaInicio, $fechaFin, $camionId, $tipos] = $this->extractRangoFechas($request);
 
-        $ventas = $this->queryVentasDigitador($fechaInicio, $fechaFin, $camionId)
+        $ventas = $this->queryVentasDigitador($fechaInicio, $fechaFin, $camionId, $tipos)
             ->where('facturado', true)
             ->where('factura_estado', 'FACTURADO')
             ->whereNotNull('cuf')
             ->get();
+        $ventas = $this->filterVentasDetallesByTipos($ventas, $tipos);
 
         if ($ventas->isEmpty()) {
             $message = $camionId
@@ -416,9 +440,10 @@ class DigitadorFacturaController extends Controller
     public function imprimirVouchers(Request $request)
     {
         $this->authorizeDigitador($request);
-        [$fechaInicio, $fechaFin, $camionId] = $this->extractRangoFechas($request);
+        [$fechaInicio, $fechaFin, $camionId, $tipos] = $this->extractRangoFechas($request);
 
-        $ventas = $this->queryVentasDigitador($fechaInicio, $fechaFin, $camionId)->get();
+        $ventas = $this->queryVentasDigitador($fechaInicio, $fechaFin, $camionId, $tipos)->get();
+        $ventas = $this->filterVentasDetallesByTipos($ventas, $tipos);
         if ($ventas->isEmpty()) {
             $message = $camionId
                 ? 'No hay ventas para imprimir vouchers para el camion seleccionado en el rango'
@@ -726,8 +751,16 @@ class DigitadorFacturaController extends Controller
             'fecha_inicio' => 'nullable|date',
             'fecha_fin' => 'nullable|date',
             'usuario_camion_id' => 'nullable|integer|exists:users,id',
+            'tipos' => 'nullable|array',
+            'tipos.*' => 'string|in:HUEVO,PET,POLLO,CERDO,EMBUTIDO,RES,NORMAL',
         ]);
         $camionId = !empty($data['usuario_camion_id']) ? (int) $data['usuario_camion_id'] : null;
+        $tipos = collect($data['tipos'] ?? [])
+            ->map(fn ($tipo) => $this->normalizeTipoFiltro(is_string($tipo) ? $tipo : null))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
         if ($camionId) {
             $camion = User::query()->find($camionId);
             if (!$camion || !$camion->es_camion) {
@@ -738,10 +771,11 @@ class DigitadorFacturaController extends Controller
             $data['fecha_inicio'] ?? now()->toDateString(),
             $data['fecha_fin'] ?? now()->toDateString(),
             $camionId,
+            $tipos,
         ];
     }
 
-    private function queryVentasDigitador(string $fechaInicio, string $fechaFin, ?int $camionId = null): Builder
+    private function queryVentasDigitador(string $fechaInicio, string $fechaFin, ?int $camionId = null, array $tipos = []): Builder
     {
         return Venta::query()
             ->with([
@@ -765,6 +799,61 @@ class DigitadorFacturaController extends Controller
             ->orderBy('fecha', 'desc')
             ->orderBy('hora', 'desc')
             ->orderBy('id', 'desc');
+    }
+
+    private function filterVentasDetallesByTipos($ventas, array $tipos)
+    {
+        if (empty($tipos)) {
+            return $ventas;
+        }
+
+        $selected = collect($tipos)
+            ->map(fn (string $tipo) => $this->normalizeTipoFiltro($tipo))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        return $ventas
+            ->map(function (Venta $venta) use ($selected) {
+                $detalles = $venta->ventaDetalles
+                    ->filter(function (VentaDetalle $detalle) use ($selected) {
+                        $tipo = $this->normalizeTipoFiltro((string) ($detalle->producto?->tipo ?? 'NORMAL'));
+                        return in_array($tipo, $selected, true);
+                    })
+                    ->values();
+                $venta->setRelation('ventaDetalles', $detalles);
+                return $venta;
+            })
+            ->filter(fn (Venta $venta) => $venta->ventaDetalles->isNotEmpty())
+            ->values();
+    }
+
+    private function normalizeTipoFiltro(?string $tipo): ?string
+    {
+        $value = strtoupper(trim((string) ($tipo ?? '')));
+        if ($value === '' || $value === 'TODOS') {
+            return null;
+        }
+        if (str_contains($value, 'HUEVO')) {
+            return 'HUEVO';
+        }
+        if (str_contains($value, 'PET')) {
+            return 'PET';
+        }
+        if (str_contains($value, 'POLLO')) {
+            return 'POLLO';
+        }
+        if (str_contains($value, 'CERDO')) {
+            return 'CERDO';
+        }
+        if (str_contains($value, 'RES')) {
+            return 'RES';
+        }
+        if (str_contains($value, 'EMBUTIDO') || $value === 'NORMAL') {
+            return 'EMBUTIDO';
+        }
+        return null;
     }
 
     private function buildFacturaItems($ventas)

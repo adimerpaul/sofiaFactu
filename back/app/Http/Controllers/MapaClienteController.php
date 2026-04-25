@@ -94,6 +94,7 @@ class MapaClienteController extends Controller
                 'contiene_pollo' => $group->contains(fn ($p) => (bool) $p->contiene_pollo),
                 'contiene_res' => $group->contains(fn ($p) => (bool) $p->contiene_res),
                 'contiene_cerdo' => $group->contains(fn ($p) => (bool) $p->contiene_cerdo),
+                'fuera_de_ruta' => $group->contains(fn ($p) => (bool) $p->fuera_de_ruta),
             ];
         })->values();
 
@@ -169,6 +170,7 @@ class MapaClienteController extends Controller
                 'tipo_pollo' => $rows->where('contiene_pollo', true)->count(),
                 'tipo_res' => $rows->where('contiene_res', true)->count(),
                 'tipo_cerdo' => $rows->where('contiene_cerdo', true)->count(),
+                'fuera_de_ruta' => $rows->where('fuera_de_ruta', true)->count(),
                 'camiones' => $statsCamiones,
             ],
         ]);

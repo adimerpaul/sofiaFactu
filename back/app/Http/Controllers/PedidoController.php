@@ -8,6 +8,7 @@ use App\Models\Cliente;
 use App\Models\Producto;
 use App\Models\Visita;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -262,8 +263,22 @@ class PedidoController extends Controller {
                 return response()->json(['message' => 'Debe seleccionar el cliente asociado para bajas o bonificacion'], 422);
             }
 
-            if ($isPedido && $clienteId && ($data['tipo_pago'] ?? null) === 'Credito') {
-                $cliente = Cliente::query()->select('id', 'puede_credito')->find($clienteId);
+            $cliente = null;
+            if ($isPedido && $clienteId) {
+                $cliente = Cliente::query()->select([
+                    'id',
+                    'puede_credito',
+                    'lu',
+                    'ma',
+                    'mi',
+                    'ju',
+                    'vi',
+                    'sa',
+                    'do',
+                ])->find($clienteId);
+            }
+
+            if ($isPedido && $cliente && ($data['tipo_pago'] ?? null) === 'Credito') {
                 if ($cliente && $cliente->puede_credito === false) {
                     return response()->json(['message' => 'Este cliente no puede tener credito'], 422);
                 }
@@ -298,11 +313,14 @@ class PedidoController extends Controller {
             }
             unset($item);
 
+            $fechaPedido = $data['fecha'] ?? now()->format('Y-m-d');
+            $fueraDeRuta = $this->isFueraDeRuta($cliente, $fechaPedido);
+
             $pedido = Pedido::create([
                 'user_id' => $user->id,
                 'cliente_id' => $clienteId,
                 'cliente_baja_id' => $clienteBajaId,
-                'fecha' => $data['fecha'] ?? now()->format('Y-m-d'),
+                'fecha' => $fechaPedido,
                 'hora' => $data['hora'] ?? null,
                 'estado' => $isPedido ? 'Creado' : 'Pendiente',
                 'tipo_pago' => $data['tipo_pago'] ?? null,
@@ -312,6 +330,7 @@ class PedidoController extends Controller {
                 'contiene_res' => $contiene['res'],
                 'contiene_cerdo' => $contiene['cerdo'],
                 'contiene_pollo' => $contiene['pollo'],
+                'fuera_de_ruta' => $fueraDeRuta,
                 'total' => 0,
                 'observaciones' => $data['observaciones'] ?? null,
                 'comentario_visita' => $data['comentario_visita'] ?? null,
@@ -523,5 +542,33 @@ class PedidoController extends Controller {
             'tipo_visita' => $tipoVisita,
             'comentario' => $comentario ? mb_substr(trim($comentario), 0, 600) : null,
         ]);
+    }
+
+    private function isFueraDeRuta(?Cliente $cliente, ?string $fecha): bool
+    {
+        if (!$cliente || !$fecha) {
+            return false;
+        }
+
+        try {
+            $dayField = match (Carbon::parse($fecha)->dayOfWeekIso) {
+                1 => 'lu',
+                2 => 'ma',
+                3 => 'mi',
+                4 => 'ju',
+                5 => 'vi',
+                6 => 'sa',
+                7 => 'do',
+                default => null,
+            };
+        } catch (\Throwable $e) {
+            return false;
+        }
+
+        if (!$dayField) {
+            return false;
+        }
+
+        return !(bool) ($cliente->{$dayField} ?? false);
     }
 }

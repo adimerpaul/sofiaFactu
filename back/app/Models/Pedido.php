@@ -35,6 +35,7 @@ class Pedido extends Model implements Auditable {
         'contiene_res',
         'contiene_cerdo',
         'contiene_pollo',
+        'fuera_de_ruta',
         'total',
         'observaciones',
         'comentario_visita'
@@ -47,6 +48,7 @@ class Pedido extends Model implements Auditable {
         'contiene_res' => 'boolean',
         'contiene_cerdo' => 'boolean',
         'contiene_pollo' => 'boolean',
+        'fuera_de_ruta' => 'boolean',
         'pedido_zona_id' => 'integer',
         'cliente_baja_id' => 'integer',
         'usuario_camion_id' => 'integer',

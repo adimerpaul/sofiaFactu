@@ -60,6 +60,11 @@
             Sin asignar: {{ statsSinAsignar }}
           </q-chip>
         </div>
+        <div class="col-6 col-md-3">
+          <q-chip square color="deep-orange-8" text-color="white" icon="warning" class="full-width justify-center">
+            Fuera de ruta: {{ stats.fuera_de_ruta || 0 }}
+          </q-chip>
+        </div>
       </q-card-section>
     </q-card>
 
@@ -69,12 +74,12 @@
 
     <q-card flat bordered>
       <q-card-section class="row q-col-gutter-sm items-center q-py-sm">
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-3">
           <q-input v-model="search" dense outlined label="Buscar cliente/zona/vendedor" debounce="350" @update:model-value="loadData">
             <template #append><q-icon name="search" /></template>
           </q-input>
         </div>
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-md-2">
           <q-select
             v-model="zonaFiltroTabla"
             :options="zonaFiltroOptions"
@@ -85,7 +90,7 @@
             label="Zona (tabla)"
           />
         </div>
-        <div class="col-12 col-md-3">
+        <div class="col-12 col-md-2">
           <q-select
             v-model="vendedorFiltroTabla"
             :options="vendedorFiltroTablaOptions"
@@ -94,6 +99,17 @@
             emit-value
             map-options
             label="Vendedor (tabla)"
+          />
+        </div>
+        <div class="col-12 col-md-3">
+          <q-select
+            v-model="fueraRutaFiltroTabla"
+            :options="fueraRutaFiltroOptions"
+            dense
+            outlined
+            emit-value
+            map-options
+            label="Fuera de ruta"
           />
         </div>
         <div class="col-12 col-md-2">
@@ -146,6 +162,11 @@
                 {{ props.row.usuario_camion ? 'EN RUTA' : 'SIN RUTA' }}
               </q-chip>
             </q-td>
+            <q-td key="fuera_ruta" :props="props">
+              <q-chip dense :color="props.row.fuera_de_ruta ? 'deep-orange-7' : 'teal-7'" text-color="white">
+                {{ props.row.fuera_de_ruta ? 'FUERA DE RUTA' : 'EN DIA' }}
+              </q-chip>
+            </q-td>
           </q-tr>
         </template>
         <template #body-cell-zona="props">
@@ -162,6 +183,13 @@
           <q-td :props="props">
             <q-chip dense :color="props.row.usuario_camion ? 'green-7' : 'red-7'" text-color="white">
               {{ props.row.usuario_camion ? 'EN RUTA' : 'SIN RUTA' }}
+            </q-chip>
+          </q-td>
+        </template>
+        <template #body-cell-fuera_ruta="props">
+          <q-td :props="props">
+            <q-chip dense :color="props.row.fuera_de_ruta ? 'deep-orange-7' : 'teal-7'" text-color="white">
+              {{ props.row.fuera_de_ruta ? 'FUERA DE RUTA' : 'EN DIA' }}
             </q-chip>
           </q-td>
         </template>
@@ -344,6 +372,7 @@ const dialogReporteZona = ref(false)
 const dialogReportePedidosTipos = ref(false)
 const zonaFiltroTabla = ref('TODAS')
 const vendedorFiltroTabla = ref('TODOS')
+const fueraRutaFiltroTabla = ref('TODOS')
 const reporteZonaCamionId = ref(null)
 const reporteTiposSugeridos = ['EMBUTIDO', 'HUEVO', 'PET']
 const reporteTiposTodos = ['EMBUTIDO', 'HUEVO', 'PET', 'POLLO', 'CERDO', 'RES']
@@ -398,6 +427,7 @@ const columns = [
   { name: 'zona', label: 'Zona', field: 'zona', align: 'left' },
   { name: 'usuario_camion', label: 'Camion', field: row => row.usuario_camion || '-', align: 'left' },
   { name: 'en_ruta', label: 'Ruta', field: 'en_ruta', align: 'left' },
+  { name: 'fuera_ruta', label: 'Fuera Ruta', field: row => !!row.fuera_de_ruta, align: 'left' },
 ]
 
 const vendedoresOptions = computed(() => [
@@ -433,11 +463,20 @@ const vendedorFiltroTablaOptions = computed(() => {
   ]
 })
 
+const fueraRutaFiltroOptions = [
+  { label: 'Todos', value: 'TODOS' },
+  { label: 'Fuera de ruta', value: 'FUERA' },
+  { label: 'En dia', value: 'EN_DIA' },
+]
+
 const rowsFiltradasTabla = computed(() => {
   return rows.value.filter((r) => {
     const okZona = zonaFiltroTabla.value === 'TODAS' || (r.zona || 'SIN ZONA') === zonaFiltroTabla.value
     const okVendedor = vendedorFiltroTabla.value === 'TODOS' || (r.vendedor || 'SIN VENDEDOR') === vendedorFiltroTabla.value
-    return okZona && okVendedor
+    const okFueraRuta = fueraRutaFiltroTabla.value === 'TODOS'
+      || (fueraRutaFiltroTabla.value === 'FUERA' && !!r.fuera_de_ruta)
+      || (fueraRutaFiltroTabla.value === 'EN_DIA' && !r.fuera_de_ruta)
+    return okZona && okVendedor && okFueraRuta
   })
 })
 
@@ -470,6 +509,7 @@ function regroupRows (items) {
     current.contiene_pollo = Boolean(current.contiene_pollo || row.contiene_pollo)
     current.contiene_res = Boolean(current.contiene_res || row.contiene_res)
     current.contiene_cerdo = Boolean(current.contiene_cerdo || row.contiene_cerdo)
+    current.fuera_de_ruta = Boolean(current.fuera_de_ruta || row.fuera_de_ruta)
   })
 
   return Array.from(grouped.values()).map((row, index) => ({
@@ -520,6 +560,7 @@ function textColor (bg) {
 }
 
 function rowClass (row) {
+  if (row?.fuera_de_ruta) return 'row-fuera-ruta'
   return row?.usuario_camion ? 'row-en-ruta' : 'row-sin-ruta'
 }
 
@@ -582,15 +623,24 @@ async function rebuildMap (preserveView = true) {
 }
 function markerIcon (row) {
   const color = row.zona_color || '#607d8b'
+  const statusColor = row.fuera_de_ruta ? '#dd6b20' : '#0f766e'
+  const statusTitle = row.fuera_de_ruta ? 'Fuera de ruta' : 'En dia'
   return L.divIcon({
     className: '',
     html: `
       <div style="
+        position:relative;
         width:26px;height:26px;border-radius:13px;
         background:${color};color:${textColor(color)};
         border:2px solid #fff;display:flex;align-items:center;justify-content:center;
         font-size:11px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.35);
-      ">${row.num}</div>
+      ">
+        ${row.num}
+        <span title="${statusTitle}" style="
+          position:absolute;right:-3px;top:-3px;width:9px;height:9px;border-radius:999px;
+          background:${statusColor};border:1px solid #fff;
+        "></span>
+      </div>
     `,
     iconSize: [26, 26],
     iconAnchor: [13, 13],
@@ -599,10 +649,13 @@ function markerIcon (row) {
 
 function tooltipHtml (row) {
   const estadoRuta = row.usuario_camion ? 'EN RUTA' : 'SIN RUTA'
+  const estadoFueraRuta = row.fuera_de_ruta ? 'FUERA DE RUTA' : 'EN DIA'
+  const estadoFueraRutaColor = row.fuera_de_ruta ? '#dd6b20' : '#0f766e'
   return `
     <div style="font-size:12px;line-height:1.25;">
       <div style="font-weight:700;">${row.cliente_nombre || '-'}</div>
       <div><b>${estadoRuta}</b></div>
+      <div><b style="color:${estadoFueraRutaColor};">${estadoFueraRuta}</b></div>
       <div><b>Territorio:</b> ${row.territorio || '-'}</div>
       <div><b>Importe:</b> ${Number(row.importe || 0).toFixed(2)} Bs</div>
       <div><b>Vendedor:</b> ${row.vendedor || '-'}</div>
@@ -747,6 +800,7 @@ async function loadData () {
     rows.value = Array.isArray(res.data?.data) ? res.data.data : []
     zonaFiltroTabla.value = 'TODAS'
     vendedorFiltroTabla.value = 'TODOS'
+    fueraRutaFiltroTabla.value = 'TODOS'
     vendedores.value = Array.isArray(res.data?.vendedores) ? res.data.vendedores : []
     camiones.value = Array.isArray(res.data?.camiones) ? res.data.camiones : []
     zonas.value = Array.isArray(res.data?.zonas) ? res.data.zonas : []
@@ -904,7 +958,7 @@ watch(dialogAsignar, (open) => {
   }
 })
 
-watch([zonaFiltroTabla, vendedorFiltroTabla], () => {
+watch([zonaFiltroTabla, vendedorFiltroTabla, fueraRutaFiltroTabla], () => {
   selectedRows.value = selectedRows.value.filter((s) => rowsFiltradasTabla.value.some((r) => r.id === s.id))
   if (selectedRows.value.length === 0) {
     zonaSeleccionRapida.value = { nombre: '', total: 0, poligonoId: null }
@@ -942,5 +996,9 @@ onBeforeUnmount(() => {
 
 :deep(.row-sin-ruta) {
   background: #fff;
+}
+
+:deep(.row-fuera-ruta) {
+  background: #fff3e0;
 }
 </style>

@@ -293,6 +293,13 @@
           <q-banner v-if="selectedCamion" dense rounded class="bg-blue-1 text-dark">
             Camión: <b>{{ selectedCamion.name }}</b>{{ selectedCamion.placa ? ` (${selectedCamion.placa})` : '' }}
           </q-banner>
+          <q-option-group
+            v-model="selectedTiposCamion"
+            :options="tiposCamionOptions"
+            type="checkbox"
+            color="primary"
+            inline
+          />
           <div class="row q-col-gutter-sm">
             <div class="col-12 col-md-6">
               <q-btn
@@ -343,6 +350,7 @@ export default {
       camiones: [],
       dialogPrintCamion: false,
       selectedCamionId: null,
+      selectedTiposCamion: ['HUEVO', 'PET', 'EMBUTIDO'],
       ventas: [],
       pedidosSinVenta: [],
       stats: {
@@ -395,6 +403,16 @@ export default {
     selectedCamion() {
       return (this.camiones || []).find((camion) => Number(camion.id) === Number(this.selectedCamionId)) || null
     },
+    tiposCamionOptions() {
+      const base = Array.isArray(this.$tiposProducto) && this.$tiposProducto.length
+        ? this.$tiposProducto
+        : ['huevo', 'pet', 'pollo', 'cerdo', 'embutido', 'res']
+      const unique = [...new Set(base.map((tipo) => this.normalizeTipo(tipo)).filter(Boolean))]
+      return unique.map((tipo) => ({
+        label: this.tipoLabel(tipo),
+        value: tipo,
+      }))
+    },
     totalEdit() {
       return (this.editForm.productos || []).reduce((acc, d) => acc + (Number(d.cantidad || 0) * Number(d.precio || 0)), 0)
     },
@@ -404,7 +422,30 @@ export default {
   },
   methods: {
     abrirDialogoCamion() {
+      this.ensureTiposCamionDefaults()
       this.dialogPrintCamion = true
+    },
+    normalizeTipo(tipo) {
+      const value = String(tipo || '').trim().toUpperCase()
+      if (!value || value === 'NORMAL') return 'EMBUTIDO'
+      return value
+    },
+    tipoLabel(tipo) {
+      const value = this.normalizeTipo(tipo)
+      if (value === 'HUEVO') return 'Huevo'
+      if (value === 'PET') return 'Pet'
+      if (value === 'POLLO') return 'Pollo'
+      if (value === 'CERDO') return 'Cerdo'
+      if (value === 'RES') return 'Res'
+      return 'Embutido'
+    },
+    ensureTiposCamionDefaults() {
+      const available = new Set((this.tiposCamionOptions || []).map((opt) => opt.value))
+      const defaults = ['HUEVO', 'PET', 'EMBUTIDO'].filter((tipo) => available.has(tipo))
+      const current = Array.isArray(this.selectedTiposCamion)
+        ? this.selectedTiposCamion.map((tipo) => this.normalizeTipo(tipo)).filter((tipo) => available.has(tipo))
+        : []
+      this.selectedTiposCamion = current.length ? [...new Set(current)] : defaults
     },
     tipoColor(tipo) {
       const t = String(tipo || 'NORMAL').toUpperCase()
@@ -422,11 +463,20 @@ export default {
     async cargarVentas() {
       this.loading = true
       try {
+        const extraFilters = this.dialogPrintCamion && this.selectedCamionId
+          ? {
+              usuario_camion_id: this.selectedCamionId,
+              tipos: Array.isArray(this.selectedTiposCamion)
+                ? this.selectedTiposCamion.map((tipo) => this.normalizeTipo(tipo)).filter(Boolean)
+                : undefined,
+            }
+          : {}
         const res = await this.$axios.get('/digitador-factura/pedidos', {
           params: {
             fecha_inicio: this.fechaInicio,
             fecha_fin: this.fechaFin,
             solo_factura: this.soloFactura,
+            ...extraFilters,
           },
         })
         const data = res && res.data ? res.data : {}
@@ -665,8 +715,17 @@ export default {
         this.$alert.error('Seleccione un camión')
         return
       }
+      const tipos = Array.isArray(this.selectedTiposCamion)
+        ? this.selectedTiposCamion.map((tipo) => this.normalizeTipo(tipo)).filter(Boolean)
+        : []
+      if (!tipos.length) {
+        this.$alert.error('Seleccione al menos un tipo de producto')
+        return
+      }
+      await this.cargarVentas()
       await this.descargarPdf('/digitador-factura/reportes/facturas', 'loadingPrintFacturas', {
         usuario_camion_id: this.selectedCamionId,
+        tipos,
       })
     },
     async imprimirVouchersPorCamion() {
@@ -674,8 +733,17 @@ export default {
         this.$alert.error('Seleccione un camión')
         return
       }
+      const tipos = Array.isArray(this.selectedTiposCamion)
+        ? this.selectedTiposCamion.map((tipo) => this.normalizeTipo(tipo)).filter(Boolean)
+        : []
+      if (!tipos.length) {
+        this.$alert.error('Seleccione al menos un tipo de producto')
+        return
+      }
+      await this.cargarVentas()
       await this.descargarPdf('/digitador-factura/reportes/vouchers', 'loadingPrintVouchers', {
         usuario_camion_id: this.selectedCamionId,
+        tipos,
       })
     },
   },

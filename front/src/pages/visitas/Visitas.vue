@@ -323,6 +323,7 @@
               <th>Subtotal</th>
               <th>Cantidad</th>
               <th>Precio</th>
+              <th>Peso est.</th>
               <th>Cod</th>
               <th>Nombre</th>
               <th>Obs</th>
@@ -347,14 +348,15 @@
                 </q-btn-dropdown>
 <!--                <pre>{{p.tipo}}</pre>-->
               </td>
-              <td>{{ (Number(p.cantidad) * Number(p.precio)).toFixed(2) }}</td>
+              <td>{{ lineSubtotal(p).toFixed(2) }}</td>
               <td>
-<!--                <q-input v-model.number="p.cantidad" dense outlined type="number" min="1" style="min-width:90px" />-->
-                <input type="text" v-model.number="p.cantidad" style="width: 40px" @input="p.cantidad = p.cantidad < 1 ? 1 : p.cantidad" />
+                <input type="number" v-model="p.cantidad" style="width: 55px" min="1" step="1" @blur="normalizePedidoItemNumbers(p)" />
               </td>
               <td>
-<!--                <q-input v-model.number="p.precio" dense outlined type="number" min="0" step="0.01" style="min-width:110px" />-->
-                <input type="text" v-model.number="p.precio" style="width: 50px" @input="p.precio = p.precio < 0 ? 0 : p.precio" />
+                <input type="number" v-model="p.precio" style="width: 65px" min="0" step="0.01" @blur="normalizePedidoItemNumbers(p)" />
+              </td>
+              <td>
+                <input type="number" v-model="p.peso_estimado" style="width: 70px" min="0" step="0.001" placeholder="1.000" @blur="normalizePedidoItemNumbers(p)" />
               </td>
               <td>{{ p.codigo || p.producto_id }}</td>
               <td>
@@ -399,7 +401,7 @@
 <!--              </td>-->
             </tr>
             <tr v-if="pedidoItems.length === 0">
-              <td colspan="8" class="text-grey-7">Sin datos disponibles</td>
+              <td colspan="9" class="text-grey-7">Sin datos disponibles</td>
             </tr>
             </tbody>
           </q-markup-table>
@@ -592,7 +594,7 @@ export default {
       return labels[this.dayCode]
     },
     totalPedido () {
-      return this.pedidoItems.reduce((acc, p) => acc + (Number(p.cantidad) * Number(p.precio)), 0)
+      return this.pedidoItems.reduce((acc, p) => acc + this.lineSubtotal(p), 0)
     },
     clientePuedeCredito () {
       return this.selectedCliente?.puede_credito !== false
@@ -753,6 +755,25 @@ export default {
     getPedidoTipoActual () {
       const tipos = this.getPedidoTipos()
       return tipos.length === 1 ? tipos[0] : null
+    },
+    pesoMultiplicador (item) {
+      const peso = Number(item?.peso_estimado)
+      return Number.isFinite(peso) && peso > 0 ? peso : 1
+    },
+    lineSubtotal (item) {
+      const cantidad = Number(item?.cantidad || 0)
+      const precio = Number(item?.precio || 0)
+      return cantidad * precio * this.pesoMultiplicador(item)
+    },
+    normalizePedidoItemNumbers (item) {
+      if (!item) return
+      const cantidad = Number(item.cantidad)
+      const precio = Number(item.precio)
+      const peso = Number(item.peso_estimado)
+
+      item.cantidad = Number.isFinite(cantidad) && cantidad > 0 ? cantidad : 1
+      item.precio = Number.isFinite(precio) && precio >= 0 ? precio : 0
+      item.peso_estimado = Number.isFinite(peso) && peso > 0 ? peso : null
     },
     sanitizeDetalleExtra (tipo, detalle = {}) {
       const defaults = this.detalleDefaultsByTipo(this.normalizeTipoProducto(tipo))
@@ -1149,6 +1170,7 @@ export default {
       window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank')
     },
     mapStockOption (p) {
+      const pesoEstimado = Number(p.peso_estimado)
       return {
         id: p.id,
         label: `${p.codigo || p.id}-${p.nombre} ${Number(p.precio1 || 0).toFixed(2)}Bs ${Number(p.stock || 0).toFixed(2)}U`,
@@ -1156,6 +1178,7 @@ export default {
         codigo: p.codigo,
         imagen: p.imagen || 'uploads/default.png',
         precio: Number(p.precio1 || 0),
+        peso_estimado: Number.isFinite(pesoEstimado) && pesoEstimado > 0 ? pesoEstimado : null,
         stock: Number(p.stock || 0),
         tipo: this.normalizeTipoProducto(p.tipo),
         codigo_unidad: p.codigo_unidad || '',
@@ -1224,6 +1247,7 @@ export default {
         imagen: p.imagen || 'uploads/default.png',
         cantidad: 1,
         precio: Number(p.precio || 0),
+        peso_estimado: p.peso_estimado ?? null,
         observacion: '',
         tipo: tipoProducto,
         codigo_unidad: p.codigo_unidad || '',
@@ -1247,13 +1271,18 @@ export default {
         return
       }
 
-      const productos = this.pedidoItems.map(p => ({
-        producto_id: p.producto_id,
-        cantidad: Number(p.cantidad || 0),
-        precio: Number(p.precio || 0),
-        observacion: p.observacion || '',
-        detalle_extra: this.sanitizeDetalleExtra(this.normalizeTipoProducto(p.tipo), p.detalle_extra || {}),
-      })).filter(p => p.cantidad > 0 && p.precio >= 0)
+      const productos = this.pedidoItems.map(p => {
+        this.normalizePedidoItemNumbers(p)
+        const peso = this.pesoMultiplicador(p)
+        return {
+          producto_id: p.producto_id,
+          cantidad: Number(p.cantidad || 0),
+          // El backend multiplica cantidad * precio, por eso incorporamos peso en el precio final.
+          precio: Number((Number(p.precio || 0) * peso).toFixed(6)),
+          observacion: p.observacion || '',
+          detalle_extra: this.sanitizeDetalleExtra(this.normalizeTipoProducto(p.tipo), p.detalle_extra || {}),
+        }
+      }).filter(p => p.cantidad > 0 && p.precio >= 0)
 
       if (productos.length === 0) {
         this.$alert.error('Revise cantidades y precios')

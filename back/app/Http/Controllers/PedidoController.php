@@ -26,13 +26,20 @@ class PedidoController extends Controller {
     public function misPedidos(Request $request)
     {
         $user = $request->user();
-        $fecha = $request->input('fecha', now()->toDateString());
+        $data = $request->validate([
+            'fecha' => 'nullable|date',
+            'cliente_id' => 'nullable|integer|exists:clientes,id',
+        ]);
+        $fecha = $data['fecha'] ?? now()->toDateString();
 
         $items = Pedido::query()
             ->with(['detalles.producto', 'cliente:id,nombre,codcli,ci', 'clienteBaja:id,nombre,codcli,ci', 'user:id,name,role'])
             ->where('tipo_pedido', 'REALIZAR_PEDIDO')
             ->where('user_id', $user->id)
             ->whereDate('fecha', $fecha)
+            ->when(!empty($data['cliente_id']), function ($q) use ($data) {
+                $q->where('cliente_id', (int) $data['cliente_id']);
+            })
             ->orderBy('hora')
             ->orderBy('id')
             ->get();

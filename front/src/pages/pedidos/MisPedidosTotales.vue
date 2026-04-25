@@ -31,6 +31,17 @@
             label="Estado"
           />
         </div>
+        <div class="col-12 col-md-2">
+          <q-select
+            v-model="clienteId"
+            :options="clienteOptions"
+            emit-value
+            map-options
+            dense
+            outlined
+            label="Cliente"
+          />
+        </div>
         <div class="col-12 col-md-1">
           <q-btn color="primary" icon="search" no-caps class="full-width" label="Consulta" :loading="loading" @click="cargarPedidos" />
         </div>
@@ -420,7 +431,9 @@ const search = ref('')
 const tipoFiltro = ref('TODOS')
 const vendedorId = ref(null)
 const estadoFiltro = ref('TODOS')
+const clienteId = ref(null)
 const vendedoresOptions = ref([{ label: 'Todos', value: null }])
+const clienteOptions = ref([{ label: 'Todos', value: null }])
 const estadoFiltroOptions = [
   { label: 'Todos', value: 'TODOS' },
   { label: 'Creado', value: 'Creado' },
@@ -715,6 +728,7 @@ async function enviarTodos () {
     await proxy.$axios.post('/pedidos-totales/enviar-emergencia', {
       fecha: fecha.value,
       user_id: vendedorId.value,
+      cliente_id: clienteId.value,
       estado: estadoFiltro.value,
       ids: enviables.value.map(p => p.id)
     })
@@ -734,6 +748,7 @@ async function cargarPedidos () {
       params: {
         fecha: fecha.value,
         user_id: vendedorId.value,
+        cliente_id: clienteId.value,
         estado: estadoFiltro.value,
       },
     })
@@ -742,6 +757,14 @@ async function cargarPedidos () {
     vendedoresOptions.value = [
       { label: 'Todos', value: null },
       ...vendedores.map(v => ({ label: v.name, value: v.id })),
+    ]
+    const clientesMap = new Map()
+    ;(pedidos.value || []).forEach((p) => {
+      if (p?.cliente?.id) clientesMap.set(p.cliente.id, p.cliente.nombre || `Cliente ${p.cliente.id}`)
+    })
+    clienteOptions.value = [
+      { label: 'Todos', value: null },
+      ...Array.from(clientesMap.entries()).map(([id, label]) => ({ label, value: id })),
     ]
     stats.value = res.data?.stats || {
       total: 0,

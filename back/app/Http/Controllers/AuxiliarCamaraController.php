@@ -27,13 +27,13 @@ class AuxiliarCamaraController extends Controller
             'cliente_id' => 'nullable|integer|exists:clientes,id',
             'usuario_camion_id' => 'nullable|integer|exists:users,id',
             'pedido_zona_id' => 'nullable|integer|exists:pedido_zonas,id',
-            'tipo' => 'nullable|string|in:TODOS,NORMAL,POLLO,RES,CERDO',
+            'tipo' => 'nullable|string|in:TODOS,NORMAL,EMBUTIDO,HUEVO,PET,POLLO,RES,CERDO',
             'auxiliar_estado' => 'nullable|string|in:TODOS,PENDIENTE,HECHO,MODIFICADO',
             'search' => 'nullable|string|max:120',
         ]);
 
         $fecha = $data['fecha'] ?? now()->toDateString();
-        $tipo = strtoupper((string) ($data['tipo'] ?? 'NORMAL'));
+        $tipo = $this->normalizeTipo((string) ($data['tipo'] ?? 'TODOS'));
         $auxEstado = strtoupper((string) ($data['auxiliar_estado'] ?? 'TODOS'));
         $search = trim((string) ($data['search'] ?? ''));
 
@@ -46,7 +46,7 @@ class AuxiliarCamaraController extends Controller
                 'zona:id,nombre,color,orden',
                 'venta:id,total,estado',
                 'detalles:id,pedido_id,producto_id,cantidad,precio,total,observacion_detalle,detalle_extra',
-                'detalles.producto:id,codigo,nombre,tipo,imagen,codigo_unidad',
+                'detalles.producto:id,codigo,nombre,tipo,imagen,codigo_unidad,peso_estimado',
             ])
             ->where('tipo_pedido', 'REALIZAR_PEDIDO')
             ->where('estado', 'Enviado')
@@ -141,6 +141,12 @@ class AuxiliarCamaraController extends Controller
                     'color' => $pedido->zona?->color ?? '#9e9e9e',
                 ],
                 'detalles' => $pedido->detalles->map(function (PedidoDetalle $detalle) {
+                    $pesoEstimado = $this->extractPesoEstimado($detalle);
+                    $observacion = trim((string) ($detalle->observacion_detalle ?? ''));
+                    if ($observacion === '') {
+                        $extraObs = $detalle->detalle_extra['observacion'] ?? null;
+                        $observacion = is_string($extraObs) ? trim($extraObs) : '';
+                    }
                     return [
                         'id' => $detalle->id,
                         'producto_id' => $detalle->producto_id,
@@ -148,9 +154,10 @@ class AuxiliarCamaraController extends Controller
                         'producto' => $detalle->producto?->nombre,
                         'tipo' => strtoupper((string) ($detalle->producto?->tipo ?? 'NORMAL')),
                         'codigo_unidad' => strtoupper((string) ($detalle->producto?->codigo_unidad ?? '')),
-                        'observacion_detalle' => $detalle->observacion_detalle,
+                        'observacion_detalle' => $observacion !== '' ? $observacion : null,
                         'detalle_extra' => $detalle->detalle_extra,
                         'imagen' => $detalle->producto?->imagen,
+                        'peso_estimado' => $pesoEstimado,
                         'cantidad' => (float) $detalle->cantidad,
                         'precio' => (float) $detalle->precio,
                         'total' => (float) $detalle->total,
@@ -187,6 +194,7 @@ class AuxiliarCamaraController extends Controller
             'detalles.*.id' => 'required_with:detalles|integer|exists:pedido_detalles,id',
             'detalles.*.cantidad' => 'required_with:detalles|numeric|min:0',
             'detalles.*.precio' => 'nullable|numeric|min:0',
+            'detalles.*.peso_estimado' => 'nullable|numeric|min:0',
         ]);
 
         $generarVenta = (bool) ($data['generar_venta'] ?? true);
@@ -207,13 +215,35 @@ class AuxiliarCamaraController extends Controller
                     $newPrecio = array_key_exists('precio', $map[$detalle->id]) && $map[$detalle->id]['precio'] !== null
                         ? (float) $map[$detalle->id]['precio']
                         : (float) $detalle->precio;
+                    $oldPeso = $this->extractPesoEstimado($detalle);
+                    $newPeso = array_key_exists('peso_estimado', $map[$detalle->id])
+                        ? (float) ($map[$detalle->id]['peso_estimado'] ?? 0)
+                        : $oldPeso;
+                    if ($newPeso <= 0) {
+                        $newPeso = null;
+                    }
                     if ($newCant < 0) {
                         abort(422, 'Cantidad invalida');
                     }
-                    if (abs((float) $detalle->cantidad - $newCant) > 0.0001 || abs((float) $detalle->precio - $newPrecio) > 0.0001) {
+                    $factorPeso = $newPeso !== null ? $newPeso : 1.0;
+                    $newTotal = round($newCant * $newPrecio * $factorPeso, 3);
+                    $hasPesoChange = ($newPeso === null && $oldPeso !== null) || ($newPeso !== null && abs($newPeso - $oldPeso) > 0.0001);
+                    if (
+                        abs((float) $detalle->cantidad - $newCant) > 0.0001 ||
+                        abs((float) $detalle->precio - $newPrecio) > 0.0001 ||
+                        $hasPesoChange ||
+                        abs((float) $detalle->total - $newTotal) > 0.0001
+                    ) {
+                        $extra = is_array($detalle->detalle_extra) ? $detalle->detalle_extra : [];
+                        if ($newPeso !== null) {
+                            $extra['peso_estimado'] = $newPeso;
+                        } else {
+                            unset($extra['peso_estimado']);
+                        }
                         $detalle->cantidad = $newCant;
                         $detalle->precio = $newPrecio;
-                        $detalle->total = round($newCant * (float) $detalle->precio, 3);
+                        $detalle->total = $newTotal;
+                        $detalle->detalle_extra = $extra;
                         $detalle->save();
                         $updated = true;
                     }
@@ -463,6 +493,7 @@ class AuxiliarCamaraController extends Controller
             $cantidad = (float) $detalle->cantidad;
             if ($cantidad <= 0) continue;
             $precio = (float) $detalle->precio;
+            $precioConPeso = $precio * $this->extractPesoEstimado($detalle);
             $nombre = (string) ($detalle->producto?->nombre ?? 'Producto');
             $tipo = $this->normalizeTipo($detalle->producto?->tipo);
 
@@ -471,7 +502,7 @@ class AuxiliarCamaraController extends Controller
                     ventaId: (int) $venta->id,
                     productoId: (int) $detalle->producto_id,
                     cantidad: $cantidad,
-                    precio: $precio,
+                    precio: $precioConPeso,
                     nombreProducto: $nombre
                 );
                 continue;
@@ -481,10 +512,10 @@ class AuxiliarCamaraController extends Controller
                 'venta_id' => $venta->id,
                 'producto_id' => $detalle->producto_id,
                 'cantidad' => $cantidad,
-                'precio' => $precio,
+                'precio' => $precioConPeso,
                 'nombre' => $nombre,
             ]);
-            $total += ($cantidad * $precio);
+            $total += ($cantidad * $precioConPeso);
         }
 
         $venta->total = round($total, 3);
@@ -589,7 +620,21 @@ class AuxiliarCamaraController extends Controller
 
     private function normalizeTipo(?string $tipo): string
     {
-        return strtoupper((string) ($tipo ?? 'NORMAL'));
+        $value = strtoupper(trim((string) ($tipo ?? 'NORMAL')));
+        if ($value === 'TODOS') return 'TODOS';
+        if ($value === 'NORMAL' || $value === 'EMBUTIDO') return 'NORMAL';
+        return $value !== '' ? $value : 'NORMAL';
+    }
+
+    private function extractPesoEstimado(PedidoDetalle $detalle): float
+    {
+        $fromExtra = is_array($detalle->detalle_extra) ? ($detalle->detalle_extra['peso_estimado'] ?? null) : null;
+        $peso = is_numeric($fromExtra) ? (float) $fromExtra : 0.0;
+        if ($peso > 0) return $peso;
+
+        $fromProduct = $detalle->producto?->peso_estimado ?? null;
+        $pesoProducto = is_numeric($fromProduct) ? (float) $fromProduct : 0.0;
+        return $pesoProducto > 0 ? $pesoProducto : 1.0;
     }
 
     private function toJpegBinary(string $fullPath): ?string

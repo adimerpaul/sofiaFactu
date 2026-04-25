@@ -17,6 +17,7 @@ class PedidoTotalesController extends Controller
         $data = $request->validate([
             'fecha' => 'nullable|date',
             'user_id' => 'nullable|integer|exists:users,id',
+            'cliente_id' => 'nullable|integer|exists:clientes,id',
             'estado' => 'nullable|string|in:TODOS,Creado,Pendiente,Enviado,Aceptado,Anulado',
         ]);
 
@@ -29,6 +30,9 @@ class PedidoTotalesController extends Controller
             ->whereDate('fecha', $fecha)
             ->when(!empty($data['user_id']), function ($q) use ($data) {
                 $q->where('user_id', (int) $data['user_id']);
+            })
+            ->when(!empty($data['cliente_id']), function ($q) use ($data) {
+                $q->where('cliente_id', (int) $data['cliente_id']);
             })
             ->when($estado !== 'TODOS', function ($q) use ($estado) {
                 $q->where('estado', $estado);
@@ -76,6 +80,7 @@ class PedidoTotalesController extends Controller
         $data = $request->validate([
             'fecha' => 'nullable|date',
             'user_id' => 'nullable|integer|exists:users,id',
+            'cliente_id' => 'nullable|integer|exists:clientes,id',
             'estado' => 'nullable|string|in:TODOS,Creado,Pendiente',
             'ids' => 'nullable|array',
             'ids.*' => 'integer|exists:pedidos,id',
@@ -91,6 +96,9 @@ class PedidoTotalesController extends Controller
             ->whereIn('estado', $this->estadosEditables)
             ->when(!empty($data['user_id']), function ($q) use ($data) {
                 $q->where('user_id', (int) $data['user_id']);
+            })
+            ->when(!empty($data['cliente_id']), function ($q) use ($data) {
+                $q->where('cliente_id', (int) $data['cliente_id']);
             })
             ->when($estado !== 'TODOS', function ($q) use ($estado) {
                 $q->where('estado', $estado);

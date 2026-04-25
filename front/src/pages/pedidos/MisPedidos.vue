@@ -56,6 +56,17 @@
         </div>
         <div class="col-12 col-md-3">
           <q-select
+            v-model="clienteId"
+            dense
+            outlined
+            emit-value
+            map-options
+            :options="clienteOptions"
+            label="Filtrar cliente"
+          />
+        </div>
+        <div class="col-12 col-md-3">
+          <q-select
             v-model="tipoFiltro"
             dense
             outlined
@@ -382,6 +393,7 @@ const sendingAll = ref(false)
 const saving = ref(false)
 const search = ref('')
 const tipoFiltro = ref('TODOS')
+const clienteId = ref(null)
 
 const pedidos = ref([])
 const stats = ref({ total: 0, creado: 0, pendiente: 0, enviado: 0 })
@@ -422,6 +434,13 @@ const tipoFiltroOptions = [
 ]
 
 const enviables = computed(() => pedidos.value.filter(p => isEditable(p)))
+const clienteOptions = computed(() => {
+  const map = new Map()
+  pedidos.value.forEach((p) => {
+    if (p?.cliente?.id) map.set(p.cliente.id, p.cliente.nombre || `Cliente ${p.cliente.id}`)
+  })
+  return [{ label: 'Todos', value: null }, ...Array.from(map.entries()).map(([id, label]) => ({ label, value: id }))]
+})
 const totalEdit = computed(() => editForm.value.productos.reduce((acc, p) => acc + (Number(p.cantidad || 0) * Number(p.precio || 0)), 0))
 const totalView = computed(() => (viewPedido.value?.detalles || []).reduce((acc, d) => acc + (Number(d.cantidad || 0) * Number(d.precio || 0)), 0))
 const detalleTipoLabel = computed(() => detalleTipo.value === 'RES' ? 'Res' : detalleTipo.value === 'CERDO' ? 'Cerdo' : detalleTipo.value === 'POLLO' ? 'Pollo' : 'Normal')
@@ -429,6 +448,8 @@ const detalleTipoLabel = computed(() => detalleTipo.value === 'RES' ? 'Res' : de
 const pedidosFiltrados = computed(() => {
   const term = search.value.trim().toLowerCase()
   return pedidos.value.filter((p) => {
+    const cumpleCliente = clienteId.value === null || Number(p?.cliente?.id) === Number(clienteId.value)
+    if (!cumpleCliente) return false
     const cumpleTipo = tipoFiltro.value === 'TODOS' || pedidoTipos(p).includes(tipoFiltro.value)
     if (!cumpleTipo) return false
     if (!term) return true
@@ -689,7 +710,7 @@ async function exportarReporteTipo (tipo) {
 async function cargarPedidos () {
   loading.value = true
   try {
-    const res = await proxy.$axios.get('/mis-pedidos', { params: { fecha: fecha.value } })
+    const res = await proxy.$axios.get('/mis-pedidos', { params: { fecha: fecha.value, cliente_id: clienteId.value } })
     pedidos.value = res.data?.data || []
     stats.value = res.data?.stats || { total: 0, creado: 0, pendiente: 0, enviado: 0 }
   } catch (e) {

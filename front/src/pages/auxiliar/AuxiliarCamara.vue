@@ -151,6 +151,9 @@
                       <q-chip dense square size="sm" color="indigo" text-color="white">
                         Bs {{ Number(getEditPrecio(pedido.id, props.row) || 0).toFixed(2) }}
                       </q-chip>
+                      <q-chip dense square size="sm" color="grey-8" text-color="white">
+                        Peso {{ Number(getEditPesoEstimado(pedido.id, props.row) || 1).toFixed(3) }}
+                      </q-chip>
                     </div>
                     <div class="row items-center q-gutter-xs">
                       <span class="text-weight-medium">{{ props.row.producto || '-' }}</span>
@@ -158,8 +161,8 @@
                         {{ tipoLabel(props.row.tipo) }}
                       </q-chip>
                     </div>
-                    <div v-if="props.row.observacion_detalle" class="text-caption text-grey-7 q-mt-xs">
-                      Comentario: {{ props.row.observacion_detalle }}
+                    <div v-if="getDetalleComentario(props.row)" class="text-caption text-grey-7 q-mt-xs">
+                      Comentario: {{ getDetalleComentario(props.row) }}
                     </div>
                   </div>
                 </q-td>
@@ -188,6 +191,24 @@
                     :disabled="isLocked(pedido)"
                     @input="(e) => setEditPrecio(pedido.id, props.row.id, e.target.value)"
                   />
+                </q-td>
+              </template>
+              <template #body-cell-peso_estimado="props">
+                <q-td :props="props">
+                  <input
+                    :value="getEditPesoEstimado(pedido.id, props.row)"
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    class="edit-input-native"
+                    :disabled="isLocked(pedido)"
+                    @input="(e) => setEditPesoEstimado(pedido.id, props.row.id, e.target.value)"
+                  />
+                </q-td>
+              </template>
+              <template #body-cell-total="props">
+                <q-td :props="props">
+                  {{ Number(lineTotal(pedido.id, props.row)).toFixed(2) }}
                 </q-td>
               </template>
             </q-table>
@@ -258,24 +279,28 @@ const rows = ref([])
 const stats = ref({})
 const editCantidad = ref({})
 const editPrecio = ref({})
+const editPesoEstimado = ref({})
 const observacionesAux = ref({})
 const unlocked = ref({})
 
 const search = ref('')
-const tipo = ref('NORMAL')
+const tipo = ref('TODOS')
 const auxiliarEstado = ref('TODOS')
 const clienteId = ref(null)
 const vendedorId = ref(null)
 const camionId = ref(null)
 const zonaId = ref(null)
 
-const tipoOptions = [
-  { label: 'Todos', value: 'TODOS' },
-  { label: 'Normal', value: 'NORMAL' },
-  { label: 'Pollo', value: 'POLLO' },
-  { label: 'Res', value: 'RES' },
-  { label: 'Cerdo', value: 'CERDO' },
-]
+const tipoOptions = computed(() => {
+  const base = Array.isArray(proxy?.$tiposProducto) && proxy.$tiposProducto.length
+    ? proxy.$tiposProducto
+    : ['embutido', 'huevo', 'pet', 'pollo', 'cerdo', 'res']
+  const unique = [...new Set(base.map(t => normalizeTipo(t)).filter(Boolean))]
+  return [
+    { label: 'Todos', value: 'TODOS' },
+    ...unique.map(value => ({ label: tipoLabel(value), value })),
+  ]
+})
 const auxEstadoOptions = [
   { label: 'Todos', value: 'TODOS' },
   { label: 'Pendiente', value: 'PENDIENTE' },
@@ -286,6 +311,7 @@ const auxEstadoOptions = [
 const detalleColumns = [
   { name: 'cantidad', label: 'Cantidad', field: 'cantidad', align: 'left' },
   { name: 'precio', label: 'Precio', field: row => Number(row.precio || 0).toFixed(2), align: 'right' },
+  { name: 'peso_estimado', label: 'Peso est.', field: row => Number(row.peso_estimado || 1).toFixed(3), align: 'right' },
   { name: 'total', label: 'Subtotal', field: row => Number(row.total || 0).toFixed(2), align: 'right' },
   { name: 'imagen', label: 'Img', field: 'imagen', align: 'left' },
   { name: 'codigo', label: 'Codigo', field: 'codigo', align: 'left' },
@@ -339,20 +365,30 @@ function chipEstadoColor (estado) {
   return 'orange'
 }
 
+function normalizeTipo (tipoValue) {
+  const value = String(tipoValue || 'EMBUTIDO').trim().toUpperCase()
+  if (!value || value === 'NORMAL') return 'EMBUTIDO'
+  return value
+}
+
 function tipoColor (tipo) {
-  const value = String(tipo || 'NORMAL').trim().toUpperCase()
+  const value = normalizeTipo(tipo)
+  if (value === 'HUEVO') return 'amber-8'
+  if (value === 'PET') return 'blue-grey'
   if (value === 'POLLO') return 'orange'
   if (value === 'RES') return 'red'
   if (value === 'CERDO') return 'brown'
-  return 'blue-grey'
+  return 'green-7'
 }
 
 function tipoLabel (tipo) {
-  const value = String(tipo || 'NORMAL').trim().toUpperCase()
+  const value = normalizeTipo(tipo)
+  if (value === 'HUEVO') return 'Huevo'
+  if (value === 'PET') return 'Pet'
   if (value === 'POLLO') return 'Pollo'
   if (value === 'RES') return 'Res'
   if (value === 'CERDO') return 'Cerdo'
-  return 'Normal'
+  return 'Embutido'
 }
 
 function unidadLabel (codigoUnidad) {
@@ -372,18 +408,23 @@ function unidadColor (codigoUnidad) {
 function syncEditMaps () {
   const nextQty = {}
   const nextPrecio = {}
+  const nextPeso = {}
   const nextObs = {}
   rows.value.forEach((pedido) => {
     nextQty[pedido.id] = {}
     nextPrecio[pedido.id] = {}
+    nextPeso[pedido.id] = {}
     ;(pedido.detalles || []).forEach((d) => {
       nextQty[pedido.id][d.id] = d.cantidad
       nextPrecio[pedido.id][d.id] = d.precio
+      const peso = Number(d.peso_estimado)
+      nextPeso[pedido.id][d.id] = Number.isFinite(peso) && peso > 0 ? peso : 1
     })
     nextObs[pedido.id] = pedido.auxiliar_observacion || ''
   })
   editCantidad.value = nextQty
   editPrecio.value = nextPrecio
+  editPesoEstimado.value = nextPeso
   observacionesAux.value = nextObs
   unlocked.value = {}
 }
@@ -408,6 +449,34 @@ function setEditPrecio (pedidoId, detalleId, value) {
   editPrecio.value[pedidoId][detalleId] = Number.isFinite(num) && num >= 0 ? num : 0
 }
 
+function getEditPesoEstimado (pedidoId, detalle) {
+  const edited = editPesoEstimado.value?.[pedidoId]?.[detalle.id]
+  if (edited !== undefined && edited !== null && edited !== '') return edited
+  const fromRow = Number(detalle.peso_estimado)
+  return Number.isFinite(fromRow) && fromRow > 0 ? fromRow : 1
+}
+
+function setEditPesoEstimado (pedidoId, detalleId, value) {
+  if (!editPesoEstimado.value[pedidoId]) editPesoEstimado.value[pedidoId] = {}
+  const num = Number(value)
+  editPesoEstimado.value[pedidoId][detalleId] = Number.isFinite(num) && num > 0 ? num : 1
+}
+
+function lineTotal (pedidoId, detalle) {
+  const cantidad = Number(getEditCantidad(pedidoId, detalle) || 0)
+  const precio = Number(getEditPrecio(pedidoId, detalle) || 0)
+  const peso = Number(getEditPesoEstimado(pedidoId, detalle) || 1)
+  return cantidad * precio * (peso > 0 ? peso : 1)
+}
+
+function getDetalleComentario (detalle) {
+  const directo = String(detalle?.observacion_detalle || '').trim()
+  if (directo) return directo
+  const extra = detalle?.detalle_extra
+  const fromExtra = typeof extra === 'object' && extra !== null ? String(extra.observacion || '').trim() : ''
+  return fromExtra
+}
+
 function isLocked (pedido) {
   return !!pedido?.venta_generada && !unlocked.value[pedido.id]
 }
@@ -422,7 +491,7 @@ function habilitarEdicion (pedido) {
 function getRequestFilters () {
   return {
     fecha: fecha.value,
-    tipo: tipo.value,
+    tipo: tipo.value === 'TODOS' ? undefined : normalizeTipo(tipo.value),
     auxiliar_estado: auxiliarEstado.value,
     cliente_id: clienteId.value,
     vendedor_id: vendedorId.value,
@@ -454,6 +523,7 @@ async function procesarPedido (pedido, generarVenta) {
       id: d.id,
       cantidad: Number(getEditCantidad(pedido.id, d)),
       precio: Number(getEditPrecio(pedido.id, d)),
+      peso_estimado: Number(getEditPesoEstimado(pedido.id, d) || 1),
     }))
     await proxy.$axios.put(`/auxiliar-camara/pedidos/${pedido.id}/procesar`, {
       generar_venta: generarVenta,

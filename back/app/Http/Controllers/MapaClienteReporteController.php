@@ -20,14 +20,27 @@ class MapaClienteReporteController extends Controller
                 'user:id,name',
                 'usuarioCamion:id,name,placa',
                 'zona:id,nombre,color',
-                'detalles.producto:id,codigo,nombre,imagen',
+                'detalles.producto:id,codigo,nombre,imagen,tipo',
             ]);
         $this->applyFilters($query, $filters);
+
+        $tiposSeleccionados = $this->resolveTiposReportePedidos($filters);
 
         $pedidos = $query
             ->orderBy('hora')
             ->orderBy('id')
-            ->get();
+            ->get()
+            ->map(function (Pedido $pedido) use ($tiposSeleccionados) {
+                $pedido->setRelation('detalles', $pedido->detalles
+                    ->filter(function ($detalle) use ($tiposSeleccionados) {
+                        $tipo = $this->normalizeTipoProductoReporte($detalle->producto?->tipo);
+                        return in_array($tipo, $tiposSeleccionados, true);
+                    })
+                    ->values());
+                return $pedido;
+            })
+            ->filter(fn (Pedido $pedido) => $pedido->detalles->isNotEmpty())
+            ->values();
 
         if ($pedidos->isEmpty()) {
             return response()->json(['message' => 'No hay pedidos para los filtros seleccionados'], 404);
@@ -138,12 +151,15 @@ class MapaClienteReporteController extends Controller
             'vendedor_id' => 'nullable|integer|exists:users,id',
             'usuario_camion_id' => ($requireCamion ? 'required' : 'nullable') . '|integer|exists:users,id',
             'pedido_zona_id' => 'nullable|integer|exists:pedido_zonas,id',
-            'tipo' => 'nullable|string|in:TODOS,NORMAL,POLLO,RES,CERDO',
+            'tipo' => 'nullable|string|in:TODOS,NORMAL,EMBUTIDO,HUEVO,PET,POLLO,RES,CERDO',
+            'tipos' => 'nullable|array',
+            'tipos.*' => 'string|in:NORMAL,EMBUTIDO,HUEVO,PET,POLLO,RES,CERDO',
         ];
 
         $data = $request->validate($rules);
         $data['fecha'] = $data['fecha'] ?? now()->toDateString();
         $data['tipo'] = strtoupper((string) ($data['tipo'] ?? 'TODOS'));
+        $data['tipos'] = $data['tipos'] ?? [];
         return $data;
     }
 
@@ -163,7 +179,7 @@ class MapaClienteReporteController extends Controller
                 $q->where('usuario_camion_id', (int) $filters['usuario_camion_id']);
             })
             ->when(($filters['tipo'] ?? 'TODOS') !== 'TODOS', function (Builder $q) use ($filters) {
-                if ($filters['tipo'] === 'NORMAL') {
+                if (in_array($filters['tipo'], ['NORMAL', 'EMBUTIDO'], true)) {
                     $q->where('contiene_normal', true);
                 }
                 if ($filters['tipo'] === 'POLLO') {
@@ -178,6 +194,31 @@ class MapaClienteReporteController extends Controller
             });
     }
 
+    private function resolveTiposReportePedidos(array $filters): array
+    {
+        $requested = collect($filters['tipos'] ?? [])
+            ->map(fn ($tipo) => $this->normalizeTipoProductoReporte($tipo))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($requested->isEmpty()) {
+            return ['EMBUTIDO', 'HUEVO', 'PET'];
+        }
+
+        return $requested->all();
+    }
+
+    private function normalizeTipoProductoReporte(?string $tipo): string
+    {
+        $value = strtoupper(trim((string) ($tipo ?? 'EMBUTIDO')));
+        if ($value === '' || $value === 'NORMAL') return 'EMBUTIDO';
+        if (in_array($value, ['EMBUTIDO', 'HUEVO', 'PET', 'POLLO', 'CERDO', 'RES'], true)) {
+            return $value;
+        }
+        return 'EMBUTIDO';
+    }
+
     private function authorizeMapaAccess(Request $request): void
     {
         $user = $request->user();
@@ -188,4 +229,3 @@ class MapaClienteReporteController extends Controller
         abort_unless($isAdmin || $canMapa, 403, 'No autorizado');
     }
 }
-

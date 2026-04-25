@@ -14,7 +14,7 @@
         <div class="col-12 col-md-2">
           <q-btn-dropdown color="primary" icon="print" label="Reportes" no-caps class="full-width">
             <q-list>
-              <q-item clickable v-close-popup @click="exportarReportePedidos">
+              <q-item clickable v-close-popup @click="openReportePedidosDialog">
                 <q-item-section avatar><q-icon name="description" /></q-item-section>
                 <q-item-section>Reporte pedidos</q-item-section>
               </q-item>
@@ -188,7 +188,7 @@
         <div class="col-12 col-md-3">
           <q-btn-dropdown color="primary" icon="print" label="Reportes" no-caps class="full-width">
             <q-list>
-              <q-item clickable v-close-popup @click="exportarReportePedidos">
+              <q-item clickable v-close-popup @click="openReportePedidosDialog">
                 <q-item-section avatar><q-icon name="description" /></q-item-section>
                 <q-item-section>Reporte pedidos</q-item-section>
               </q-item>
@@ -286,6 +286,36 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="dialogReportePedidosTipos">
+      <q-card style="width: 440px; max-width: 96vw;">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">Reporte pedidos por tipo</div>
+          <q-space />
+          <q-btn flat round dense icon="close" v-close-popup />
+        </q-card-section>
+        <q-card-section>
+          <q-option-group
+            v-model="reporteTiposSeleccionados"
+            :options="reporteTipoOptions"
+            type="checkbox"
+            color="primary"
+          />
+          <div class="row q-col-gutter-sm q-mt-sm">
+            <div class="col-12 col-md-6">
+              <q-btn flat dense no-caps color="grey-8" label="Marcar sugeridos" class="full-width" @click="marcarTiposSugeridos" />
+            </div>
+            <div class="col-12 col-md-6">
+              <q-btn flat dense no-caps color="grey-8" label="Marcar todos" class="full-width" @click="marcarTodosLosTiposReporte" />
+            </div>
+          </div>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat color="grey-8" no-caps label="Cancelar" v-close-popup />
+          <q-btn color="primary" no-caps label="Generar" :loading="loadingReport" @click="exportarReportePedidosConTipos" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -311,9 +341,13 @@ const assigning = ref(false)
 const loadingReport = ref(false)
 const dialogAsignar = ref(false)
 const dialogReporteZona = ref(false)
+const dialogReportePedidosTipos = ref(false)
 const zonaFiltroTabla = ref('TODAS')
 const vendedorFiltroTabla = ref('TODOS')
 const reporteZonaCamionId = ref(null)
+const reporteTiposSugeridos = ['EMBUTIDO', 'HUEVO', 'PET']
+const reporteTiposTodos = ['EMBUTIDO', 'HUEVO', 'PET', 'POLLO', 'CERDO', 'RES']
+const reporteTiposSeleccionados = ref([...reporteTiposSugeridos])
 const tipoMapa = ref(5)
 
 const rows = ref([])
@@ -342,6 +376,15 @@ const tipoOptions = [
   { label: 'Pollo', value: 'POLLO' },
   { label: 'Res', value: 'RES' },
   { label: 'Cerdo', value: 'CERDO' },
+]
+
+const reporteTipoOptions = [
+  { label: 'Embutido', value: 'EMBUTIDO' },
+  { label: 'Huevo', value: 'HUEVO' },
+  { label: 'Pet', value: 'PET' },
+  { label: 'Pollo', value: 'POLLO' },
+  { label: 'Cerdo', value: 'CERDO' },
+  { label: 'Res', value: 'RES' },
 ]
 
 const columns = [
@@ -794,12 +837,31 @@ async function descargarPdf (url, params, defaultFileName) {
   }
 }
 
-async function exportarReportePedidos () {
+function marcarTiposSugeridos () {
+  reporteTiposSeleccionados.value = [...reporteTiposSugeridos]
+}
+
+function marcarTodosLosTiposReporte () {
+  reporteTiposSeleccionados.value = [...reporteTiposTodos]
+}
+
+function openReportePedidosDialog () {
+  marcarTiposSugeridos()
+  dialogReportePedidosTipos.value = true
+}
+
+async function exportarReportePedidosConTipos () {
+  const tipos = Array.from(new Set((reporteTiposSeleccionados.value || []).map(t => String(t || '').toUpperCase()).filter(Boolean)))
+  if (tipos.length === 0) {
+    proxy.$alert.error('Debe seleccionar al menos un tipo')
+    return
+  }
   await descargarPdf(
     '/mapa-clientes/reportes/pedidos',
-    baseReportParams(),
+    { ...baseReportParams(), tipos, tipo: 'TODOS' },
     `reporte_pedidos_${fecha.value}.pdf`,
   )
+  dialogReportePedidosTipos.value = false
 }
 
 async function exportarReporteZonaVehiculo () {

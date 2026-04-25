@@ -99,6 +99,12 @@
         <div class="col-12 col-md-2">
           <q-chip color="teal" text-color="white">Seleccionados: {{ selectedRows.length }}</q-chip>
         </div>
+        <div v-if="zonaSeleccionRapida.nombre" class="col-12 col-md-4">
+          <q-chip square color="deep-purple-7" text-color="white" class="q-mr-sm">
+            Zona clic: {{ zonaSeleccionRapida.nombre }} ({{ zonaSeleccionRapida.total }} clientes)
+          </q-chip>
+          <q-btn flat dense no-caps color="grey-8" icon="close" label="Limpiar seleccion zona" @click="limpiarSeleccionZonaRapida" />
+        </div>
       </q-card-section>
 
       <q-table
@@ -317,6 +323,7 @@ const vendedores = ref([])
 const camiones = ref([])
 const zonas = ref([])
 const poligonos = ref([])
+const zonaSeleccionRapida = ref({ nombre: '', total: 0, poligonoId: null })
 
 const asignacion = ref({
   usuario_camion_id: null,
@@ -620,7 +627,60 @@ function renderPolygons () {
         <div><b>Zona:</b> ${poligono.pedido_zona?.nombre || '-'}</div>
       </div>
     `, { sticky: true })
+
+    layer.on('click', () => {
+      seleccionarClientesPorPoligono(poligono, latlngs)
+    })
   })
+}
+
+function pointInPolygon (lat, lng, latlngs) {
+  // Ray-casting algorithm on lng/lat plane.
+  let inside = false
+  for (let i = 0, j = latlngs.length - 1; i < latlngs.length; j = i++) {
+    const yi = latlngs[i][0]
+    const xi = latlngs[i][1]
+    const yj = latlngs[j][0]
+    const xj = latlngs[j][1]
+
+    const intersects = ((yi > lat) !== (yj > lat)) &&
+      (lng < ((xj - xi) * (lat - yi)) / ((yj - yi) || 1e-12) + xi)
+
+    if (intersects) inside = !inside
+  }
+  return inside
+}
+
+function seleccionarClientesPorPoligono (poligono, latlngs) {
+  if (!Array.isArray(latlngs) || latlngs.length < 3) return
+
+  const candidatos = rows.value.filter((row) => {
+    const lat = Number(row.latitud)
+    const lng = Number(row.longitud)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false
+    return pointInPolygon(lat, lng, latlngs)
+  })
+
+  if (candidatos.length === 0) {
+    proxy.$alert.error('No se encontraron clientes dentro de esta zona')
+    return
+  }
+
+  const zonaNombre = poligono?.pedido_zona?.nombre || poligono?.nombre || 'ZONA'
+  const coincideZona = zonaFiltroOptions.value.some(z => z.value === zonaNombre)
+  zonaFiltroTabla.value = coincideZona ? zonaNombre : 'TODAS'
+  selectedRows.value = [...candidatos]
+  zonaSeleccionRapida.value = {
+    nombre: zonaNombre,
+    total: candidatos.length,
+    poligonoId: poligono?.id ?? null,
+  }
+  renderMarkers()
+}
+
+function limpiarSeleccionZonaRapida () {
+  zonaSeleccionRapida.value = { nombre: '', total: 0, poligonoId: null }
+  selectedRows.value = []
 }
 
 function focusRow (row) {
@@ -650,6 +710,7 @@ async function loadData () {
     poligonos.value = Array.isArray(res.data?.poligonos) ? res.data.poligonos : []
     stats.value = res.data?.stats || {}
     selectedRows.value = []
+    zonaSeleccionRapida.value = { nombre: '', total: 0, poligonoId: null }
     renderPolygons()
     renderMarkers()
     await refreshMapLayout()
@@ -783,6 +844,9 @@ watch(dialogAsignar, (open) => {
 
 watch([zonaFiltroTabla, vendedorFiltroTabla], () => {
   selectedRows.value = selectedRows.value.filter((s) => rowsFiltradasTabla.value.some((r) => r.id === s.id))
+  if (selectedRows.value.length === 0) {
+    zonaSeleccionRapida.value = { nombre: '', total: 0, poligonoId: null }
+  }
   renderMarkers()
 })
 

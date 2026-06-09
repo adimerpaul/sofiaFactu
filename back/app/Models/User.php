@@ -66,7 +66,6 @@ class User extends Authenticatable implements Auditable{
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'clave' => 'encrypted',
             'es_camion' => 'boolean',
             'fecha_nacimiento' => 'date',
             'acceso_emp' => 'boolean',

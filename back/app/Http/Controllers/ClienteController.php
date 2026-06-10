@@ -276,7 +276,7 @@ class ClienteController extends Controller
             'puede_credito' => $optionalBool,
 
             'fotos' => [$presence, 'array', 'max:3'],
-            'fotos.*' => ['image', 'max:5120'],
+            'fotos.*' => ['image', 'max:20120'],
             'remove_fotos' => [$presence, 'array'],
             'remove_fotos.*' => ['string'],
         ];

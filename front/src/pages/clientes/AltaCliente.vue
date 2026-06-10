@@ -355,19 +355,47 @@ export default {
         this.setLatLng(pos.coords.latitude, pos.coords.longitude, true)
       }, () => this.$alert.error('No se pudo obtener ubicacion'))
     },
-    onFotosChange (e) {
+    toWebP (file) {
+      return new Promise(resolve => {
+        const img = new Image()
+        const url = URL.createObjectURL(file)
+        img.onload = () => {
+          const MAX = 800
+          let w = img.naturalWidth
+          let h = img.naturalHeight
+          if (w > MAX || h > MAX) {
+            if (w >= h) { h = Math.round(h * MAX / w); w = MAX }
+            else { w = Math.round(w * MAX / h); h = MAX }
+          }
+          const canvas = document.createElement('canvas')
+          canvas.width = w
+          canvas.height = h
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+          URL.revokeObjectURL(url)
+          canvas.toBlob(blob => {
+            const name = file.name.replace(/\.[^.]+$/, '.webp')
+            resolve(new File([blob], name, { type: 'image/webp' }))
+          }, 'image/webp', 0.82)
+        }
+        img.src = url
+      })
+    },
+    async onFotosChange (e) {
       const files = Array.from(e.target.files || [])
       const existingCount = this.previewFotos.length
       const available = Math.max(0, 3 - existingCount)
       const selected = files.slice(0, available)
+      e.target.value = ''
 
-      selected.forEach(f => {
+      const converted = await Promise.all(selected.map(f => this.toWebP(f)))
+
+      converted.forEach(f => {
         f.__preview = URL.createObjectURL(f)
         this.previewFotos.push(f.__preview)
       })
 
       const current = this.cliente.fotos_files || []
-      this.cliente.fotos_files = [...current, ...selected]
+      this.cliente.fotos_files = [...current, ...converted]
     },
     removeFoto (index) {
       const current = this.previewFotos[index]
